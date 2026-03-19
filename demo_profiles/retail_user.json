@@ -1,0 +1,78 @@
+{
+    "wallet": "0x3Bd196Ab866cB99251AcC4b62722cF0BdC5A4c13",
+    "intent": "Retail User",
+    "resumen_ejecutivo": {
+        "tipo_usuario": "Inversor Minorista",
+        "actividad": "Media",
+        "riesgo": "Medio",
+        "exploracion": "Media"
+    },
+    "scores": {
+        "activity_score": {
+            "valor": 45,
+            "interpretacion": "Actividad mensual paulatina, sin operaciones de alta frecuencia."
+        },
+        "risk_score": {
+            "valor": 40,
+            "interpretacion": "Riesgo moderado, exposición a algunos tokens especulativos."
+        },
+        "defi_engagement": {
+            "valor": 30,
+            "interpretacion": "Uso esporádico de exchanges descentralizados."
+        },
+        "token_diversity": {
+            "valor": 55,
+            "interpretacion": "Portafolio equilibrado entre tokens mayores."
+        },
+        "protocol_exploration": {
+            "valor": 35,
+            "interpretacion": "Baja exploración, suele limitarse a los contratos estándar."
+        },
+        "web3_activity_index": {
+            "valor": 42,
+            "interpretacion": "Usuario Retail de Criptomonedas Estándar."
+        }
+    },
+    "features": {
+        "total_transacciones": 120,
+        "frecuencia_transacciones_por_dia": 0.5,
+        "volumen_total_transferido_eth": 5.4,
+        "numero_wallets_interactuadas": 25,
+        "balance_eth_actual": 0.8,
+        "tokens_unicos_utilizados": 8,
+        "token_mas_utilizado": "USDT",
+        "diversidad_tokens": 0.45,
+        "transferencias_token_total": 300,
+        "ratio_envios_vs_recepciones": 0.8,
+        "porcentaje_transacciones_recientes": 40.0,
+        "interacciones_contratos": 45,
+        "porcentaje_interacciones_contratos": 37.5,
+        "transacciones_con_error": 8,
+        "dias_activo": 240
+    },
+    "perfil": {
+        "tipo": "retail_user",
+        "confianza": "alta",
+        "score_confianza": 0.88,
+        "senales": [
+            "Depósitos desde CEX",
+            "Swaps puntuales en Uniswap",
+            "Hold puro de activos"
+        ],
+        "descripcion": "Usuario de uso personal que interactúa periódicamente para ahorro e intercambios sencillos."
+    },
+    "insight_ia": {
+        "analisis": "El usuario refleja las operaciones clásicas de un 'holder', recibiendo fondos desde Binance/Coinbase y almacenándolos.",
+        "comportamiento": "Interacciona ocasionalmente en pares mayores dentro de DEXes como Uniswap.",
+        "riesgos": "Posibilidad de caer en rugs debido a su poca profundidad de investigación on-chain.",
+        "oportunidades": "Incentivos de ahorro de bajo riesgo (lending rates básicos).",
+        "hipotesis_usuario": "Individuo con capital pequeño/mediano utilizándolo como ahorro o inversión de largo plazo.",
+        "modelo_utilizado": "Mistral-7B (Demo Mode)"
+    },
+    "decision_agente": {
+        "decision": "MONITOR",
+        "confidence": 0.85,
+        "reason": "Métricas de Actividad y Riesgo equilibradas. No se ejecuta simulación, el agente opta por iniciar vigilancia proactiva de comportamiento futuro."
+    },
+    "simulacion_transaccion": null
+}

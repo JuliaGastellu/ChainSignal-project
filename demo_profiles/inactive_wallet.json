@@ -1,0 +1,78 @@
+{
+    "wallet": "0x0000000000000000000000000000000000000000",
+    "intent": "Inactive/Dead",
+    "resumen_ejecutivo": {
+        "tipo_usuario": "Wallet Inactiva",
+        "actividad": "Baja",
+        "riesgo": "Alto",
+        "exploracion": "Baja"
+    },
+    "scores": {
+        "activity_score": {
+            "valor": 5,
+            "interpretacion": "Nula actividad o abandonada."
+        },
+        "risk_score": {
+            "valor": 85,
+            "interpretacion": "Riesgo alto debido a perfil inerte y posibles firmas fantasma."
+        },
+        "defi_engagement": {
+            "valor": 0,
+            "interpretacion": "Ausencia de participación ecosistémica."
+        },
+        "token_diversity": {
+            "valor": 5,
+            "interpretacion": "Solo retiene airdrops o polvo (dust)."
+        },
+        "protocol_exploration": {
+            "valor": 5,
+            "interpretacion": "Nula expansión hacia contratos externos."
+        },
+        "web3_activity_index": {
+            "valor": 10,
+            "interpretacion": "Perfil Muerto o de Quemado."
+        }
+    },
+    "features": {
+        "total_transacciones": 12,
+        "frecuencia_transacciones_por_dia": 0.01,
+        "volumen_total_transferido_eth": 0.05,
+        "numero_wallets_interactuadas": 2,
+        "balance_eth_actual": 0.001,
+        "tokens_unicos_utilizados": 2,
+        "token_mas_utilizado": "SHIB",
+        "diversidad_tokens": 0.1,
+        "transferencias_token_total": 15,
+        "ratio_envios_vs_recepciones": 0.1,
+        "porcentaje_transacciones_recientes": 0.0,
+        "interacciones_contratos": 2,
+        "porcentaje_interacciones_contratos": 16.6,
+        "transacciones_con_error": 5,
+        "dias_activo": 1200
+    },
+    "perfil": {
+        "tipo": "inactive",
+        "confianza": "muy_alta",
+        "score_confianza": 0.99,
+        "senales": [
+            "Sin transacciones en 1 año",
+            "Alto ratio de fail",
+            "Balance ínfimo"
+        ],
+        "descripcion": "Dirección abandonada o utilizada estrictamente para almacenamiento frío de mínimo valor."
+    },
+    "insight_ia": {
+        "analisis": "La ausencia de firmas y el bajo balance consolidan el dictamen de una cuenta 'dust' inerte.",
+        "comportamiento": "Sin registros de transacciones entrantes o salientes en meses. La red no observa movimiento.",
+        "riesgos": "Posibilidad alta de que sea una cartera generada para farming de airdrops que luego fue descartada.",
+        "oportunidades": "Ninguna observable bajo la perspectiva de riesgo-beneficio.",
+        "hipotesis_usuario": "Cuenta bloqueada, llaves perdidas, o dirección basurero descartable de un cluster de bots.",
+        "modelo_utilizado": "Mistral-7B (Demo Mode)"
+    },
+    "decision_agente": {
+        "decision": "NO_ACTION",
+        "confidence": 0.99,
+        "reason": "La actividad es sumamente Baja y el Riesgo de legitimidad es Alto. Agente AI deniega operar bajo estas condiciones ineficientes y bloquea el perfil."
+    },
+    "simulacion_transaccion": null
+}

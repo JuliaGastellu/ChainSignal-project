@@ -1,0 +1,130 @@
+{
+  "contratos": [
+    {
+      "timestamp": "2026-03-10T13:41:05.294937",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-10T13:41:58.545504",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T10:33:47.828234",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T10:37:07.570937",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEAD",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T10:42:13.721358",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEAD",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T10:42:22.577779",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T11:09:16.359119",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T11:09:50.508973",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEAD",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T11:11:30.163045",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T11:12:03.849370",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEAD",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T11:16:26.284676",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T11:17:01.323303",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEAD",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T13:53:04.787046",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T13:53:09.632520",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEAD",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T18:38:51.711034",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T18:39:08.602594",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEAD",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T18:42:19.123369",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-19T18:42:29.120269",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEAD",
+      "transaction_hash": "0xHASH"
+    }
+  ]
+}

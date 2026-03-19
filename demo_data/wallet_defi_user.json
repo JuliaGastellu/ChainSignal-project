@@ -1,0 +1,44 @@
+{
+    "wallet": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+    "intent": "Staking & DeFi",
+    "scores": {
+        "activity_score": { "valor": 85, "interpretacion": "Actividad muy alta. Perfil intensivo." },
+        "risk_score": { "valor": 15, "interpretacion": "Muy bajo riesgo. Perfil conservador." },
+        "defi_engagement": { "valor": 92, "interpretacion": "Totalmente inmerso en protocolos DeFi/Smart Contracts." },
+        "token_diversity": { "valor": 65, "interpretacion": "Diversidad media de tokens." },
+        "protocol_exploration": { "valor": 78, "interpretacion": "Explorador activo de la red." },
+        "web3_activity_index": { "valor": 82, "interpretacion": "Usuario Nativo Web3 avanzado o institucional." }
+    },
+    "features": {
+        "total_transacciones": 450,
+        "frecuencia_transacciones_por_dia": 2.5,
+        "volumen_total_transferido_eth": 125.4,
+        "numero_wallets_interactuadas": 45,
+        "balance_eth_actual": 12.5,
+        "tokens_unicos_utilizados": 12,
+        "token_mas_utilizado": "WETH",
+        "diversidad_tokens": 0.75,
+        "transferencias_token_total": 1200,
+        "ratio_envios_vs_recepciones": 1.2,
+        "porcentaje_transacciones_recientes": 85.0,
+        "interacciones_contratos": 380,
+        "porcentaje_interacciones_contratos": 84.4,
+        "transacciones_con_error": 5,
+        "dias_activo": 180
+    },
+    "perfil": {
+        "tipo": "defi_user",
+        "confianza": "alta",
+        "score_confianza": 0.95,
+        "senales": ["Uso intensivo de dApps", "Múltiples aprobaciones de tokens", "Interacciones con protocolos de lending"],
+        "descripcion": "Usuario avanzado con alta exposición a protocolos DeFi y gestión activa de activos."
+    },
+    "insight_ia": {
+        "analisis": "Perfil DeFi de alto nivel con interacciones constantes en protocolos de liquidez y lending.",
+        "comportamiento": "Muestra patrones de yield farming y gestión de colateral en diversas dApps.",
+        "riesgos": "Exposición a múltiples smart contracts; requiere vigilancia de permisos (allowances).",
+        "oportunidades": "Optimización de estrategias de staking líquido y participación en gobernanza.",
+        "hipotesis_usuario": "Inversor institucional o ballena DeFi que maximiza el rendimiento de sus activos on-chain.",
+        "modelo_utilizado": "Mistral-7B (Demo Mode)"
+    }
+}

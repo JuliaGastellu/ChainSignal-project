@@ -1,0 +1,83 @@
+{
+    "wallet": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+    "intent": "DeFi Power User",
+    "resumen_ejecutivo": {
+        "tipo_usuario": "Ballena DeFi",
+        "actividad": "Alta",
+        "riesgo": "Bajo",
+        "exploracion": "Alta"
+    },
+    "scores": {
+        "activity_score": {
+            "valor": 95,
+            "interpretacion": "Actividad masiva y constante en la red."
+        },
+        "risk_score": {
+            "valor": 12,
+            "interpretacion": "Bajo riesgo (historico estable y sin rechazos)."
+        },
+        "defi_engagement": {
+            "valor": 98,
+            "interpretacion": "Interacción profunda con protocolos nativos."
+        },
+        "token_diversity": {
+            "valor": 85,
+            "interpretacion": "Portafolio altamente diversificado."
+        },
+        "protocol_exploration": {
+            "valor": 90,
+            "interpretacion": "Early adopter de nuevos contratos."
+        },
+        "web3_activity_index": {
+            "valor": 92,
+            "interpretacion": "Súper Usuario Web3."
+        }
+    },
+    "features": {
+        "total_transacciones": 1500,
+        "frecuencia_transacciones_por_dia": 5.2,
+        "volumen_total_transferido_eth": 450.5,
+        "numero_wallets_interactuadas": 120,
+        "balance_eth_actual": 45.2,
+        "tokens_unicos_utilizados": 35,
+        "token_mas_utilizado": "USDC",
+        "diversidad_tokens": 0.85,
+        "transferencias_token_total": 4500,
+        "ratio_envios_vs_recepciones": 1.1,
+        "porcentaje_transacciones_recientes": 90.0,
+        "interacciones_contratos": 1200,
+        "porcentaje_interacciones_contratos": 80.0,
+        "transacciones_con_error": 12,
+        "dias_activo": 365
+    },
+    "perfil": {
+        "tipo": "defi_whale",
+        "confianza": "muy_alta",
+        "score_confianza": 0.98,
+        "senales": [
+            "Alto volumen TVL",
+            "Interacciones diarias con LP",
+            "Gobernanza activa"
+        ],
+        "descripcion": "Usuario de alto volumen e interacción profunda con protocolos de finanzas descentralizadas."
+    },
+    "insight_ia": {
+        "analisis": "El usuario presenta un nivel operativo avanzado, moviendo grandes volúmenes de capital a través de docenas de smart contracts.",
+        "comportamiento": "Patrón claro de 'Yield Farmer': deposita ETH/USDC en bóvedas y retira rendimientos semanalmente.",
+        "riesgos": "Mitigados. Demuestra conocimiento profundo de los protocolos que utiliza.",
+        "oportunidades": "Ideal para estrategias automatizadas de provisión de liquidez algorítmica concentrada.",
+        "hipotesis_usuario": "Fondo institucional de inversión o individuo de alto capital buscando rendimientos de bajo riesgo.",
+        "modelo_utilizado": "Mistral-7B (Demo Mode)"
+    },
+    "decision_agente": {
+        "decision": "SIMULATE_TRADE",
+        "confidence": 0.95,
+        "reason": "La wallet presenta actividad Alta y Riesgo Bajo. El agente sugiere ejecutar un comercio simulado de yield-farming para acaparar rendimiento."
+    },
+    "simulacion_transaccion": {
+        "tx_simulada": "0xsim_742d35Cc6634C0532925a3b844Bc454e4438f44e",
+        "monto": 4.52,
+        "red": "Ethereum Mainnet",
+        "status": "SUCCESS_SIMULATION"
+    }
+}

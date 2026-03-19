@@ -1,0 +1,14 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+openclaw>=0.1.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+loguru>=0.7.2
+pydantic>=2.7.0
+pytest>=8.2.0
+jinja2
+httpx
+python-multipart
+web3>=6.0.0
+eth-account>=0.8.0
+py-solc-x>=2.0.2
