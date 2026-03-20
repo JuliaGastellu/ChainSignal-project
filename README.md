@@ -1,91 +1,75 @@
-# ChainSignal: Agente Económico Autónomo de Inteligencia On-Chain
+﻿# ChainSignal Autonomous On-Chain Agent
 
-ChainSignal es un agente autónomo determinista que analiza el comportamiento on-chain, genera decisiones estructuradas y ejecuta estrategias de mitigación directamente en la cadena mediante una billetera autocustodial a través de Tether WDK.
+ChainSignal is an autonomous deterministic agent that analyzes on-chain wallet behavior, generates structured mitigation insights, and executes protective operations through the Tether Wallet Development Kit (WDK).
 
-Utiliza el **Tether Wallet Development Kit (WDK)** para interactuar con la red Ethereum (Sepolia), integrando capacidades avanzadas de Account Abstraction (ERC-4337), swaps estratégicos vía Velora y orquestación de smart contracts mediante LLMs.
+## Architecture Overview
 
-## Arquitectura del Proyecto
+The system is organized as follows:
 
-El sistema opera bajo una arquitectura de microservicios coordinada por un núcleo de inteligencia en Python:
+1. Data ingestion and feature extraction from Etherscan.
+2. Behavioral profiling and risk scoring.
+3. Deterministic decision engine that outputs explicit actions.
+4. Agent orchestration for contract generation/execution.
+5. Execution gateway through WDK and ERC-4337.
 
-1.  **Ingesta y Análisis**: Extracción de features on-chain y clasificación conductual de carteras.
-2.  **Motor de Decisión**: Evaluación de riesgos y determinación de acciones de protección.
-3.  **Orquestación de Agente**: Generación de lógica en Solidity y gestión de ciclo de vida de contratos.
-4.  **Capa de Ejecución (WDK)**: Interfaz con la blockchain mediante un servicio especializado en Node.js.
+## Technology Stack
 
-## Stack Tecnológico
+- Python 3.x (FastAPI, Web3.py, HTTPX)
+- Node.js (WDK gateway service)
+- Tether WDK for wallet orchestration and ERC-4337
+- SSE frontend for real-time progress updates
 
--   **Backend**: Python 3.x (FastAPI, Web3.py, HTTPX, OpenClaw opcional).
--   **Blockchain Gateway**: Node.js (Tether WDK Protocol, Ethers.js).
--   **Infraestructura Web3**: 
-    -   **Tether WDK**: Gestión de wallets y transacciones.
-    -   **ERC-4337**: Soporte nativo para Account Abstraction (transacciones sin gas/bundlers).
-    -   **Velora**: Protocolo de swap para mitigación en USD₮.
--   **Seguridad**: Verificación de firmas y límites de capital dinámicos por confianza.
+## Setup
 
-## Configuración del Entorno
+Install dependencies:
 
-1.  **Dependencias Python**:
-    ```bash
-    pip install -r requirements.txt
-    ```
-2.  **Dependencias WDK**:
-    ```bash
-    cd wdk_service
-    npm install
-    ```
-3.  **Variables de Entorno** (`.env`):
-    -   `ETHERSCAN_API_KEY`: Acceso a datos históricos.
-    -   `SEPOLIA_RPC_URL`: Conectividad con la red.
-    -   `AGENT_SEED_PHRASE`: Llave maestra del agente.
-    -   `WDK_BUNDLER_URL` / `WDK_PAYMASTER_URL`: Configuración para ERC-4337.
+```bash
+pip install -r requirements.txt
+cd wdk_service && npm install
+```
 
-## Modos de Operación
+Set required environment variables:
 
--   **Modo Producción (Live)**: Requiere el microservicio WDK activo en el puerto 3001. El agente ejecuta transacciones reales.
--   **Modo Simulación**: Activado automáticamente ante la ausencia del servicio WDK, permitiendo pruebas de flujo sin consumo de gas real.
+- APP_ENV (production/local)
+- ETHERSCAN_API_KEY
+- SEPOLIA_RPC_URL
+- AGENT_SEED_PHRASE
+- WDK_BUNDLER_URL
+- WDK_PAYMASTER_URL
 
-## Ejecución del Sistema
+## Run
 
-### Mediante Docker (Recomendado)
+Production:
+
 ```bash
 docker-compose up --build
 ```
 
-### Ejecución Manual
-```bash
-# Iniciar servicio WDK
-cd wdk_service && node server.js
+Local run:
 
-# Iniciar API de Inteligencia
+```bash
+cd wdk_service && node server.js
 python -m uvicorn api.main:app --host 0.0.0.0 --port 8001
 ```
 
-## Estructura de Documentación
+## API Documentation
 
--   [ARCHITECTURE.md](ARCHITECTURE.md): Detalle técnico del pipeline de datos y flujos de decisión.
--   [test_wdk_swap.py](tests/test_wdk_swap.py): Script de validación para la lógica de intercambio y conectividad WDK.
--   API docs: https://chainsignal-project.onrender.com/docs
+- https://chainsignal-project.onrender.com/docs
 
-## Execution Modes & Reliability
+## API and UI
 
-This project supports explicit simulation and production modes. Use `APP_ENV=production` for live execution. For local development, simulation mode provides deterministic behavior without real wallet transactions.
+The FastAPI backend provides:
 
-## Deterministic Decision System
+- `GET /` for landing page
+- `GET /ejecutar-agente/{wallet}` as SSE for agent execution updates
+- API docs at `https://chainsignal-project.onrender.com/docs`
 
-ChainSignal uses a deterministic decision engine based on defined risk thresholds, activity scores, and configured strategy rules. The engine outputs explicit decisions (`DATOS_INSUFICIENTES`, `MONITOR`, `EXECUTE_BASIC`, `EXECUTE_ADVANCED`) and does not rely on hidden randomness.
+The UI is served via FastAPI from `web_app/app.py` and uses SSE to display real-time progress.
 
-## Safety Guarantees
+## Operational Modes
 
-The system enforces guardrails in the API flow and WDK execution service. On invalid inputs or low confidence, no contract actions are executed. Simulation mode is clearly signaled in API responses and logs.
-
-## Path to Production
-
-1. Set `APP_ENV=production`.
-2. Provide valid `ETHERSCAN_API_KEY` and `SEPOLIA_RPC_URL`.
-3. Ensure WDK service is available and active.
-4. Run API and verify health endpoints.
-5. Use the audit logs and decision trace for governance.
+- Production mode (`APP_ENV=production`) executes real blockchain operations.
+- Simulation mode runs deterministic flows without real on-chain transactions.
 
 ## Production Mode Requirements
 
@@ -93,3 +77,23 @@ The system enforces guardrails in the API flow and WDK execution service. On inv
 - [ ] WDK active and reachable
 - [ ] Bundler configured
 - [ ] Paymaster configured
+
+## Decision System
+
+The deterministic decision engine returns explicit outputs:
+
+- `DATOS_INSUFICIENTES` (insufficient data)
+- `MONITOR`
+- `EXECUTE_BASIC`
+- `EXECUTE_ADVANCED`
+
+## Safety Guarantees
+
+- Invalid wallet inputs are rejected.
+- Execution only occurs when risk and confidence thresholds are met.
+- Simulation mode is explicitly indicated.
+
+## References
+
+- ARCHITECTURE.md
+- AGENT_DESIGN.md

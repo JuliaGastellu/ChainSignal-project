@@ -1,16 +1,16 @@
-# Diseño del Agente ChainSignal
+﻿# ChainSignal Agent Design
 
-Este documento describe el diseño del agente autónomo y la migración de lógica de LLM hacia un motor determinista + OpenClaw opcional.
+This document describes the ChainSignal autonomous agent design and the migration from LLM-driven logic to a deterministic core with optional OpenClaw orchestration.
 
-## Principios de diseño
+## Design Principles
 
-- Entrada estructurada (métricas, perfil)
-- Salida estructurada (`InsightContrato`)
-- Paso a paso determinista para transparencia y reproducibilidad
-- Compatibilidad total con el pipeline de WDK y herramientas existentes
-- Modo OpenClaw opcional cuando está disponible
+- Structured input (metrics, wallet profile)
+- Structured output (`InsightContrato`)
+- Deterministic step-by-step processing for transparency and reproducibility
+- Full compatibility with the WDK pipeline and existing tools
+- Optional OpenClaw mode when available
 
-## Modelo de insight estructurado
+## Structured Insight Model
 
 `InsightContrato` (domain/modelos_contrato.py):
 
@@ -20,29 +20,29 @@ Este documento describe el diseño del agente autónomo y la migración de lógi
 - `score_actividad`: int
 - `accion_recomendada`: str
 
-## Flujo de análisis
+## Analysis Flow
 
-1. Se extraen métricas on-chain (`ExtractorFeatures`) y se clasifica el perfil (`ClasificadorWallet`).
-2. `AgenteAnalisis.analizar()` crea insight determinista:
-   - Calcula risk/actividad con reglas heurísticas
-   - Selecciona tipo de contrato
-   - Sugiere acción
-3. DecisionEngine evalúa si ejecutar (`EXECUTE_ADVANCED`, `EXECUTE_BASIC`, etc.).
-4. Si se requiere operación avanzada, `AgenteChainSignal` orquesta generar/compilar/desplegar/leer usando herramientas WDK.
+1. On-chain metrics are extracted (`ExtractorFeatures`) and wallet profile is classified (`ClasificadorWallet`).
+2. `AgenteAnalisis.analizar()` creates a deterministic insight:
+   - Computes risk/activity using heuristic rules
+   - Selects contract type
+   - Recommends action
+3. `DecisionEngine` evaluates execution level (`EXECUTE_ADVANCED`, `EXECUTE_BASIC`, etc.).
+4. If advanced operations are required, `AgenteChainSignal` orchestrates contract generation, compilation, deployment, and state reads using WDK tools.
 
 ## OpenClaw
 
-- Si `OPENCLAW_ENABLED=true` y OpenClaw está instalado, el agente inicializa client OpenClaw.
-- El flujo determinista no depende de modelo externo y sigue funcionando sin OpenClaw.
-- OpenClaw se usa como capa de orquestación potencial para registrar tasks futuros.
+- If `OPENCLAW_ENABLED=true` and OpenClaw is installed, the agent initializes an OpenClaw client.
+- The deterministic core does not depend on external models and continues to operate without OpenClaw.
+- OpenClaw is used as an orchestration layer to track future tasks.
 
-## Dependencias eliminadas
+## Removed Dependencies
 
-Se removió la dependencia a LLM local (LM Studio) en `agente_ia/agente.py`.
-El sistema no depende de endpoints `/chat/completions`.
+The local LLM dependency (LM Studio) was removed from `agente_ia/agente.py`.
+The system does not rely on `/chat/completions` endpoints.
 
-## Compatibilidad con tests y pipeline
+## Test and Pipeline Compatibility
 
-- Se mantienen todos los endpoints y formatos de resultados.
-- Se mantuvo la integración con `services/servicio_wdk.py` y `tools/*`.
-- Las pruebas existentes pasan con la nueva lógica.
+- API endpoints and result formats remain compatible.
+- Integration with `services/servicio_wdk.py` and `tools/*` is preserved.
+- Existing tests pass with the deterministic logic.

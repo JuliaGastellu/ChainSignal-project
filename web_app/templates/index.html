@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -13,14 +13,12 @@
 <body>
     <div class="loading-overlay" id="loader">
         <div class="spinner"></div>
-        <p style="font-weight: 600; color: var(--primary-light)">EJECUTANDO AGENTE EN SEPOLIA</p>
-    </div>
-
+        <p style="font-weight: 600; color: var(--primary-light)">RUNNING CHAIN SIGNAL AGENT</p>
     <div class="container">
         <header style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
             <p
                 style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
-                Sistema de Inteligencia On-Chain</p>
+                On-Chain Intelligence System</p>
             <h1 style="font-size: 1.5rem; opacity: 0.8;">ChainSignal <span
                     style="font-size: 0.7rem; vertical-align: middle; background: var(--border); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; margin-left: 10px; font-weight: 500;">SEPOLIA
                     LIVE</span></h1>
@@ -33,14 +31,13 @@
 
         <section class="search-section" style="margin-bottom: 48px;">
             <div class="search-box" style="max-width: 600px; margin: 0 auto;">
-                <input type="text" id="walletInput" placeholder="Dirección de la wallet (0x...)"
+                <input type="text" id="walletInput" placeholder="Wallet address (0x...)"
                     value="{{ wallet or '' }}" required>
                 <button onclick="iniciarAnalisis()">Analyze</button>
             </div>
             <div style="margin-top: 16px; text-align: center;">
                 <button onclick="fillWallet('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')"
-                    style="background: transparent; border: none; color: var(--primary-light); font-size: 0.75rem; cursor: pointer; text-decoration: underline;">Probar
-                    con wallet demo</button>
+                    style="background: transparent; border: none; color: var(--primary-light); font-size: 0.75rem; cursor: pointer; text-decoration: underline;">Use demo wallet</button>
             </div>
         </section>
 
@@ -189,7 +186,7 @@
 
             if (eventSource) eventSource.close();
 
-            eventSource = new EventSource(`${API_URL}/ejecutar-agente/${wallet}`);
+            eventSource = new EventSource(`${API_URL}/run-agent/${wallet}`);
 
             eventSource.onmessage = function (event) {
                 const data = JSON.parse(event.data);

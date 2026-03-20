@@ -23,18 +23,18 @@ from decision_engine.engine import DecisionEngine
 
 
 @asynccontextmanager
-async def vida_util(app: FastAPI):
-    """Inicialización y limpieza de recursos al arrancar la API."""
-    logger.info("Iniciando ChainSignal API...")
+async def lifespan(app: FastAPI):
+    """Initialize and clean up resources during API lifespan."""
+    logger.info("Starting ChainSignal API...")
     yield
-    logger.info("Cerrando ChainSignal API...")
+    logger.info("Shutting down ChainSignal API...")
 
 
 app = FastAPI(
     title="ChainSignal API",
-    description="Sistema de inteligencia conductual on-chain para wallets de Ethereum.",
+    description="On-chain behavioral intelligence system for Ethereum wallets.",
     version="0.2.0",
-    lifespan=vida_util,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -59,14 +59,15 @@ def obtener_agente() -> AgenteAnalisis:
     return _agente
 
 
+@app.get("/health", summary="Service health check")
 @app.get("/salud", summary="Service health check")
-def salud():
+def health():
     """Service health check endpoint."""
-    return {"estado": "ok", "servicio": "ChainSignal API", "version": "0.2.0"}
+    return {"status": "ok", "service": "ChainSignal API", "version": "0.2.0"}
 
 
 @app.get("/report/{wallet_address}", summary="Protected analysis report")
-def obtener_reporte(wallet_address: str, request: Request):
+def get_report(wallet_address: str, request: Request):
     """Protected report endpoint via x402 challenge and payment flow."""
     x402 = GatewayX402()
     valido, motivo = x402.verificar_acceso({k.lower(): v for k, v in request.headers.items()})
@@ -106,8 +107,9 @@ def obtener_reporte(wallet_address: str, request: Request):
         })
 
 
+@app.get("/run-agent/{wallet}", summary="Run agent analysis stream")
 @app.get("/ejecutar-agente/{wallet}", summary="Run agent analysis stream")
-async def ejecutar_agente_stream(wallet: str):
+async def run_agent_stream(wallet: str):
     """
     Runs the full agent pipeline with real-time SSE event streaming.
     """
