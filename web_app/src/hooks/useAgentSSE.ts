@@ -98,6 +98,14 @@ export function useAgentSSE() {
             const activity = Number(payload.activity ?? payload.score_actividad ?? payload.activity_score);
             if (!Number.isNaN(risk)) nextResults.risk_score = risk;
             if (!Number.isNaN(activity)) nextResults.activity_score = activity;
+
+            // Fallback parse from detail text "Riesgo: X, Actividad: Y"
+            const regex = /Riesgo:\s*(\d+).*Actividad:\s*(\d+)/i;
+            const match = regex.exec(detalle);
+            if (match) {
+              nextResults.risk_score = Number(match[1]);
+              nextResults.activity_score = Number(match[2]);
+            }
           }
 
           if (paso === "clasificando_perfil" || paso === "classifying_profile") {
@@ -111,7 +119,10 @@ export function useAgentSSE() {
             if (typeof data.data === "object" && data.data !== null) {
               const insightData = data.data as Record<string, unknown>;
               const parts: string[] = [];
-              if (typeof insightData.tipo === "string") parts.push(`Tipo: ${insightData.tipo}`);
+              if (typeof insightData.tipo === "string") {
+                parts.push(`Tipo: ${insightData.tipo}`);
+                if (!nextResults.contract_type) nextResults.contract_type = insightData.tipo;
+              }
               if (typeof insightData.accion_recomendada === "string")
                 parts.push(`Acción: ${insightData.accion_recomendada}`);
               if (parts.length) nextResults.insight = parts.join(" · ");
@@ -152,7 +163,25 @@ export function useAgentSSE() {
               if (!nextResults.contract_type && typeof payload.tipo_contrato === "string") {
                 nextResults.contract_type = payload.tipo_contrato;
               }
+              if (!nextResults.risk_score && typeof payload.risk === "number") {
+                nextResults.risk_score = payload.risk;
+              }
+              if (!nextResults.activity_score && typeof payload.activity === "number") {
+                nextResults.activity_score = payload.activity;
+              }
             }
+          // Fallback parse for detail text
+          const riskMatch = /Riesgo:\s*(\d+)/i.exec(detalle);
+          const activityMatch = /Actividad:\s*(\d+)/i.exec(detalle);
+          if (riskMatch) {
+            nextResults.risk_score = Number(riskMatch[1]);
+          }
+          if (activityMatch) {
+            nextResults.activity_score = Number(activityMatch[1]);
+          }
+          if (/monitorear|monitoring/i.test(detalle)) {
+            nextResults.recommended_action = "monitorear";
+          }
 
           return nextResults;
         });

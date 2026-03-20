@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CheckCircle2, Circle, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, Circle, AlertCircle, Loader2, ArrowRight, Sparkles } from "lucide-react";
 import type { AgentEvent } from "@/hooks/useAgentSSE";
 
 interface AgentTimelineProps {
@@ -7,14 +7,32 @@ interface AgentTimelineProps {
   isStreaming: boolean;
 }
 
+const STEP_ORDER = [
+  "analizando_wallet",
+  "calculando_scores",
+  "clasificando_perfil",
+  "generando_insight",
+  "evaluando_decision",
+  "decision_final",
+  "contrato_activo",
+  "operacion_financiera",
+  "generando_contrato",
+  "compilando_contrato",
+  "deployando_contrato",
+];
+
 const STEP_LABELS: Record<string, string> = {
   analizando_wallet: "Analyzing Wallet",
   calculando_scores: "Calculating Scores",
   clasificando_perfil: "Classifying Profile",
   generando_insight: "Generating Insight",
-  decision_agente: "Agent Decision",
-  ejecutando_accion: "Executing Action",
-  resultado_final: "Final Result",
+  evaluando_decision: "Evaluating Decision",
+  decision_final: "Final Decision",
+  contrato_activo: "Contract Active",
+  operacion_financiera: "Financial Operation",
+  generando_contrato: "Generating Contract",
+  compilando_contrato: "Compiling Contract",
+  deployando_contrato: "Deploying Contract",
 };
 
 function getStepIcon(estado: string) {
@@ -27,6 +45,7 @@ function getStepIcon(estado: string) {
       return <AlertCircle className="h-4 w-4 text-destructive" />;
     case "iniciando":
     case "processing":
+    case "running":
       return <Loader2 className="h-4 w-4 text-primary animate-spin" />;
     default:
       return <Circle className="h-4 w-4 text-muted-foreground" />;
@@ -34,24 +53,37 @@ function getStepIcon(estado: string) {
 }
 
 function getStatusBadge(estado: string) {
-  const base = "text-xs font-medium px-2 py-0.5 rounded-full";
+  const base = "text-[10px] font-semibold px-2 py-0.5 rounded-full";
   switch (estado) {
     case "completado":
     case "completed":
-      return <span className={`${base} bg-risk-low/10 text-risk-low`}>Completed</span>;
+      return <span className={`${base} bg-risk-low/15 text-risk-low`}>Completed</span>;
     case "iniciando":
     case "processing":
-      return <span className={`${base} bg-primary/10 text-primary`}>Running</span>;
+    case "running":
+      return <span className={`${base} bg-primary/15 text-primary`}>Running</span>;
     case "error":
     case "failed":
-      return <span className={`${base} bg-destructive/10 text-destructive`}>Error</span>;
+      return <span className={`${base} bg-destructive/15 text-destructive`}>Error</span>;
     default:
       return <span className={`${base} bg-muted text-muted-foreground`}>{estado}</span>;
   }
 }
 
+function buildStepSummary(events: AgentEvent[]) {
+  const summary: Record<string, AgentEvent> = {};
+  for (const event of events) {
+    const key = event.paso.toLowerCase();
+    summary[key] = event; // keeps latest by same step
+  }
+  return summary;
+}
+
 export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
   if (events.length === 0) return null;
+
+  const summary = buildStepSummary(events);
+  const orderedSteps = STEP_ORDER.filter((s) => summary[s]);
 
   return (
     <motion.div
@@ -60,54 +92,51 @@ export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
       transition={{ duration: 0.3 }}
       className="w-full max-w-2xl mx-auto mt-8"
     >
-      <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">
-        Agent Execution
-      </h2>
-      <div className="relative">
-        {/* Vertical line */}
-        <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Agent Execution</h2>
+          <p className="text-xs text-muted-foreground">Stream progress with quick action states.</p>
+        </div>
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary"><Sparkles className="h-3.5 w-3.5" /> Live</span>
+      </div>
 
-        <div className="space-y-1">
-          {events.map((event, i) => (
+      <div className="bg-card border border-border rounded-xl p-3 space-y-2">
+        {orderedSteps.map((stepKey, index) => {
+          const event = summary[stepKey];
+          const label = STEP_LABELS[stepKey] || stepKey;
+          const isActive = event.estado === "iniciando" || event.estado === "processing" || event.estado === "running";
+          return (
             <motion.div
-              key={event.id}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: i * 0.05 }}
-              className="relative flex items-start gap-4 pl-6 py-2.5 rounded-lg hover:bg-secondary/30 transition-colors group"
+              key={stepKey}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: index * 0.04 }}
+              className={`rounded-lg border px-3 py-2 ${event.estado === "completado" || event.estado === "completed" ? "border-risk-low/30 bg-risk-low/5" : "border-border bg-secondary/50"}`}
             >
-              <div className="absolute left-0 top-3">
-                {getStepIcon(event.estado)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-medium text-foreground">
-                    {STEP_LABELS[event.paso] || event.paso}
-                  </span>
-                  {getStatusBadge(event.estado)}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {getStepIcon(event.estado)}
+                  <span>{label}</span>
                 </div>
-                {event.detalle && (
-                  <p className="text-xs text-muted-foreground leading-relaxed truncate">
-                    {event.detalle}
-                  </p>
+                <div>{getStatusBadge(event.estado)}</div>
+              </div>
+              <div className="mt-2 flex flex-col gap-1">
+                <p className={`text-sm ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
+                  {event.detalle || "Waiting for new update..."}
+                </p>
+                {event.data && (event.data as Record<string, unknown>).decision && (
+                  <p className="text-[11px] text-primary font-medium">Decision: {((event.data as Record<string, unknown>).decision as string)}</p>
                 )}
               </div>
-              <span className="text-xs text-muted-foreground font-mono opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                {new Date(event.timestamp).toLocaleTimeString()}
-              </span>
+              <div className="text-[11px] text-muted-foreground font-mono mt-1">{new Date(event.timestamp).toLocaleTimeString()}</div>
             </motion.div>
-          ))}
-        </div>
-
+          );
+        })}
         {isStreaming && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center gap-2 pl-6 pt-3 text-xs text-muted-foreground"
-          >
+          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin text-primary" />
-            <span>Waiting for next step...</span>
-          </motion.div>
+            <span>Processing next step...</span>
+          </div>
         )}
       </div>
     </motion.div>

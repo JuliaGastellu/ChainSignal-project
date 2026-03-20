@@ -120,12 +120,22 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
           icon={FileText}
           label="Contract Type"
           value={results.contract_type || "N/A"}
+          subtext={
+            results.contract_type
+              ? "Tipo de contrato de mitigación sugerido por el agente."
+              : "No se identificó tipo de contrato aún."
+          }
           delay={0.2}
         />
         <ScoreCard
           icon={Zap}
           label="Recommended Action"
           value={results.recommended_action || "N/A"}
+          subtext={
+            results.recommended_action
+              ? "Acción sugerida para la wallet basada en riesgo y perfil."
+              : "No se generó acción aún."
+          }
           delay={0.3}
         />
       </div>
