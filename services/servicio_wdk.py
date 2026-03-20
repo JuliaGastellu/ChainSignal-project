@@ -18,6 +18,8 @@ class ServicioWDK:
     def __init__(self):
         self._agente = WalletAgent()
         self.modo_simulacion = os.getenv("APP_ENV", "local") != "production"
+        if self.modo_simulacion:
+            logger.warning("[WARNING] WDK running in SIMULATION MODE (APP_ENV={})", os.getenv("APP_ENV", "local"))
 
     @property
     def activo(self) -> bool:

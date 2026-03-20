@@ -1,121 +1,118 @@
-# Arquitectura Técnica del Sistema ChainSignal
+# ChainSignal Technical Architecture
 
-ChainSignal es un sistema de orquestación financiera autónoma que integra análisis predictivo de comportamiento on-chain con ejecución directa mediante el Tether Wallet Development Kit (WDK). Este documento detalla la topología de componentes y el flujo de datos del sistema.
+ChainSignal is an autonomous financial orchestration system that integrates on-chain behavioral analysis with direct execution via the Tether Wallet Development Kit (WDK). This document details the component topology and data flow.
 
-## 1. Topología de Componentes
+## 1. Component Topology
 
-El ecosistema se divide en cuatro capas funcionales de alta cohesión y bajo acoplamiento:
+The ecosystem is split into four functional layers with high cohesion and low coupling:
 
-### A. Capa de Interfaz y API (Python/FastAPI)
-- **Responsabilidad**: Gestión de endpoints REST y streaming vía Server-Sent Events (SSE).
-- **Componentes**: `api/main.py`.
-- **Funcionalidad**: Orquesta las solicitudes de análisis y expone el progreso del agente en tiempo real.
+### A. Interface and API Layer (Python/FastAPI)
+- **Responsibility**: Manage REST endpoints and streaming via Server-Sent Events (SSE).
+- **Components**: `api/main.py`.
+- **Functionality**: Orchestrates analysis requests and exposes agent progress in real-time.
 
-### B. Capa de Inteligencia y Decisión (Python/OpenClaw opcional)
-- **Responsabilidad**: Análisis heurístico y determinista de datos blockchain.
-- **Componentes**:
-    - `generacion_features/`: Extracción de métricas crudas desde Etherscan.
-    - `perfil_wallet/`: Clasificación conductual (Whale, DeFi Power User, Bot, etc.).
-    - `decision_engine/`: Motor de lógica para determinar el nivel de intervención (MONITOR, EXECUTE_BASIC, EXECUTE_ADVANCED).
-- **Tecnología**: Integración con LLMs para interpretación narrativa y generación de código Solidity.
+### B. Intelligence and Decision Layer (Python/OpenClaw optional)
+- **Responsibility**: Heuristic and deterministic analysis of blockchain data.
+- **Components**:
+    - `generacion_features/`: Extract raw metrics from Etherscan.
+    - `perfil_wallet/`: Behavioral classification (Whale, DeFi Power User, Bot, etc.).
+    - `decision_engine/`: Logic engine for intervention level (MONITOR, EXECUTE_BASIC, EXECUTE_ADVANCED).
+- **Technology**: Optional LLM integration for narrative interpretation and Solidity code generation.
 
-### C. Capa de Orquestación de Agente (Python)
-- **Responsabilidad**: Gestión del ciclo de vida de operaciones on-chain.
-- **Componentes**:
-    - `agents/agente_chainsignal.py`: Orquestador principal.
-    - `strategy/`: Lógica de mitigación (Swaps a USD₮, protección de balance).
-    - `contract_generator/`: Generación y compilación dinámica de scripts de control.
+### C. Agent Orchestration Layer (Python)
+- **Responsibility**: Manage lifecycle of on-chain operations.
+- **Components**:
+    - `agents/agente_chainsignal.py`: Main orchestrator.
+    - `strategy/`: Mitigation logic (USD₮ swaps, balance protection).
+    - `contract_generator/`: Dynamic generation and compilation of control scripts.
 
-### D. Capa de Ejecución y Puerta de Enlace (Node.js/Tether WDK)
-- **Responsabilidad**: Firma de transacciones y comunicación con la red Ethereum.
-- **Componentes**: `wdk_service/server.js`.
-- **Integraciones**:
-    - **Tether WDK**: Autocustodia y manejo de activos.
-    - **ERC-4337**: Soporte de Account Abstraction para transacciones delegadas y gasless.
-    - **Velora**: Ejecución de intercambios de activos nativos por USD₮.
+### D. Execution Gateway Layer (Node.js/Tether WDK)
+- **Responsibility**: Sign transactions and interact with Ethereum network.
+- **Components**: `wdk_service/server.js`.
+- **Integrations**:
+    - **Tether WDK**: Self-custody and asset management.
+    - **ERC-4337**: Account Abstraction support for delegated and gasless transactions.
+    - **Velora**: Native asset swap execution to USD₮.
 
-## 2. Flujo de Ejecución del Pipeline
+## 2. Pipeline Execution Flow
 
 ```mermaid
 graph TD
-    A[Wallet Externa] -->|Ingesta| B(Extractor de Features)
-    B --> C(Clasificador Conductual)
+    A[External wallet] -->|Ingest| B(Feature Extractor)
+    B --> C(Behavioral Classifier)
     C --> D(Behavioral Scorer)
-    D --> E{Motor de Decisiones}
-    E -->|Riesgo Detectado| F[Agente ChainSignal]
-    F --> G(Evaluación de Estrategia)
-    G -->|Mitigación| H[Servicio WDK]
-    H -->|ERC-4337/EOA| I[Blockchain Sepolia]
-    I -->|Confirmación| J[API SSE Stream]
+    D --> E{Decision Engine}
+    E -->|Risk detected| F[ChainSignal Agent]
+    F --> G(Strategy Evaluation)
+    G -->|Mitigation| H[WDK Service]
+    H -->|ERC-4337/EOA| I[Sepolia Blockchain]
+    I -->|Confirmation| J[API SSE Stream]
 ```
 
-## 3. Gestión de Microservicios
+## 3. Microservice Management
 
-El sistema opera bajo una configuración de microservicios contenida en Docker:
+The system operates under a Docker microservice configuration:
 
--   **API de Inteligencia (8001)**: Nodo central de procesamiento.
--   **Servicio WDK (3001)**: Gateway crítico para la interacción on-chain.
--   **Frontend Web (8080)**: Visualización y monitoreo de operaciones.
+- **Intelligence API (8001)**: Core processing node.
+- **WDK Service (3001)**: Critical gateway for on-chain interaction.
+- **Web Frontend (8080)**: Visualization and operation monitoring.
 
-## 4. Estrategia de Mitigación de Riesgo
+## 4. Risk Mitigation Strategy
 
-ChainSignal prioriza la preservación de capital en **USD₮**. Ante la detección de un score de riesgo superior al umbral configurado (ej. > 80), el agente ejecuta un flujo de emergencia:
+ChainSignal prioritizes preserving capital in USD₮. When risk exceeds configured threshold (e.g. > 80), the agent executes an emergency flow:
 
-1.  **Cotización (Quote)**: Consulta de tasa de cambio vía Velora WDK.
-2.  **Swap Estratégico**: Intercambio de activos de alta volatilidad por USD₮.
-3.  **Habilitación de AA**: Uso de Smart Accounts (ERC-4337) si el balance nativo del agente es insuficiente para cubrir el gas de la operación.
-4.  **Despliegue de Gating x402**: Aplicación de licencias de acceso sobre los reportes generados (ver Sección 5).
+1. **Quote**: Query exchange rate via Velora WDK.
+2. **Strategic Swap**: Convert high-volatility assets to USD₮.
+3. **AA Enablement**: Use Smart Accounts (ERC-4337) if agent native balance is insufficient for gas.
+4. **x402 Gate**: Apply access licenses to generated reports.
 
----
+## 5. x402 Report Monetization Flow
 
-## 5. Flujo x402 — Monetización de Reportes
+The x402 protocol protects `GET /report/{wallet_address}`. Each behavioral report is a paid resource: API returns HTTP 402 challenge, client pays in USD₮ via WDK, then presents proof to receive the report.
 
-El protocolo x402 protege el endpoint `GET /report/{wallet_address}`. Cada reporte de análisis conductual es un recurso de pago: el sistema emite un desafío HTTP 402, el cliente paga en **USD₮** via el WDK, y presenta el comprobante para obtener el reporte completo.
+### Involved Components
 
-### Componentes involucrados
+- **`services/servicio_x402.py`**: Validator and gateway logic.
+- **`api/main.py` → `/report/{wallet}`**: Protected endpoint orchestration.
+- **`wdk_service/server.js`**: Payment gateway for transaction signing.
 
--   **`services/servicio_x402.py`**: Módulo central con `ValidadorX402`, `GatewayX402` y `ChallengeX402`.
--   **`api/main.py` → `/report/{wallet}`**: Endpoint protegido que orquesta el flujo.
--   **`wdk_service/server.js`**: Gateway de pago que firma la transacción en USD₮.
-
-### Diagrama de secuencia
+### Sequence Diagram
 
 ```mermaid
 sequenceDiagram
-    participant Cliente
+    participant Client
     participant API as FastAPI (8001)
     participant X402 as GatewayX402
     participant WDK as WDK Service (3001)
-    participant Chain as Blockchain Sepolia
+    participant Chain as Sepolia Blockchain
 
-    Cliente->>API: GET /report/0xWallet
-    API->>X402: verificar_acceso(headers)
-    X402-->>API: acceso=False, sin X-Payment
-    API-->>Cliente: HTTP 402 {monto, token, receptor, instrucciones}
+    Client->>API: GET /report/0xWallet
+    API->>X402: verify_access(headers)
+    X402-->>API: access=False, no X-Payment
+    API-->>Client: HTTP 402 {amount, token, recipient, instructions}
 
-    Note over Cliente,WDK: El cliente paga via WDK
-    Cliente->>WDK: POST /skills/swap/execute o transfer USD₮
-    WDK->>Chain: Transacción USD₮ firmada
-    Chain-->>WDK: tx_hash confirmado
-    WDK-->>Cliente: {hash: 0xTxHash...}
+    Note over Client,WDK: Client pays via WDK
+    Client->>WDK: POST /skills/swap/execute or transfer USD₮
+    WDK->>Chain: USD₮ transaction signed
+    Chain-->>WDK: tx_hash confirmed
+    WDK-->>Client: {hash: 0xTxHash...}
 
-    Cliente->>API: GET /report/0xWallet [X-Payment: 0xTxHash]
-    API->>X402: verificar_acceso(headers)
-    X402->>X402: validar hash (formato + anti-replay)
-    X402-->>API: acceso=True
-    API->>API: Ejecutar pipeline de análisis
-    API-->>Cliente: HTTP 200 {scores, perfil, insight, decision}
+    Client->>API: GET /report/0xWallet [X-Payment: 0xTxHash]
+    API->>X402: verify_access(headers)
+    X402->>X402: validate hash (format + anti-replay)
+    X402-->>API: access=True
+    API->>API: run analysis pipeline
+    API-->>Client: HTTP 200 {scores, profile, insight, decision}
 ```
 
-### Variables de entorno requeridas
+### Required Env Variables
 
-| Variable | Descripción | Ejemplo |
+| Variable | Description | Example |
 |---|---|---|
-| `X402_ENABLED` | Habilita/deshabilita el acceso protegido | `true` |
-| `X402_PAYMENT_RECIPIENT` | Dirección que recibe el pago | `0x...` |
-| `X402_REPORT_PRICE_USDT` | Precio del reporte en USDT (unidades enteras) | `1` |
+| `X402_ENABLED` | Enables/disables protected access | `true` |
+| `X402_PAYMENT_RECIPIENT` | Recipient address for payment | `0x...` |
+| `X402_REPORT_PRICE_USDT` | Report price in USDT | `1` |
 
-### Degradación ante falla
+### Failure Degradation
 
-Si `X402_ENABLED=false`, el endpoint retorna `HTTP 503` con un mensaje descriptivo. El sistema **no crashea** ni devuelve datos sin autorización.
-
+If `X402_ENABLED=false`, endpoint returns HTTP 503 with descriptive message. System does not crash or leak data.

@@ -1,7 +1,6 @@
-"""Agente de análisis determinista para ChainSignal.
+"""Deterministic analysis agent for ChainSignal.
 
-Genera insights estructurados de tipo InsightContrato y gestiona la orquestación
-con OpenClaw cuando está disponible.
+Generates structured InsightContrato and optionally orchestrates with OpenClaw.
 """
 
 import os
@@ -28,7 +27,7 @@ class AgenteAnalisis:
             logger.info("OpenClaw no disponible; usando agente determinista local.")
 
     def analizar(self, metrics: Any, perfil: Any) -> InsightContrato:
-        """Genera un InsightContrato estructurado sin llamadas HTTP externas."""
+        """Generates a structured InsightContrato without external HTTP calls."""
         risk = self._calcular_score_riesgo(metrics)
         activity = self._calcular_score_actividad(metrics)
         tipo = self._decidir_tipo_contrato(risk, activity, perfil)
@@ -78,23 +77,23 @@ class AgenteAnalisis:
 
     def _resolver_tipo_contrato(self, risk: int, actividad: int, perfil: Any, decision: str | None = None) -> str | None:
         """Reglas deterministas de asignación de tipo de contrato."""
-        # Regla 1: Si no hay decisión confiable, no hay contrato.
+        # Rule 1: If decision is insufficient data, do not propose contract.
         if decision == "DATOS_INSUFICIENTES":
             return None
 
-        # Regla 2: Actividad muy baja no justifica despliegue.
+        # Rule 2: Very low activity does not justify deployment.
         if actividad < 20:
             return None
 
-        # Regla 4: Riesgo alto exige mitigación de protección.
+        # Rule 4: High risk requires risk mitigation contract.
         if risk > 70:
             return "risk_guard"
 
-        # Regla 3: Treasury Manager solo con actividad alta.
+        # Rule 3: Treasury manager only at high activity.
         if actividad >= 80:
             return "treasury_manager"
 
-        # Regla general: señal pasiva para riesgo moderado.
+        # Default: passive signal contract for moderate risk.
         if 40 <= risk <= 70:
             return "signal_lock"
 
@@ -108,12 +107,12 @@ class AgenteAnalisis:
         """Sugerencia de acción principal para reportar en el insight."""
         tipo = self._resolver_tipo_contrato(risk, actividad, perfil)
         if tipo == "risk_guard":
-            return "proteger"
+            return "protect"
         if tipo == "treasury_manager":
-            return "optimizar"
+            return "optimize"
         if tipo == "signal_lock":
-            return "proteger"
-        return "monitorear"
+            return "protect"
+        return "monitor"
 
     def _orquestar_con_openclaw(self, insight: InsightContrato, metrics: Any, perfil: Any) -> None:
         """Log opcional de orquestación. No bloquea el flujo determinista."""

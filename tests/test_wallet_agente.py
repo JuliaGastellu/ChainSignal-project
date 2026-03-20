@@ -63,7 +63,7 @@ def test_decision_engine_datos_insuficientes_tipo_nulo():
 
     assert resultado["decision"] == "DATOS_INSUFICIENTES"
     assert resultado["tipo_contrato"] is None
-    assert resultado["accion_recomendada"] == "monitorear"
+    assert resultado["accion_recomendada"] == "monitor"
     assert resultado["ejecucion"] is False
 
 
@@ -78,7 +78,7 @@ def test_agente_analisis_tipo_none_por_actividad_baja():
 
     insight = agente.analizar(metrics, perfil)
     assert insight.tipo is None
-    assert insight.accion_recomendada == "monitorear"
+    assert insight.accion_recomendada == "monitor"
 
 def test_decision_engine_execute_advanced_ejecucion_true():
     from decision_engine.engine import DecisionEngine

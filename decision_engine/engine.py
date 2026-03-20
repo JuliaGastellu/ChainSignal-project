@@ -1,8 +1,8 @@
-"""Motor de decisiones determinista para el agente AI."""
+"""Deterministic decision engine for the AI agent."""
 from loguru import logger
 
 class DecisionEngine:
-    """Toma decisiones financieras basadas en scores conductuales."""
+    """Makes deterministic decisions using behavior and risk scores."""
 
     def evaluate(self, scores: dict, metrics: dict = None):
         """
@@ -38,33 +38,33 @@ class DecisionEngine:
         if tx_count < 5:
             decision = "DATOS_INSUFICIENTES"
             action_allowed = "NONE"
-            reasoning = f"actividad ({tx_count} txs) insuficiente para establecer perfil."
+            reasoning = f"activity ({tx_count} txs) insufficient to build a profile."
             tipo_contrato = None
-            accion_recomendada = "monitorear"
+            accion_recomendada = "monitor"
             ejecucion = False
         elif risk > 60:
             decision = "BLOCK"
             action_allowed = "NONE"
-            reasoning = "riesgo elevado detectado en el comportamiento de la wallet."
+            reasoning = "high-risk behavior detected in wallet activity."
             tipo_contrato = None
-            accion_recomendada = "proteger"
+            accion_recomendada = "protect"
             ejecucion = False
         elif confidence > 0.80 and activity > 70 and defi > 50:
             decision = "EXECUTE_ADVANCED"
             action_allowed = "ALL"
-            reasoning = "perfil experto con alta confianza; se permiten operaciones avanzadas."
+            reasoning = "high-confidence advanced profile; advanced operations allowed."
             ejecucion = True
 
-            # Selección de tipo de contrato determinista
+            # Deterministic contract type selection
             if risk > 70:
                 tipo_contrato = "risk_guard"
-                accion_recomendada = "proteger"
+                accion_recomendada = "protect"
             elif activity > 80:
                 tipo_contrato = "treasury_manager"
-                accion_recomendada = "optimizar"
+                accion_recomendada = "optimize"
             else:
                 tipo_contrato = "signal_lock"
-                accion_recomendada = "proteger"
+                accion_recomendada = "protect"
 
             return {
                 "decision": decision,
@@ -83,16 +83,16 @@ class DecisionEngine:
         elif confidence > 0.50:
             decision = "EXECUTE_BASIC"
             action_allowed = "TRANSFER_CALL"
-            reasoning = "perfil estable; se permiten transferencias e interacciones estándar."
+            reasoning = "stable profile; standard transfers and interactions allowed."
             tipo_contrato = None
-            accion_recomendada = "monitorear"
+            accion_recomendada = "monitor"
             ejecucion = True
         else:
             decision = "MONITOR"
             action_allowed = "NONE"
-            reasoning = "confianza insuficiente para ejecutar operaciones automáticas."
+            reasoning = "insufficient confidence for auto-execution."
             tipo_contrato = None
-            accion_recomendada = "monitorear"
+            accion_recomendada = "monitor"
             ejecucion = False
 
         return {

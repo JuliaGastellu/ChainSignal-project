@@ -13,4 +13,11 @@ templates = Jinja2Templates(directory="web_app/templates")
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     api_url = os.getenv("API_URL", "https://chainsignal-project.onrender.com")
-    return templates.TemplateResponse("index.html", {"request": request, "api_url": api_url, "wallet": "", "datos": None})
+    simulation_mode = os.getenv("APP_ENV", "local") != "production"
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "api_url": api_url,
+        "wallet": "",
+        "datos": None,
+        "simulation_mode": simulation_mode,
+    })

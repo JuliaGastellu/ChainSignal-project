@@ -1,6 +1,7 @@
-"""API REST de ChainSignal usando FastAPI."""
+"""ChainSignal REST API using FastAPI."""
 
 import json
+import os
 from contextlib import asynccontextmanager
 
 from typing import AsyncGenerator
@@ -58,15 +59,15 @@ def obtener_agente() -> AgenteAnalisis:
     return _agente
 
 
-@app.get("/salud", summary="Verificación de disponibilidad del servicio")
+@app.get("/salud", summary="Service health check")
 def salud():
-    """Retorna el estado de salud de la API."""
+    """Service health check endpoint."""
     return {"estado": "ok", "servicio": "ChainSignal API", "version": "0.2.0"}
 
 
-@app.get("/report/{wallet_address}", summary="Reporte de análisis protegido por x402")
+@app.get("/report/{wallet_address}", summary="Protected analysis report")
 def obtener_reporte(wallet_address: str, request: Request):
-    """Retorna un reporte de análisis protegido por x402 (requiere header X-Payment)."""
+    """Protected report endpoint via x402 challenge and payment flow."""
     x402 = GatewayX402()
     valido, motivo = x402.verificar_acceso({k.lower(): v for k, v in request.headers.items()})
     if not valido:
@@ -105,34 +106,42 @@ def obtener_reporte(wallet_address: str, request: Request):
         })
 
 
-@app.get("/ejecutar-agente/{wallet}")
+@app.get("/ejecutar-agente/{wallet}", summary="Run agent analysis stream")
 async def ejecutar_agente_stream(wallet: str):
     """
-    Ejecuta el pipeline completo del agente emitiendo eventos SSE en tiempo real.
+    Runs the full agent pipeline with real-time SSE event streaming.
     """
     wallet_addr = wallet.lower()
 
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
-            # Paso 1: Analizando Wallet
-            yield f'data: {json.dumps({"paso": "analizando_wallet", "estado": "iniciando", "detalle": "Obteniendo datos de Etherscan..."})}\n\n'
+            # Step 1: Validate input for invalid wallets (burn address)
+            if wallet_addr == "0x0000000000000000000000000000000000000000":
+                yield f'data: {json.dumps({"paso": "evaluando_decision", "estado": "completado", "detalle": "Decisión: DATOS_INSUFICIENTES", "data": {"decision": "DATOS_INSUFICIENTES", "confidence": 0.0, "reasoning": "La dirección de wallet es la dirección nula; no se analiza ni despliega compromiso."}})}\n\n'
+                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": "no_execution_due_to_invalid_wallet", "data": {"decision": "DATOS_INSUFICIENTES", "tipo_contrato": None, "accion_recomendada": "monitorear", "ejecucion": False, "motivo": "invalid_wallet", "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
+                return
+
+            # Step 1: Analyzing wallet
+            yield f'data: {json.dumps({"paso": "analyzing_wallet", "estado": "starting", "detalle": "Fetching data from Etherscan..."})}\n\n'
             datos_crudos = _cliente.obtener_datos_wallet(wallet_addr)
             metrics = _extractor.extraer(datos_crudos)
-            msg1 = f"Analizadas {metrics.total_transacciones} transacciones."
-            yield f'data: {json.dumps({"paso": "analizando_wallet", "estado": "completado", "detalle": msg1})}\n\n'
+            msg1 = f"Analyzed {metrics.total_transacciones} transactions."
+            yield f'data: {json.dumps({"paso": "analyzing_wallet", "estado": "completed", "detalle": msg1})}\n\n'
 
-            # Paso 2: Calculando Scores
-            yield f'data: {json.dumps({"paso": "calculando_scores", "estado": "iniciando", "detalle": "Ejecutando behavioral scoring..."})}\n\n'
+            # Step 2: Calculating scores
+            yield f'data: {json.dumps({"paso": "calculating_scores", "estado": "starting", "detalle": "Running behavioral scoring..."})}\n\n'
             scorer = BehavioralScorer()
             scores_obj = scorer.calcular_scores(metrics)
+            tx_count = metrics.total_transacciones if hasattr(metrics, "total_transacciones") else 0
+            confidence = min(1.0, tx_count / 100)
             scores_dict = {
                 "activity": scores_obj.activity_score.valor,
                 "risk": scores_obj.risk_score.valor,
                 "defi_engagement": scores_obj.defi_engagement.valor,
-                "confidence": 0.85
+                "confidence": round(confidence, 2),
             }
-            msg2 = f"Riesgo: {scores_dict['risk']}, Actividad: {scores_dict['activity']}"
-            yield f'data: {json.dumps({"paso": "calculando_scores", "estado": "completado", "detalle": msg2, "data": {"risk": scores_dict["risk"], "activity": scores_dict["activity"], "defi_engagement": scores_dict["defi_engagement"]}})}\n\n'
+            msg2 = f"Riesgo: {scores_dict['risk']}, Actividad: {scores_dict['activity']}, Confianza: {scores_dict['confidence']}"
+            yield f'data: {json.dumps({"paso": "calculando_scores", "estado": "completado", "detalle": msg2, "data": {"risk": scores_dict["risk"], "activity": scores_dict["activity"], "defi_engagement": scores_dict["defi_engagement"], "confidence": scores_dict["confidence"]}})}\n\n'
 
             # Paso 3: Clasificando Perfil
             yield f'data: {json.dumps({"paso": "clasificando_perfil", "estado": "iniciando", "detalle": "Determinando perfil de la wallet..."})}\n\n'
@@ -185,7 +194,6 @@ async def ejecutar_agente_stream(wallet: str):
                 yield f'data: {json.dumps({"paso": "estrategia_agente", "estado": "iniciando", "detalle": "Calculando mitigaciones y razonamiento táctico..."})}\n\n'
                 from strategy.estrategia_proteccion_wallet import EstrategiaProteccionWallet
                 from domain.modelos_agente import DecisionAgente
-                import os
 
                 estrategia = EstrategiaProteccionWallet()
                 decision_estrategia = estrategia.evaluar(insight_obj)
@@ -299,7 +307,7 @@ async def ejecutar_agente_stream(wallet: str):
                 ejecucion = bool(decision.get("ejecucion", decision.get("decision") in ["EXECUTE_ADVANCED", "EXECUTE_BASIC"]))
                 if decision.get("decision") == "DATOS_INSUFICIENTES":
                     detalle_final = "no_execution_due_to_low_confidence"
-                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": detalle_final, "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada"), "ejecucion": ejecucion, "motivo": motivo}})}\n\n'
+                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": detalle_final, "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada"), "ejecucion": ejecucion, "motivo": motivo, "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
 
         except Exception as e:
             logger.error(f"Error en stream: {e}")

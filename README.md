@@ -65,3 +65,31 @@ python -m uvicorn api.main:app --host 0.0.0.0 --port 8001
 
 -   [ARCHITECTURE.md](ARCHITECTURE.md): Detalle técnico del pipeline de datos y flujos de decisión.
 -   [test_wdk_swap.py](tests/test_wdk_swap.py): Script de validación para la lógica de intercambio y conectividad WDK.
+-   API docs: https://chainsignal-project.onrender.com/docs
+
+## Execution Modes & Reliability
+
+This project supports explicit simulation and production modes. Use `APP_ENV=production` for live execution. For local development, simulation mode provides deterministic behavior without real wallet transactions.
+
+## Deterministic Decision System
+
+ChainSignal uses a deterministic decision engine based on defined risk thresholds, activity scores, and configured strategy rules. The engine outputs explicit decisions (`DATOS_INSUFICIENTES`, `MONITOR`, `EXECUTE_BASIC`, `EXECUTE_ADVANCED`) and does not rely on hidden randomness.
+
+## Safety Guarantees
+
+The system enforces guardrails in the API flow and WDK execution service. On invalid inputs or low confidence, no contract actions are executed. Simulation mode is clearly signaled in API responses and logs.
+
+## Path to Production
+
+1. Set `APP_ENV=production`.
+2. Provide valid `ETHERSCAN_API_KEY` and `SEPOLIA_RPC_URL`.
+3. Ensure WDK service is available and active.
+4. Run API and verify health endpoints.
+5. Use the audit logs and decision trace for governance.
+
+## Production Mode Requirements
+
+- [ ] APP_ENV=production
+- [ ] WDK active and reachable
+- [ ] Bundler configured
+- [ ] Paymaster configured

@@ -1,4 +1,4 @@
-"""Estrategia para determinar si una wallet analizada requiere protección."""
+"""Strategy to determine if an analyzed wallet requires protection."""
 
 from strategy.modelos_estrategia import DecisionEstrategia
 from domain.modelos_contrato import InsightContrato
@@ -14,13 +14,13 @@ class EstrategiaProteccionWallet:
         self.cantidad_transferencia_wei = cantidad_transferencia_wei
 
     def evaluar(self, insight: InsightContrato) -> DecisionEstrategia:
-        """Evalúa el insight y determina la estrategia de protección.
+        """Evaluates the insight and determines protection strategy.
 
         Args:
-            insight: El contexto analizado de la wallet externa.
+            insight: The analyzed context of the external wallet.
 
         Returns:
-            DecisionEstrategia con las acciones requeridas.
+            DecisionEstrategia with required actions.
         """
         acciones = []
         requiere_contrato = False
@@ -35,38 +35,38 @@ class EstrategiaProteccionWallet:
         if insight.score_riesgo >= self.umbral_riesgo:
             requiere_contrato = True
             requiere_ejecucion = True
-            acciones.append("Desplegar contrato RiskGuard")
-            acciones.append("Ejecutar actualizarPausa() para mitigar riesgo")
-            detalle = "Riesgo alto detectado. Se requiere protección on-chain activa."
+            acciones.append("Deploy RiskGuard contract")
+            acciones.append("Execute actualizarPausa() to mitigate risk")
+            detalle = "High risk detected. Active on-chain protection required."
             
-            # Galáctica: Swap preventivo a USD₮ si el riesgo es alto
+            # Preventive swap to USD₮ for high risk
             if insight.score_riesgo >= 80:
                 requiere_swap = True
-                token_in = "ETH" # Vende ETH
-                token_out = "0xdAC17F958D2ee523a2206206994597C13D831ec7" # Compra USD₮
-                acciones.append("Ejecutar SWAP preventivo a USD₮ para proteger capital")
+                token_in = "ETH"
+                token_out = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+                acciones.append("Execute preventive swap to USD₮ to protect capital")
 
-            # Si además hay riesgo crítico, sugerir mover fondos preventivamente
+            # Critical risk: suggest moving funds to safe wallet
             if insight.score_riesgo >= 90:
                 requiere_fondos = True
-                acciones.append(f"Transferir {self.cantidad_transferencia_wei} wei para test de rescate a wallet segura")
-                detalle = "Riesgo crítico. Preparando rescate de fondos preventivo, swap a USD₮ y bloqueo on-chain."
+                acciones.append(f"Transfer {self.cantidad_transferencia_wei} wei for rescue test to secure wallet")
+                detalle = "Critical risk. Preparing preventive rescue, USD₮ swap, and on-chain lock."
 
-        # Estrategia 2: Actividad muy alta -> Treasury Manager
+        # Strategy 2: High activity -> Treasury Manager
         elif insight.score_actividad >= self.umbral_actividad_alta:
             requiere_contrato = True
             requiere_fondos = False
             requiere_ejecucion = False
-            acciones.append("Desplegar contrato TreasuryManager")
-            detalle = "Wallet altamente activa. Se requiere infraestructura de tesorería on-chain."
+            acciones.append("Deploy TreasuryManager contract")
+            detalle = "Highly active wallet. On-chain treasury infrastructure required."
             
-        # Estrategia 3: Risk Guard bajo pero sospechoso -> Signal Lock
+        # Strategy 3: Lower risk but suspicious -> Signal Lock
         elif insight.score_riesgo >= 30:
             requiere_contrato = True
             requiere_fondos = False
             requiere_ejecucion = False
-            acciones.append("Desplegar contrato SignalLock")
-            detalle = "Riesgo medio detectado. Desplegando bloqueo temporal pasivo."
+            acciones.append("Deploy SignalLock contract")
+            detalle = "Medium risk detected. Deploying temporary passive lock."
 
         return DecisionEstrategia(
             requiere_contrato=requiere_contrato,

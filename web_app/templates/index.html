@@ -17,20 +17,25 @@
     </div>
 
     <div class="container">
-        <header style="margin-bottom: 40px; border-bottom: 1px solid var(--border); padding-bottom: 20px;">
+        <header style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
             <p
                 style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
                 Sistema de Inteligencia On-Chain</p>
             <h1 style="font-size: 1.5rem; opacity: 0.8;">ChainSignal <span
                     style="font-size: 0.7rem; vertical-align: middle; background: var(--border); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; margin-left: 10px; font-weight: 500;">SEPOLIA
                     LIVE</span></h1>
+            {% if simulation_mode %}
+            <div style="margin-top: 8px; border: 1px solid #f59e0b; background: rgba(245,162,0,0.12); color: #f59e0b; padding: 8px 12px; border-radius: 10px; font-weight: 700; letter-spacing: 0.2px;">
+                Demo Mode — No real transactions executed. (APP_ENV != production)
+            </div>
+            {% endif %}
         </header>
 
         <section class="search-section" style="margin-bottom: 48px;">
             <div class="search-box" style="max-width: 600px; margin: 0 auto;">
                 <input type="text" id="walletInput" placeholder="Dirección de la wallet (0x...)"
                     value="{{ wallet or '' }}" required>
-                <button onclick="iniciarAnalisis()">Analizar</button>
+                <button onclick="iniciarAnalisis()">Analyze</button>
             </div>
             <div style="margin-top: 16px; text-align: center;">
                 <button onclick="fillWallet('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045')"
@@ -77,7 +82,7 @@
                                 <div>
                                     <h3
                                         style="margin: 0; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase;">
-                                        Decisión del Agente</h3>
+                                        Agent Decision</h3>
                                     <div id="decision-text"
                                         style="font-size: 1.8rem; font-weight: 900; margin-top: 8px;"></div>
                                 </div>
@@ -85,7 +90,7 @@
                                     <div id="decision-confidence" style="font-size: 1.2rem; font-weight: 800;">0%</div>
                                     <div
                                         style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">
-                                        Confianza</div>
+                                        Confidence</div>
                                 </div>
                             </div>
                             <p id="decision-reasoning"
@@ -96,12 +101,12 @@
                             </div>
                         </div>
 
-                        <!-- Panel de Pasos de Ejecución (SSE) -->
+                        <!-- Execution Steps (SSE) -->
                         <div id="execution-panel" class="card"
                             style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border);">
                             <h3
                                 style="margin: 0 0 20px 0; font-size: 0.85rem; color: var(--primary-light); text-transform: uppercase; letter-spacing: 1px;">
-                                Ejecución en Tiempo Real</h3>
+                                Real-Time Execution</h3>
                             <div id="steps-list" style="display: flex; flex-direction: column; gap: 12px;">
                                 <!-- Los pasos aparecerán aquí -->
                             </div>
@@ -139,14 +144,14 @@
                             <div id="ia-analisis-box">
                                 <h4
                                     style="font-size: 0.7rem; color: var(--primary-light); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px;">
-                                    Análisis de Actividad</h4>
+                                    Activity Analysis</h4>
                                 <p id="ia-analisis" style="font-size: 1rem; line-height: 1.6; color: var(--text-main);">
                                 </p>
                             </div>
                             <div id="ia-riesgos-box">
                                 <h4
                                     style="font-size: 0.7rem; color: var(--primary-light); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 1px;">
-                                    Evaluación de Riesgo</h4>
+                                    Risk Evaluation</h4>
                                 <p id="ia-riesgos" style="font-size: 1rem; line-height: 1.6; color: var(--text-main);">
                                 </p>
                             </div>
@@ -278,11 +283,15 @@
             meta.style.display = 'block';
             const ejecucion = decision.ejecucion === true || decision.ejecucion === 'true';
             const motivo = decision.motivo || (decision.decision === 'DATOS_INSUFICIENTES' ? 'low_confidence' : 'none');
-            meta.innerHTML = `Ejecución: <strong>${ejecucion ? 'true' : 'false'}</strong> • Motivo: <strong>${motivo}</strong>`;
+            const tipoContrato = decision.tipo_contrato || 'No aplica';
+            meta.innerHTML = `Ejecución: <strong>${ejecucion ? 'true' : 'false'}</strong> • Contrato: <strong>${tipoContrato}</strong> • Motivo: <strong>${motivo}</strong>`;
 
             if (decision.decision === 'EXECUTE_ADVANCED') {
                 text.style.color = 'var(--secondary-light)';
                 accent.style.background = 'var(--secondary)';
+            } else if (decision.decision === 'EXECUTE_BASIC') {
+                text.style.color = 'var(--primary-light)';
+                accent.style.background = 'var(--primary)';
             } else {
                 text.style.color = 'var(--warning)';
                 accent.style.background = 'var(--warning)';
