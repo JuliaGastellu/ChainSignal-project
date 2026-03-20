@@ -68,42 +68,42 @@ def health():
 
 @app.get("/report/{wallet_address}", summary="Protected analysis report")
 def get_report(wallet_address: str, request: Request):
-    """Protected report endpoint via x402 challenge and payment flow."""
+    """Protected analysis report endpoint with x402 payment challenge flow."""
     x402 = GatewayX402()
-    valido, motivo = x402.verificar_acceso({k.lower(): v for k, v in request.headers.items()})
-    if not valido:
-        challenge = x402.emitir_challenge(f"reporte de análisis para wallet {wallet_address}")
+    valid, reason = x402.verificar_acceso({k.lower(): v for k, v in request.headers.items()})
+    if not valid:
+        challenge = x402.emitir_challenge(f"analysis report for wallet {wallet_address}")
         return JSONResponse(status_code=402, content={
             "error": "payment_required",
-            "message": motivo,
+            "message": reason,
             "challenge": challenge.to_dict(),
         })
 
-    # Generamos un reporte rápido, realista para la demo.
+    # Return a lightweight demo analysis report.
     try:
         wallet = wallet_address.lower()
-        datos_crudos = _cliente.obtener_datos_wallet(wallet)
-        metrics = _extractor.extraer(datos_crudos)
-        perfil_crudo = _clasificador.clasificar(metrics)
+        raw_data = _cliente.obtener_datos_wallet(wallet)
+        metrics = _extractor.extraer(raw_data)
+        profile = _clasificador.clasificar(metrics)
         scorer = BehavioralScorer()
         scores_obj = scorer.calcular_scores(metrics)
 
         return {
             "wallet": wallet,
-            "perfil": perfil_crudo.tipo,
+            "perfil": profile.tipo,
             "scores": {
                 "risk": scores_obj.risk_score.valor,
                 "activity": scores_obj.activity_score.valor,
                 "defi_engagement": scores_obj.defi_engagement.valor,
             },
-            "insight": f"Wallet {wallet} clasificada como {perfil_crudo.tipo} con riesgo {scores_obj.risk_score.valor}.",
+            "insight": f"Wallet {wallet} classified as {profile.tipo} with risk {scores_obj.risk_score.valor}.",
             "x402_payment": "validated",
         }
     except Exception as e:
-        logger.error("Error generando reporte x402: {}", e)
+        logger.error("Error generating x402 report: {}", e)
         return JSONResponse(status_code=500, content={
             "error": "internal_server_error",
-            "message": "No se pudo generar el reporte. Revise la wallet y reintente.",
+            "message": "Could not generate report. Check wallet and retry.",
         })
 
 
