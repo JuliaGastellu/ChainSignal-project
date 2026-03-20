@@ -64,6 +64,46 @@ def salud():
     return {"estado": "ok", "servicio": "ChainSignal API", "version": "0.2.0"}
 
 
+@app.get("/report/{wallet_address}", summary="Reporte de análisis protegido por x402")
+def obtener_reporte(wallet_address: str, request: Request):
+    """Retorna un reporte de análisis protegido por x402 (requiere header X-Payment)."""
+    x402 = GatewayX402()
+    valido, motivo = x402.verificar_acceso({k.lower(): v for k, v in request.headers.items()})
+    if not valido:
+        challenge = x402.emitir_challenge(f"reporte de análisis para wallet {wallet_address}")
+        return JSONResponse(status_code=402, content={
+            "error": "payment_required",
+            "message": motivo,
+            "challenge": challenge.to_dict(),
+        })
+
+    # Generamos un reporte rápido, realista para la demo.
+    try:
+        wallet = wallet_address.lower()
+        datos_crudos = _cliente.obtener_datos_wallet(wallet)
+        metrics = _extractor.extraer(datos_crudos)
+        perfil_crudo = _clasificador.clasificar(metrics)
+        scorer = BehavioralScorer()
+        scores_obj = scorer.calcular_scores(metrics)
+
+        return {
+            "wallet": wallet,
+            "perfil": perfil_crudo.tipo,
+            "scores": {
+                "risk": scores_obj.risk_score.valor,
+                "activity": scores_obj.activity_score.valor,
+                "defi_engagement": scores_obj.defi_engagement.valor,
+            },
+            "insight": f"Wallet {wallet} clasificada como {perfil_crudo.tipo} con riesgo {scores_obj.risk_score.valor}.",
+            "x402_payment": "validated",
+        }
+    except Exception as e:
+        logger.error("Error generando reporte x402: {}", e)
+        return JSONResponse(status_code=500, content={
+            "error": "internal_server_error",
+            "message": "No se pudo generar el reporte. Revise la wallet y reintente.",
+        })
+
 
 @app.get("/ejecutar-agente/{wallet}")
 async def ejecutar_agente_stream(wallet: str):
@@ -92,7 +132,7 @@ async def ejecutar_agente_stream(wallet: str):
                 "confidence": 0.85
             }
             msg2 = f"Riesgo: {scores_dict['risk']}, Actividad: {scores_dict['activity']}"
-            yield f'data: {json.dumps({"paso": "calculando_scores", "estado": "completado", "detalle": msg2})}\n\n'
+            yield f'data: {json.dumps({"paso": "calculando_scores", "estado": "completado", "detalle": msg2, "data": {"risk": scores_dict["risk"], "activity": scores_dict["activity"], "defi_engagement": scores_dict["defi_engagement"]}})}\n\n'
 
             # Paso 3: Clasificando Perfil
             yield f'data: {json.dumps({"paso": "clasificando_perfil", "estado": "iniciando", "detalle": "Determinando perfil de la wallet..."})}\n\n'
@@ -250,7 +290,7 @@ async def ejecutar_agente_stream(wallet: str):
                 yield f'data: {json.dumps({"paso": "contrato_activo", "estado": "completado", "detalle": "Contrato verificado y activo.", "data": {"address": desplegado.direccion, "hash": desplegado.transaction_hash, "metricas": metricas_dict, "etherscan": msg10}})}\n\n'
 
             else:
-                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": decision["reasoning"]})}\n\n'
+                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": decision["reasoning"], "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada")}})}\n\n'
 
         except Exception as e:
             logger.error(f"Error en stream: {e}")
