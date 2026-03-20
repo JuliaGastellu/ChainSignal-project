@@ -106,7 +106,9 @@ class BehavioralScorer:
 
     def _score_exploracion(self, f: FeaturesWallet) -> MetricaScoring:
         """Score for protocol exploration and discovery."""
-        valor = min(100, int(f.diversidad_protocolos * 100))
+        # Safety check for the attribute
+        div = getattr(f, "diversidad_protocolos", 0.0)
+        valor = min(100, int(div * 100))
         
         if valor >= 80: inter = "Early adopter. Actively interacts with multiple protocols."
         elif valor >= 50: inter = "Protocol explorer; interacts with diverse DApps."
