@@ -2,6 +2,7 @@
 
 from strategy.modelos_estrategia import DecisionEstrategia
 from domain.modelos_contrato import InsightContrato
+from infra.config import settings
 
 
 class EstrategiaProteccionWallet:
