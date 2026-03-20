@@ -26,16 +26,21 @@ class AgenteAnalisis:
             self.OpenClaw = None
             logger.info("OpenClaw not available; using local deterministic agent.")
 
-    def analizar(self, metrics: Any, perfil: Any) -> InsightContrato:
+    def analizar(self, metrics: Any, perfil: Any, wallet_addr: str = "unknown", scores: dict | None = None) -> InsightContrato:
         """Generates a structured InsightContrato without external HTTP calls."""
-        risk = self._calcular_score_riesgo(metrics)
-        activity = self._calcular_score_actividad(metrics)
+        if scores:
+            risk = scores.get("risk", self._calcular_score_riesgo(metrics))
+            activity = scores.get("activity", self._calcular_score_actividad(metrics))
+        else:
+            risk = self._calcular_score_riesgo(metrics)
+            activity = self._calcular_score_actividad(metrics)
+            
         tipo = self._decidir_tipo_contrato(risk, activity, perfil)
         accion = self._determinar_accion(risk, activity, perfil)
 
         insight = InsightContrato(
             type=tipo,
-            analyzed_wallet=getattr(perfil, "wallet", getattr(perfil, "address", "unknown")) if perfil is not None else "unknown",
+            analyzed_wallet=wallet_addr,
             risk_score=risk,
             activity_score=activity,
         )

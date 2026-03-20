@@ -9,10 +9,10 @@ from domain.modelos_transaccion import ResultadoTransaccion, EstadoContrato
 
 
 class ServicioWDK:
-    """Encapsula la comunicación con el microservicio WDK.
+    """Encapsulates communication with the WDK microservice.
 
-    Traduce entre los modelos del dominio y la interfaz de WalletAgent,
-    registrando cada operación con sus parámetros y resultado.
+    Translates between domain models and the WalletAgent interface,
+    logging each operation with its parameters and results.
     """
 
     def __init__(self):
@@ -23,7 +23,7 @@ class ServicioWDK:
 
     @property
     def activo(self) -> bool:
-        """Indica si el microservicio WDK está disponible."""
+        """Indicates if the WDK microservice is available."""
         return self._agente.wdk_active
 
     def desplegar_contrato(
@@ -31,27 +31,27 @@ class ServicioWDK:
         contrato: ContratoCompilado,
         args_constructor: list | None = None,
     ) -> ContratoDeplegado | None:
-        """Despliega un contrato compilado en la red configurada.
+        """Deploys a compiled contract on the configured network.
 
         Args:
-            contrato: Contrato con ABI y bytecode listos para despliegue.
-            args_constructor: Argumentos para el constructor del contrato.
+            contrato: Contract with ABI and bytecode ready for deployment.
+            args_constructor: Arguments for the contract constructor.
 
         Returns:
-            ContratoDeplegado con dirección y hash, o None si el WDK no está activo.
+            ContratoDeplegado with address and hash, or None if WDK is inactive.
         """
         logger.info(
-            "Solicitando despliegue de '{}' con args={}",
-            contrato.nombre,
+            "Requesting deployment of '{}' with args={}",
+            contrato.name,
             args_constructor,
         )
 
         if self.modo_simulacion:
-            logger.info("MODO SIMULACION: Simulando despliegue de '{}'", contrato.nombre)
+            logger.info("SIMULATION MODE: Simulating deployment of '{}'", contrato.name)
             return ContratoDeplegado(
-                nombre=contrato.nombre,
-                direccion="0xSimulatedAddress" + contrato.nombre.lower()[:20].ljust(20, '0'),
-                transaction_hash="0xSimulatedHash" + contrato.nombre.lower().ljust(49, '0'),
+                name=contrato.name,
+                address="0xSimulatedAddress" + contrato.name.lower()[:20].ljust(20, '0'),
+                transaction_hash="0xSimulatedHash" + contrato.name.lower().ljust(49, '0'),
                 abi=contrato.abi,
             )
 
@@ -63,20 +63,20 @@ class ServicioWDK:
 
         if not datos:
             logger.error(
-                "El despliegue de '{}' no produjo respuesta del WDK.", contrato.nombre
+                "Deployment of '{}' produced no response from WDK.", contrato.name
             )
             return None
 
         resultado = ContratoDeplegado(
-            nombre=contrato.nombre,
-            direccion=datos["address"],
+            name=contrato.name,
+            address=datos["address"],
             transaction_hash=datos["hash"],
             abi=contrato.abi,
         )
         logger.info(
-            "Contrato '{}' desplegado en {}. Hash: {}",
-            resultado.nombre,
-            resultado.direccion,
+            "Contract '{}' deployed at {}. Hash: {}",
+            resultado.name,
+            resultado.address,
             resultado.transaction_hash,
         )
         return resultado
@@ -88,55 +88,55 @@ class ServicioWDK:
         args: list | None = None,
         valor_wei: int = 0,
     ) -> ResultadoTransaccion:
-        """Ejecuta una función de escritura en un contrato desplegado.
+        """Executes a write function on a deployed contract.
 
         Args:
-            contrato: Contrato desplegado con dirección y ABI.
-            funcion: Nombre del método a invocar.
-            args: Argumentos de la función.
-            valor_wei: ETH a enviar con la transacción (en wei).
+            contrato: Deployed contract with address and ABI.
+            funcion: Name of the method to invoke.
+            args: Function arguments.
+            valor_wei: ETH to send with the transaction (in wei).
 
         Returns:
-            ResultadoTransaccion con hash y estado.
+            ResultadoTransaccion with hash and status.
         """
         logger.info(
-            "Ejecutando {}() en {} con args={}",
+            "Executing {}() in {} with args={}",
             funcion,
-            contrato.direccion,
+            contrato.address,
             args,
         )
 
         if self.modo_simulacion:
-            logger.info("MODO SIMULACION: Simulando ejecución de {}()", funcion)
+            logger.info("SIMULATION MODE: Simulating execution of {}()", funcion)
             return ResultadoTransaccion(
                 transaction_hash="0xSimulatedExecHash" + funcion.lower()[:45].ljust(45, '0'),
-                contrato_direccion=contrato.direccion,
-                funcion=funcion,
-                exitoso=True,
-                detalle="Transacción ejecutada en MODO SIMULACIÓN.",
+                contract_address=contrato.address,
+                function=funcion,
+                success=True,
+                detail="Transaction executed in SIMULATION MODE.",
             )
 
         tx_hash = self._agente.call_contract(
-            contrato.direccion,
+            contrato.address,
             contrato.abi,
             funcion,
             args=args or [],
             value=valor_wei,
         )
 
-        exitoso = tx_hash is not None
+        success = tx_hash is not None
         resultado = ResultadoTransaccion(
             transaction_hash=tx_hash or "",
-            contrato_direccion=contrato.direccion,
-            funcion=funcion,
-            exitoso=exitoso,
-            detalle="Transacción enviada." if exitoso else "El WDK no devolvió hash.",
+            contract_address=contrato.address,
+            function=funcion,
+            success=success,
+            detail="Transaction sent." if success else "WDK did not return hash.",
         )
         logger.info(
-            "{}() en {}: exitoso={}, hash={}",
+            "{}() in {}: success={}, hash={}",
             funcion,
-            contrato.direccion,
-            exitoso,
+            contrato.address,
+            success,
             tx_hash,
         )
         return resultado
@@ -147,118 +147,118 @@ class ServicioWDK:
         campo: str,
         args: list | None = None,
     ) -> EstadoContrato:
-        """Lee el valor de una variable o función view de un contrato.
+        """Reads the value of a view variable or function from a contract.
 
         Args:
-            contrato: Contrato desplegado con dirección y ABI.
-            campo: Nombre de la variable o método view.
-            args: Argumentos opcionales para funciones view.
+            contrato: Deployed contract with address and ABI.
+            campo: Name of the variable or view method.
+            args: Optional arguments for view functions.
 
         Returns:
-            EstadoContrato con el valor leído.
+            EstadoContrato with the read value.
         """
-        logger.info("Leyendo '{}' de {}", campo, contrato.direccion)
+        logger.info("Reading '{}' from {}", campo, contrato.address)
 
         valor = self._agente.get_contract_state(
-            contrato.direccion,
+            contrato.address,
             contrato.abi,
             campo,
             args=args or [],
         )
 
-        exitoso = valor is not None
+        success = valor is not None
         resultado = EstadoContrato(
-            contrato_direccion=contrato.direccion,
-            campo=campo,
-            valor=valor,
-            exitoso=exitoso,
-            detalle="Lectura completada." if exitoso else "El WDK no devolvió valor.",
+            contract_address=contrato.address,
+            field=campo,
+            value=valor,
+            success=success,
+            detail="Read completed." if success else "WDK did not return value.",
         )
         logger.info(
-            "'{}' en {}: valor={}",
+            "'{}' in {}: value={}",
             campo,
-            contrato.direccion,
+            contrato.address,
             valor,
         )
         return resultado
 
     def obtener_direccion_wallet(self) -> str | None:
-        """Obtiene la dirección de la wallet gestionada por el WDK.
+        """Obtains the address of the wallet managed by the WDK.
 
         Returns:
-            La dirección de la wallet o None si no hay WDK activo.
+            The wallet address or None if no active WDK.
         """
         if not self.activo:
             return None
 
-        # create_agent_wallet devuelve la wallet actual si ya existe
+        # create_agent_wallet returns the current wallet if it already exists
         datos_wallet = self._agente.create_agent_wallet()
         direccion = datos_wallet.get("address")
-        logger.info("Dirección de wallet del agente: {}", direccion)
+        logger.info("Agent wallet address: {}", direccion)
         return direccion
 
     def consultar_balance(self, direccion: str | None = None) -> float | None:
-        """Consulta el balance en ETH de una dirección.
-        Si no se provee dirección, consulta la wallet del propio agente.
+        """Consults the ETH balance of an address.
+        If no address is provided, consults the agent's own wallet.
 
         Args:
-            direccion: Dirección a consultar. Opcional.
+            direccion: Address to consult. Optional.
 
         Returns:
-            El balance en ETH o None si hay error.
+            The ETH balance or None if error.
         """
         if self.modo_simulacion:
-            return 10.5  # Balance simulado siempre positivo para permitir tests
+            return 10.5  # Simulated balance always positive for tests
 
         if not self.activo:
             return None
 
         balance = self._agente.get_balance(direccion)
-        logger.info("Balance de {}: {} ETH", direccion or "agente", balance)
+        logger.info("Balance of {}: {} ETH", direccion or "agent", balance)
         return float(balance)
 
     def transferir_activo(
         self, direccion_destino: str, cantidad_wei: int, use_aa: bool = False
     ) -> ResultadoTransaccion:
-        """Transfiere ETH desde la wallet del agente hacia un destino.
+        """Transfers ETH from the agent wallet to a destination.
 
         Args:
-            direccion_destino: Dirección receptora.
-            cantidad_wei: Cantidad de ETH en wei a enviar.
+            direccion_destino: Recipient address.
+            cantidad_wei: Amount of ETH in wei to send.
 
         Returns:
-            ResultadoTransaccion con el hash de la operación.
+            ResultadoTransaccion with the operation hash.
         """
         logger.info(
-            "Solicitando transferencia de {} wei a {}",
+            "Requesting transfer of {} wei to {}",
             cantidad_wei,
             direccion_destino,
         )
 
         if self.modo_simulacion:
-            logger.info("MODO SIMULACION: Simulando transferencia a {}", direccion_destino)
+            logger.info("SIMULATION MODE: Simulating transfer to {}", direccion_destino)
             return ResultadoTransaccion(
                 transaction_hash="0xSimulatedTransferHash00000000000000000000000000000000000000000",
-                contrato_direccion="",
-                funcion="transferencia_nativa",
-                exitoso=True,
-                detalle="Transferencia enviada en MODO SIMULACIÓN.",
+                contract_address="",
+                function="transferencia_nativa",
+                success=True,
+                detail="Transfer sent in SIMULATION MODE.",
             )
 
         tx_hash = self._agente.ejecutar_transaccion(direccion_destino, cantidad_wei)
 
-        exitoso = tx_hash is not None
+        success = tx_hash is not None
         resultado = ResultadoTransaccion(
             transaction_hash=tx_hash or "",
-            contrato_direccion="",  # Es una tranferencia nativa, no a contrato
-            funcion="transferencia_nativa",
-            exitoso=exitoso,
-            detalle="Transferencia enviada." if exitoso else "El WDK no transfirió.",
+            contract_address="",  # Native transfer, not to contract
+            function="transferencia_nativa",
+            success=success,
+            detail="Transfer sent." if success else "WDK did not transfer.",
         )
         logger.info(
-            "Transferencia a {}: exitoso={}, hash={}",
+            "Transfer to {}: success={}, hash={}",
             direccion_destino,
-            exitoso,
+            success,
             tx_hash,
         )
         return resultado
@@ -266,140 +266,96 @@ class ServicioWDK:
     def obtener_cotizacion_swap(
         self, token_in: str, token_out: str, cantidad: int
     ) -> dict | None:
-        """Obtiene una cotización para intercambiar tokens.
+        """Obtains a quote for token exchange.
 
         Args:
-            token_in: Dirección del token de entrada (o 0x... para nativo si aplica).
-            token_out: Dirección del token de salida.
-            cantidad: Cantidad en unidades base del token_in.
+            token_in: Input token address (or 0x... for native if applicable).
+            token_out: Output token address.
+            cantidad: Amount in base units of token_in.
 
         Returns:
-            Dict con fee, tokenInAmount y tokenOutAmount, o None.
+            Dict with fee, tokenInAmount and tokenOutAmount, or None.
         """
-        logger.info("Solicitando cotización: {} -> {} (monto: {})", token_in, token_out, cantidad)
+        logger.info("Requesting quote: {} -> {} (amount: {})", token_in, token_out, cantidad)
         return self._agente.get_swap_quote(token_in, token_out, cantidad)
 
     def ejecutar_swap(
         self, token_in: str, token_out: str, cantidad: int, use_aa: bool = False
     ) -> ResultadoTransaccion:
-        """Ejecuta un intercambio de tokens on-chain.
+        """Executes an on-chain token exchange.
 
         Args:
-            token_in: Token a vender.
-            token_out: Token a comprar.
-            cantidad: Cantidad a vender.
-            use_aa: Si se debe usar Account Abstraction.
+            token_in: Token to sell.
+            token_out: Token to buy.
+            cantidad: Amount to sell.
+            use_aa: Whether to use Account Abstraction.
 
         Returns:
-            ResultadoTransaccion con el hash y estado.
+            ResultadoTransaccion with hash and status.
         """
-        logger.info("Solicitando ejecución de swap: {} -> {} (AA={})", token_in, token_out, use_aa)
+        logger.info("Requesting swap execution: {} -> {} (AA={})", token_in, token_out, use_aa)
 
         if self.modo_simulacion:
-            logger.info("MODO SIMULACION: Simulando swap {} -> {}", token_in, token_out)
+            logger.info("SIMULATION MODE: Simulating swap {} -> {}", token_in, token_out)
             return ResultadoTransaccion(
                 transaction_hash="0xSimulatedSwapHash" + token_out.lower()[:44].ljust(44, '0'),
-                contrato_direccion="",
-                funcion="swap_tokens",
-                exitoso=True,
-                detalle="Swap ejecutado en MODO SIMULACIÓN.",
+                contract_address="",
+                function="swap_tokens",
+                success=True,
+                detail="Swap executed in SIMULATION MODE.",
             )
 
         datos = self._agente.execute_swap(token_in, token_out, cantidad, use_aa)
-        exitoso = datos is not None
+        success = datos is not None
 
         resultado = ResultadoTransaccion(
-            transaction_hash=datos["hash"] if exitoso else "",
-            contrato_direccion="",
-            funcion="swap_tokens",
-            exitoso=exitoso,
-            detalle="Swap confirmado." if exitoso else "Fallo al ejecutar swap en WDK.",
+            transaction_hash=datos["hash"] if success else "",
+            contract_address="",
+            function="swap_tokens",
+            success=success,
+            detail="Swap confirmed." if success else "Failed to execute swap in WDK.",
         )
         return resultado
 
     # ─────────────────────────────────────────────────────────────────────────
-    # WDK Agent Skills — Habilidades invocables cuando la decisión es EXECUTE_ADVANCED
+    # WDK Agent Skills — Callable skills when decision is EXECUTE_ADVANCED
     # ─────────────────────────────────────────────────────────────────────────
 
     def skill_obtener_balance(self, direccion: str) -> dict:
-        """Skill: Consulta el balance de una dirección via el endpoint /skills/balance.
+        """Skill: Consults the balance of an address via the /skills/balance endpoint.
 
-        Difiere de consultar_balance() en que siempre pasamos una dirección explícita
-        y devolvemos el dict completo del skill (balanceEth, balanceWei, red).
-
-        Args:
-            direccion: Dirección Ethereum a consultar.
-
-        Returns:
-            Dict con claves 'balanceEth', 'balanceWei', 'red', o dict vacío en error.
+        Differs from consultar_balance() in that we always pass an explicit address
+        and return the complete skill dict (balanceEth, balanceWei, network).
         """
-        logger.info("Skill activo: obtener_balance para {}", direccion)
-
+        logger.info("Invoking Skill: balance for {}", direccion)
         if self.modo_simulacion:
-            logger.info("MODO SIMULACION: Skill balance simulado para {}", direccion)
             return {
-                "skill": "obtener_balance",
                 "address": direccion,
                 "balanceEth": "10.5",
                 "balanceWei": "10500000000000000000",
-                "red": "simulacion",
+                "network": "sepolia (simulated)"
             }
 
-        try:
-            import httpx
-            resp = httpx.get(
-                f"{self._agente.wdk_url}/skills/balance",
-                params={"address": direccion},
-                timeout=10.0,
-            )
-            if resp.status_code == 200:
-                return resp.json()
-            logger.warning("Skill balance retornó HTTP {}: {}", resp.status_code, resp.text)
-            return {}
-        except Exception as error:
-            logger.error("Fallo en skill obtener_balance: {}", error)
-            return {}
+        return self._agente.get_skill_balance(direccion)
 
     def skill_obtener_cotizacion(
         self, token_in: str, token_out: str, cantidad: int
     ) -> dict:
-        """Skill: Obtiene cotización de swap sin ejecutarla via /skills/swap/quote.
+        """Skill: Consults a swap quote via the /skills/quote endpoint.
 
-        Args:
-            token_in: Token a vender (dirección o símbolo 'ETH').
-            token_out: Token a comprar (dirección).
-            cantidad: Cantidad en wei del token de entrada.
-
-        Returns:
-            Dict con 'fee', 'tokenInAmount', 'tokenOutAmount', o dict vacío en error.
+        Returns enriched information including the provider and expected output.
         """
-        logger.info("Skill activo: obtener_cotizacion {} -> {}", token_in, token_out)
-
+        logger.info("Invoking Skill: quote {} -> {}", token_in, token_out)
         if self.modo_simulacion:
-            logger.info("MODO SIMULACION: Skill cotización simulada")
             return {
-                "skill": "obtener_cotizacion_swap",
                 "tokenIn": token_in,
                 "tokenOut": token_out,
-                "fee": "50000000000000",
-                "tokenInAmount": str(cantidad),
-                "tokenOutAmount": str(int(cantidad * 0.98)),
+                "amountIn": str(cantidad),
+                "expectedOut": str(int(cantidad * 0.98)),
+                "provider": "velora (simulated)"
             }
 
-        try:
-            import httpx
-            resp = httpx.post(
-                f"{self._agente.wdk_url}/skills/swap/quote",
-                json={"tokenIn": token_in, "tokenOut": token_out, "amount": str(cantidad)},
-                timeout=15.0,
-            )
-            if resp.status_code == 200:
-                return resp.json()
-            logger.warning("Skill cotización retornó HTTP {}: {}", resp.status_code, resp.text)
-            return {}
-        except Exception as error:
-            logger.error("Fallo en skill obtener_cotizacion: {}", error)
-            return {}
+        return self._agente.get_skill_quote(token_in, token_out, cantidad)
 
     def skill_ejecutar_swap(
         self, token_in: str, token_out: str, cantidad: int, use_aa: bool = False

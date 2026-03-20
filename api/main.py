@@ -155,7 +155,7 @@ async def run_agent_stream(wallet: str):
             # Step 4: Generating Structured Insight
             yield f'data: {json.dumps({"paso": "generating_insight", "estado": "starting", "detalle": "Running deterministic analysis agent..."})}\n\n'
             agente = obtener_agente()
-            insight_obj = agente.analizar(metrics, perfil_crudo)
+            insight_obj = agente.analizar(metrics, perfil_crudo, wallet_addr=wallet_addr, scores=scores_dict)
             # Normalize keys to English for the SSE output
             insight_data = {
                 "type": insight_obj.type,
@@ -317,7 +317,7 @@ async def run_agent_stream(wallet: str):
                 yield f'data: {json.dumps({"paso": "decision_final", "estado": "completed", "detalle": detalle_final, "data": {"decision": decision.get("decision"), "contract_type": decision.get("contract_type"), "recommended_action": decision.get("recommended_action"), "execution": execution, "motivo": motivo, "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
 
         except Exception as e:
-            logger.error(f"Error en stream: {e}")
+            logger.error(f"Stream error: {e}")
             yield f'data: {json.dumps({"paso": "error", "estado": "error", "detalle": str(e)})}\n\n'
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

@@ -31,7 +31,7 @@ class DecisionEngine:
         else:
             confidence = min(0.98, 0.81 + ((tx_count - 50) * 0.001))
             
-        # 3. Límites dinámicos (Simulación/Seguridad)
+        # 3. Dynamic limits (Simulation/Security)
         max_amount_eth = round(confidence * 0.5, 3) 
         gas_limit = 500000 if activity > 70 else 250000
 

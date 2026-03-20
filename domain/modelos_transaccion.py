@@ -6,21 +6,21 @@ from typing import Any
 
 @dataclass
 class ResultadoTransaccion:
-    """Resultado de ejecutar una función de escritura en un contrato."""
+    """Result of executing a write function on a contract."""
 
     transaction_hash: str
-    contrato_direccion: str
-    funcion: str
-    exitoso: bool
-    detalle: str = ""
+    contract_address: str
+    function: str
+    success: bool
+    detail: str = ""
 
 
 @dataclass
 class EstadoContrato:
-    """Resultado de leer el estado de una variable o función de un contrato."""
+    """Result of reading the state of a contract variable or function."""
 
-    contrato_direccion: str
-    campo: str
-    valor: Any
-    exitoso: bool
-    detalle: str = ""
+    contract_address: str
+    field: str
+    value: Any
+    success: bool
+    detail: str = ""
