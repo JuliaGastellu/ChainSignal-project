@@ -1,4 +1,4 @@
-"""Motor de clasificación de wallets basado en reglas deterministas."""
+"""Wallet classification engine based on deterministic rules."""
 
 from dataclasses import dataclass
 from typing import List
@@ -8,7 +8,7 @@ from generacion_features.extractor import FeaturesWallet
 
 @dataclass
 class PerfilWallet:
-    """Perfil clasificado de una wallet con tipo y señales de soporte."""
+    """Classified wallet profile with type and support signals."""
 
     tipo: str
     confianza: str
@@ -18,9 +18,9 @@ class PerfilWallet:
 
 
 class ClasificadorWallet:
-    """Clasifica wallets en perfiles predefinidos usando reglas sobre las features."""
+    """Classifies wallets into predefined profiles using rules over features."""
 
-    # Umbrales de clasificación
+    # Classification thresholds
     UMBRAL_ALTA_ACTIVIDAD = 50
     UMBRAL_BAJA_ACTIVIDAD = 5
     UMBRAL_DEFI_TOKENS = 5
@@ -30,7 +30,7 @@ class ClasificadorWallet:
     UMBRAL_WHALE_BALANCE = 50.0
 
     def clasificar(self, features: FeaturesWallet) -> PerfilWallet:
-        """Aplica las reglas de clasificación y retorna el perfil de la wallet."""
+        """Applies classification rules and returns the wallet profile."""
         puntajes = {
             "defi_power_user": self._evaluar_defi_power_user(features),
             "protocol_explorer": self._evaluar_protocol_explorer(features),
@@ -46,9 +46,9 @@ class ClasificadorWallet:
         puntaje_maximo = puntajes[tipo]
         senales = self._recolectar_senales(features)
 
-        # Cálculo de confianza
+        # Confidence calculation
         score_confianza = min(puntaje_maximo / 5.0, 1.0)
-        confianza = "alta" if score_confianza >= 0.8 else "media" if score_confianza >= 0.5 else "baja"
+        confianza = "high" if score_confianza >= 0.8 else "medium" if score_confianza >= 0.5 else "low"
 
         descripcion = self._generar_descripcion(tipo, features)
 
@@ -143,37 +143,37 @@ class ClasificadorWallet:
         return puntaje
 
     def _recolectar_senales(self, f: FeaturesWallet) -> List[str]:
-        """Identifica señales conductuales específicas a partir de las features."""
+        """Identifies specific behavioral signals from features."""
         senales = []
         if f.total_transacciones > 100:
-            senales.append("Alta actividad histórica en la red")
+            senales.append("High historical network activity")
         if f.frecuencia_transacciones_por_dia > 2:
-            senales.append("Transacciones frecuentes diarias")
+            senales.append("Frequent daily transactions")
         if f.porcentaje_interacciones_contratos > 50:
-            senales.append("Uso intensivo de protocolos y smart contracts")
+            senales.append("Intensive protocol and smart contract usage")
         if f.tokens_unicos_utilizados > 10:
-            senales.append(f"Diversidad de activos: {f.tokens_unicos_utilizados} tokens detectados")
+            senales.append(f"Asset diversity: {f.tokens_unicos_utilizados} tokens detected")
         if f.volumen_total_transferido_eth > 10:
-            senales.append("Movimientos de volumen significativo de ETH")
+            senales.append("Significant ETH volume movements")
         if f.porcentaje_transacciones_recientes > 50:
-            senales.append("Actividad reciente muy alta (últimos 30 días)")
+            senales.append("High recent activity (last 30 days)")
         if f.transacciones_con_error > 5:
-            senales.append("Presencia de transacciones fallidas")
+            senales.append("Presence of failed transactions")
         if f.dias_activo > 365:
-            senales.append("Wallet veterana (más de 1 año activa)")
+            senales.append("Veteran wallet (active for more than 1 year)")
         
         return senales
 
     def _generar_descripcion(self, tipo: str, f: FeaturesWallet) -> str:
-        """Genera una descripción breve del perfil clasificado."""
+        """Generates a brief description of the classified profile."""
         descripciones = {
-            "defi_power_user": "Usuario avanzado de protocolos DeFi con alta interaccion con smart contracts.",
-            "protocol_explorer": "Explorador de protocolos con gran diversidad de tokens e interacciones.",
-            "active_trader": "Trader activo con alta frecuencia de transacciones y volumen de movimiento.",
-            "liquidity_provider_candidate": "Candidato a proveedor de liquidez con balance estable y uso de DeFi.",
-            "experimental_wallet": "Wallet experimental con alta tasa de errores y exploracion de contratos.",
-            "long_term_holder": "Holder a largo plazo con baja actividad reciente y balance significativo.",
-            "high_activity_wallet": f"Wallet de alta actividad con {f.total_transacciones} transacciones.",
-            "low_activity_wallet": "Wallet con actividad minima o casi nula.",
+            "defi_power_user": "Advanced DeFi protocol user with high smart contract interaction.",
+            "protocol_explorer": "Protocol explorer with high token diversity and interactions.",
+            "active_trader": "Active trader with high transaction frequency and movement volume.",
+            "liquidity_provider_candidate": "Liquidity provider candidate with stable balance and DeFi usage.",
+            "experimental_wallet": "Experimental wallet with high error rate and contract exploration.",
+            "long_term_holder": "Long term holder with low recent activity and significant balance.",
+            "high_activity_wallet": f"High activity wallet with {f.total_transacciones} transactions.",
+            "low_activity_wallet": "Wallet with minimal or almost null activity.",
         }
-        return descripciones.get(tipo, "Perfil conductual no determinado.")
+        return descripciones.get(tipo, "Behavioral profile not determined.")

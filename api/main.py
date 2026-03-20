@@ -52,7 +52,7 @@ _agente: AgenteAnalisis | None = None
 
 
 def obtener_agente() -> AgenteAnalisis:
-    """Retorna la instancia del agente de IA (inicialización diferida)."""
+    """Returns the analysis agent instance (lazy initialization)."""
     global _agente
     if _agente is None:
         _agente = AgenteAnalisis()
@@ -121,8 +121,8 @@ async def run_agent_stream(wallet: str):
         try:
             # Step 1: Validate input for invalid wallets (burn address)
             if wallet_addr == "0x0000000000000000000000000000000000000000":
-                yield f'data: {json.dumps({"paso": "evaluando_decision", "estado": "completado", "detalle": "Decisión: DATOS_INSUFICIENTES", "data": {"decision": "DATOS_INSUFICIENTES", "confidence": 0.0, "reasoning": "La dirección de wallet es la dirección nula; no se analiza ni despliega compromiso."}})}\n\n'
-                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": "no_execution_due_to_invalid_wallet", "data": {"decision": "DATOS_INSUFICIENTES", "tipo_contrato": None, "accion_recomendada": "monitorear", "ejecucion": False, "motivo": "invalid_wallet", "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
+                yield f'data: {json.dumps({"paso": "evaluating_decision", "estado": "completed", "detalle": "Decision: INSUFFICIENT_DATA", "data": {"decision": "INSUFFICIENT_DATA", "confidence": 0.0, "reasoning": "Null address; no analysis or deployment executed."}})}\n\n'
+                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completed", "detalle": "no_execution_due_to_invalid_wallet", "data": {"decision": "INSUFFICIENT_DATA", "tipo_contrato": None, "accion_recomendada": "monitor", "ejecucion": False, "motivo": "invalid_wallet", "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
                 return
 
             # Step 1: Analyzing wallet
@@ -144,40 +144,39 @@ async def run_agent_stream(wallet: str):
                 "defi_engagement": scores_obj.defi_engagement.valor,
                 "confidence": round(confidence, 2),
             }
-            msg2 = f"Riesgo: {scores_dict['risk']}, Actividad: {scores_dict['activity']}, Confianza: {scores_dict['confidence']}"
-            yield f'data: {json.dumps({"paso": "calculando_scores", "estado": "completado", "detalle": msg2, "data": {"risk": scores_dict["risk"], "activity": scores_dict["activity"], "defi_engagement": scores_dict["defi_engagement"], "confidence": scores_dict["confidence"]}})}\n\n'
+            msg2 = f"Risk: {scores_dict['risk']}, Activity: {scores_dict['activity']}, Confidence: {scores_dict['confidence']}"
+            yield f'data: {json.dumps({"paso": "calculating_scores", "estado": "completed", "detalle": msg2, "data": {"risk": scores_dict["risk"], "activity": scores_dict["activity"], "defi_engagement": scores_dict["defi_engagement"], "confidence": scores_dict["confidence"]}})}\n\n'
 
-            # Paso 3: Clasificando Perfil
-            yield f'data: {json.dumps({"paso": "clasificando_perfil", "estado": "iniciando", "detalle": "Determinando perfil de la wallet..."})}\n\n'
+            # Step 3: Classifying Profile
+            yield f'data: {json.dumps({"paso": "classifying_profile", "estado": "starting", "detalle": "Determining wallet profile..."})}\n\n'
             perfil_crudo = _clasificador.clasificar(metrics)
-            msg3 = f"Perfil detectado: {perfil_crudo.tipo}"
-            yield f'data: {json.dumps({"paso": "clasificando_perfil", "estado": "completado", "detalle": msg3})}\n\n'
+            msg3 = f"Profile detected: {perfil_crudo.tipo}"
+            yield f'data: {json.dumps({"paso": "classifying_profile", "estado": "completed", "detalle": msg3})}\n\n'
 
-            # Paso 4: Generando Insight Estructurado
-            yield f'data: {json.dumps({"paso": "generando_insight", "estado": "iniciando", "detalle": "Ejecutando agente de análisis determinista..."})}\n\n'
+            # Step 4: Generating Structured Insight
+            yield f'data: {json.dumps({"paso": "generating_insight", "estado": "starting", "detalle": "Running deterministic analysis agent..."})}\n\n'
             agente = obtener_agente()
             insight_obj = agente.analizar(metrics, perfil_crudo)
-            yield f'data: {json.dumps({"paso": "generando_insight", "estado": "completado", "detalle": "Insight estructurado generado.", "data": insight_obj.__dict__})}\n\n'
+            yield f'data: {json.dumps({"paso": "generating_insight", "estado": "completed", "detalle": "Structured insight generated.", "data": insight_obj.__dict__})}\n\n'
 
-            # Paso 5: Evaluando Decisión
-            yield f'data: {json.dumps({"paso": "evaluando_decision", "estado": "iniciando", "detalle": "Ejecutando motor de decisiones..."})}\n\n'
+            # Step 5: Evaluating Decision
+            yield f'data: {json.dumps({"paso": "evaluating_decision", "estado": "starting", "detalle": "Executing decision engine..."})}\n\n'
             engine = DecisionEngine()
             decision = engine.evaluate(scores_dict, metrics={"transaction_count": metrics.total_transacciones})
             if decision.get("decision") == "DATOS_INSUFICIENTES":
                 insight_obj.tipo = None
-                decision["accion_recomendada"] = "monitorear"
-                decision["reasoning"] = "No hay suficiente información; no se desplegará contrato."
-            msg5 = f"Decisión: {decision.get('decision', 'MONITOR')}"
-            yield f'data: {json.dumps({"paso": "evaluando_decision", "estado": "completado", "detalle": msg5, "data": decision})}\n\n'
+                decision["accion_recomendada"] = "monitor"
+                decision["reasoning"] = "Insufficient information; no contract will be deployed."
+            msg5 = f"Decision: {decision.get('decision', 'MONITOR')}"
+            yield f'data: {json.dumps({"paso": "evaluating_decision", "estado": "completed", "detalle": msg5, "data": decision})}\n\n'
 
-            # Flujo avanzado si aplica — delegado al AgenteChainSignal
+            # Advanced flow if applicable
             if decision.get("decision") == "EXECUTE_ADVANCED":
-                # Paso 5.5: Monetización x402 (Galáctica)
-                yield f'data: {json.dumps({"paso": "monetizacion_x402", "estado": "iniciando", "detalle": "Verificando licencia de reporte avanzado (WDK x402)..."})}\n\n'
-                # Simulación de verificación de pago en USD₮ para el reporte
+                # Step 5.5: x402 Monetization
+                yield f'data: {json.dumps({"paso": "x402_validation", "estado": "starting", "detalle": "Verifying advanced report license (WDK x402)..."})}\n\n'
                 import time
                 time.sleep(1) 
-                yield f'data: {json.dumps({"paso": "monetizacion_x402", "estado": "completado", "detalle": "Licencia x402 validada via USD₮. Accediendo a mitigaciones avanzadas."})}\n\n'
+                yield f'data: {json.dumps({"paso": "x402_validation", "estado": "completed", "detalle": "x402 license validated via USDT. Accessing advanced mitigations."})}\n\n'
 
                 datos_insight = {
                     "tipo": decision.get("tipo_contrato"),
@@ -194,8 +193,8 @@ async def run_agent_stream(wallet: str):
                     score_actividad=datos_insight["score_actividad"],
                 )
 
-                # Paso 6: Evaluando Estrategia
-                yield f'data: {json.dumps({"paso": "estrategia_agente", "estado": "iniciando", "detalle": "Calculando mitigaciones y razonamiento táctico..."})}\n\n'
+                # Step 6: Evaluating Strategy
+                yield f'data: {json.dumps({"paso": "strategy_execution", "estado": "starting", "detalle": "Calculating mitigations and tactical reasoning..."})}\n\n'
                 from strategy.estrategia_proteccion_wallet import EstrategiaProteccionWallet
                 from domain.modelos_agente import DecisionAgente
 
@@ -204,19 +203,19 @@ async def run_agent_stream(wallet: str):
 
                 es_simulacion = os.getenv("APP_ENV", "local") != "production"
                 decision_agente = DecisionAgente(
-                    contexto_analizado=f"Score Riesgo: {datos_insight['score_riesgo']}, Actividad: {datos_insight['score_actividad']}",
+                    contexto_analizado=f"Risk Score: {datos_insight['score_riesgo']}, Activity: {datos_insight['score_actividad']}",
                     estrategia_evaluada=estrategia.__class__.__name__,
                     acciones_elegidas=decision_estrategia.acciones,
                     motivo=decision_estrategia.detalle,
                     es_simulacion=es_simulacion,
                 )
 
-                yield f'data: {json.dumps({"paso": "estrategia_agente", "estado": "completado", "detalle": decision_estrategia.detalle, "data": decision_agente.__dict__})}\n\n'
+                yield f'data: {json.dumps({"paso": "strategy_execution", "estado": "completed", "detalle": decision_estrategia.detalle, "data": decision_agente.__dict__})}\n\n'
 
-                # Paso 6.5: Operación Financiera (si requiere fondos)
+                # Step 6.5: Financial Operation
                 if decision_estrategia.requiere_movimiento_fondos:
-                    msg65 = f"Movilizando fondos de seguridad ({estrategia.cantidad_transferencia_wei} wei)..."
-                    yield f'data: {json.dumps({"paso": "operacion_financiera", "estado": "iniciando", "detalle": msg65})}\n\n'
+                    msg65 = f"Mobilizing security funds ({estrategia.cantidad_transferencia_wei} wei)..."
+                    yield f'data: {json.dumps({"paso": "financial_operation", "estado": "starting", "detalle": msg65})}\n\n'
                     from tools.herramienta_consultar_balance import consultar_balance
                     from tools.herramienta_transferir_activo import transferir_activo
 
@@ -225,85 +224,81 @@ async def run_agent_stream(wallet: str):
 
                     if balance > 0:
                         tx_financiera = transferir_activo(wallet_segura, estrategia.cantidad_transferencia_wei)
-                        yield f'data: {json.dumps({"paso": "operacion_financiera", "estado": "completado", "detalle": "Transferencia de rescate enviada.", "data": {"destino": wallet_segura, "hash": tx_financiera.transaction_hash, "exitoso": tx_financiera.exitoso}})}\n\n'
+                        yield f'data: {json.dumps({"paso": "financial_operation", "estado": "completed", "detalle": "Rescue transfer sent.", "data": {"destination": wallet_segura, "hash": tx_financiera.transaction_hash, "success": tx_financiera.exitoso}})}\n\n'
                     else:
-                        yield f'data: {json.dumps({"paso": "operacion_financiera", "estado": "error", "detalle": "Balance insuficiente en wallet de agente."})}\n\n'
+                        yield f'data: {json.dumps({"paso": "financial_operation", "estado": "error", "detalle": "Insufficient balance in agent wallet."})}\n\n'
 
-                # Paso 6.2: Swap Preventivo (si la estrategia lo requiere)
+                # Step 6.2: Swap Operation
                 if decision_estrategia.requiere_swap:
-                    msg62 = f"Ejecutando swap preventivo ({decision_estrategia.token_in} -> {decision_estrategia.token_out})..."
-                    yield f'data: {json.dumps({"paso": "operacion_swap", "estado": "iniciando", "detalle": msg62})}\n\n'
+                    msg62 = f"Executing preventive swap ({decision_estrategia.token_in} -> {decision_estrategia.token_out})..."
+                    yield f'data: {json.dumps({"paso": "swap_operation", "estado": "starting", "detalle": msg62})}\n\n'
                     from services.servicio_wdk import ServicioWDK
                     wdk = ServicioWDK()
                     
-                    # Monto de prueba: 0.0005 ETH
                     monto_swap_wei = 500000000000000 
                     
                     tx_swap = wdk.ejecutar_swap(decision_estrategia.token_in, decision_estrategia.token_out, monto_swap_wei)
                     
                     if tx_swap.exitoso:
-                        yield f'data: {json.dumps({"paso": "operacion_swap", "estado": "completado", "detalle": "Swap preventivo a USD₮ completado.", "data": {"hash": tx_swap.transaction_hash, "exitoso": True}})}\n\n'
+                        yield f'data: {json.dumps({"paso": "swap_operation", "estado": "completed", "detalle": "Preventive swap to USDT completed.", "data": {"hash": tx_swap.transaction_hash, "success": True}})}\n\n'
                     else:
-                        yield f'data: {json.dumps({"paso": "operacion_swap", "estado": "error", "detalle": "El swap on-chain falló o no tiene liquidez."})}\n\n'
+                        yield f'data: {json.dumps({"paso": "swap_operation", "estado": "error", "detalle": "On-chain swap failed or lacks liquidity."})}\n\n'
 
                 if not decision_estrategia.requiere_contrato:
-                    # Fin temprano si la estrategia no pide contratos (pero tal vez ya transfirió)
-                    yield f'data: {json.dumps({"paso": "contrato_activo", "estado": "completado", "detalle": "Estrategia ejecutada sin requerir contratos."})}\n\n'
+                    yield f'data: {json.dumps({"paso": "contract_active", "estado": "completed", "detalle": "Strategy executed without requiring contracts."})}\n\n'
                     return
 
-                # Paso 7: Generando Contrato
-                tipo_val = datos_insight.get('tipo', 'desconocido')
-                msg7 = f"Creando código Solidity para {tipo_val}..."
-                yield f'data: {json.dumps({"paso": "generando_contrato", "estado": "iniciando", "detalle": msg7})}\n\n'
+                # Step 7: Generating Contract
+                tipo_val = datos_insight.get('tipo', 'unknown')
+                msg7 = f"Creating Solidity code for {tipo_val}..."
+                yield f'data: {json.dumps({"paso": "contract_generation", "estado": "starting", "detalle": msg7})}\n\n'
                 from tools.herramienta_generar_contrato import generar_contrato
                 codigo_sol = generar_contrato(insight_obj)
-                yield f'data: {json.dumps({"paso": "generando_contrato", "estado": "completado", "detalle": "Código Solidity generado.", "data": {"codigo": codigo_sol}})}\n\n'
+                yield f'data: {json.dumps({"paso": "contract_generation", "estado": "completed", "detalle": "Solidity code generated.", "data": {"code": codigo_sol}})}\n\n'
 
-                # Paso 8: Compilando Contrato
-                yield f'data: {json.dumps({"paso": "compilando_contrato", "estado": "iniciando", "detalle": "Compilando contrato inteligente..."})}\n\n'
+                # Step 8: Compiling Contract
+                yield f'data: {json.dumps({"paso": "contract_compilation", "estado": "starting", "detalle": "Compiling smart contract..."})}\n\n'
                 from tools.herramienta_compilar_contrato import compilar_contrato_tool
                 compilado = compilar_contrato_tool(codigo_sol)
-                yield f'data: {json.dumps({"paso": "compilando_contrato", "estado": "completado", "detalle": "Compilación exitosa (ABI/Bytecode listos)."})}\n\n'
+                yield f'data: {json.dumps({"paso": "contract_compilation", "estado": "completed", "detalle": "Compilation successful (ABI/Bytecode ready)."})}\n\n'
 
-                # Paso 9: Desplegando Contrato
-                yield f'data: {json.dumps({"paso": "deployando_contrato", "estado": "iniciando", "detalle": "Desplegando en la red Sepolia..."})}\n\n'
+                # Step 9: Deploying Contract
+                yield f'data: {json.dumps({"paso": "contract_deployment", "estado": "starting", "detalle": "Deploying to Sepolia network..."})}\n\n'
 
                 from tools.herramienta_desplegar_contrato import desplegar_contrato
                 desplegado = desplegar_contrato(compilado)
 
                 if not desplegado:
                     raise Exception(
-                        "El despliegue del contrato falló o el microservicio WDK está inactivo."
+                        "Contract deployment failed or WDK microservice is inactive."
                     )
 
-                msg9 = f"Desplegado en {desplegado.direccion}"
-                yield f'data: {json.dumps({"paso": "deployando_contrato", "estado": "completado", "detalle": msg9})}\n\n'
+                msg9 = f"Deployed at {desplegado.direccion}"
+                yield f'data: {json.dumps({"paso": "contract_deployment", "estado": "completed", "detalle": msg9})}\n\n'
 
-                # Paso 9/10: Finalización y Métricas
+                # Step 10: Finalization
                 from pathlib import Path
-                
-                # Actualizando métricas simplificadamente para el streaming de la demo
                 _METRICAS_AGENTE = Path("metricas_agente.json")
                 try:
-                    metricas_dict = {"valor_protegido_eth": 0.0, "transacciones_realizadas": 0, "contratos_creados": 0}
+                    metricas_dict = {"protected_value_eth": 0.0, "transactions_executed": 0, "contracts_created": 0}
                     if _METRICAS_AGENTE.exists():
                         with _METRICAS_AGENTE.open("r", encoding="utf-8") as f:
                             metricas_dict = json.load(f)
                     
-                    metricas_dict["contratos_creados"] += 1
-                    metricas_dict["transacciones_realizadas"] += 1
+                    metricas_dict["contracts_created"] += 1
+                    metricas_dict["transactions_executed"] += 1
                     
                     if decision_estrategia.requiere_movimiento_fondos:
-                        metricas_dict["transacciones_realizadas"] += 1
-                        metricas_dict["valor_protegido_eth"] += 0.001
+                        metricas_dict["transactions_executed"] += 1
+                        metricas_dict["protected_value_eth"] += 0.001
 
                     with _METRICAS_AGENTE.open("w", encoding="utf-8") as f:
                         json.dump(metricas_dict, f, indent=2, ensure_ascii=False)
                 except Exception as ex:
-                    logger.error(f"Error escribiendo métricas: {ex}")
+                    logger.error(f"Error writing metrics: {ex}")
                 
                 msg10 = f"https://sepolia.etherscan.io/address/{desplegado.direccion}"
-                yield f'data: {json.dumps({"paso": "contrato_activo", "estado": "completado", "detalle": "Contrato verificado y activo.", "data": {"address": desplegado.direccion, "hash": desplegado.transaction_hash, "metricas": metricas_dict, "etherscan": msg10}})}\n\n'
+                yield f'data: {json.dumps({"paso": "contract_active", "estado": "completed", "detalle": "Contract verified and active.", "data": {"address": desplegado.direccion, "hash": desplegado.transaction_hash, "metrics": metricas_dict, "etherscan": msg10}})}\n\n'
 
             else:
                 detalle_final = decision.get("reasoning", "No action required.")
@@ -311,7 +306,7 @@ async def run_agent_stream(wallet: str):
                 ejecucion = bool(decision.get("ejecucion", decision.get("decision") in ["EXECUTE_ADVANCED", "EXECUTE_BASIC"]))
                 if decision.get("decision") == "DATOS_INSUFICIENTES":
                     detalle_final = "no_execution_due_to_low_confidence"
-                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": detalle_final, "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada"), "ejecucion": ejecucion, "motivo": motivo, "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
+                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completed", "detalle": detalle_final, "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada"), "ejecucion": ejecucion, "motivo": motivo, "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
 
         except Exception as e:
             logger.error(f"Error en stream: {e}")

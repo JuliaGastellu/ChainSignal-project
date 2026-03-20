@@ -22,7 +22,7 @@ export interface AgentResults {
 
 type AgentStatus = "idle" | "connecting" | "streaming" | "completed" | "error";
 
-const API_BASE = "https://chainsignal-project.onrender.com";
+const API_BASE = "";
 
 export function useAgentSSE() {
   const [events, setEvents] = useState<AgentEvent[]>([]);
@@ -69,8 +69,8 @@ export function useAgentSSE() {
         }
 
         const data: Record<string, unknown> = parsed || { texto: event.data };
-        const paso = String(data.paso || data.step || "mensaje");
-        const estado = String(data.estado || data.status || "procesando");
+        const paso = String(data.paso || data.step || "message");
+        const estado = String(data.estado || data.status || "processing");
         const detalle = String(
           data.detalle || data.detail || data.message || data.texto || ""
         );
@@ -92,111 +92,88 @@ export function useAgentSSE() {
             raw: data,
           };
 
-          if (paso === "calculando_scores" || paso === "calculating_scores") {
-            const payload = (typeof data.data === "object" && data.data !== null) ? (data.data as Record<string, unknown>) : data;
-            const risk = Number(payload.risk ?? payload.score_riesgo ?? payload.risk_score);
-            const activity = Number(payload.activity ?? payload.score_actividad ?? payload.activity_score);
+          const payload = (typeof data.data === "object" && data.data !== null) 
+            ? (data.data as Record<string, unknown>) 
+            : data;
+
+          // 1. Scoring step
+          if (paso === "calculating_scores") {
+            const risk = Number(payload.risk ?? payload.risk_score);
+            const activity = Number(payload.activity ?? payload.activity_score);
             if (!Number.isNaN(risk)) nextResults.risk_score = risk;
             if (!Number.isNaN(activity)) nextResults.activity_score = activity;
-
-            // Fallback parse from detail text "Riesgo: X, Actividad: Y"
-            const regex = /Riesgo:\s*(\d+).*Actividad:\s*(\d+)/i;
-            const match = regex.exec(detalle);
-            if (match) {
-              nextResults.risk_score = Number(match[1]);
-              nextResults.activity_score = Number(match[2]);
-            }
           }
 
-          if (paso === "clasificando_perfil" || paso === "classifying_profile") {
-            if (typeof data.data === "object" && data.data !== null) {
-              const perfil = (data.data as Record<string, unknown>).tipo;
-              if (typeof perfil === "string") nextResults.perfil = perfil;
-            }
+          // 2. Profile step
+          if (paso === "classifying_profile") {
+            const perfil = payload.tipo || payload.perfil;
+            if (typeof perfil === "string") nextResults.perfil = perfil;
           }
 
-          if (paso === "generando_insight" || paso === "generating_insight") {
-            if (typeof data.data === "object" && data.data !== null) {
-              const insightData = data.data as Record<string, unknown>;
-              const parts: string[] = [];
-              if (typeof insightData.tipo === "string") {
-                parts.push(`Tipo: ${insightData.tipo}`);
-                if (!nextResults.contract_type) nextResults.contract_type = insightData.tipo;
-              }
-              if (typeof insightData.accion_recomendada === "string")
-                parts.push(`Acción: ${insightData.accion_recomendada}`);
-              if (parts.length) nextResults.insight = parts.join(" · ");
+          // 3. Insight step
+          if (paso === "generating_insight") {
+            const parts: string[] = [];
+            if (typeof payload.tipo === "string") {
+              parts.push(`Type: ${payload.tipo}`);
+              if (!nextResults.contract_type) nextResults.contract_type = payload.tipo;
             }
-            if (detalle) nextResults.insight = detalle;
+            if (typeof payload.accion_recomendada === "string") {
+              parts.push(`Action: ${payload.accion_recomendada}`);
+            }
+            if (parts.length) nextResults.insight = parts.join(" · ");
+            else if (detalle) nextResults.insight = detalle;
           }
 
-          if (paso === "evaluando_decision" || paso === "evaluating_decision") {
-            if (typeof data.data === "object" && data.data !== null) {
-              const d = data.data as Record<string, unknown>;
-              if (typeof d.decision === "string") nextResults.agent_decision = d.decision;
-              if (typeof d.reasoning === "string") nextResults.agent_decision = d.reasoning;
-            }
+          // 4. Decision step
+          if (paso === "evaluating_decision") {
+            if (typeof payload.decision === "string") nextResults.agent_decision = payload.decision;
+            if (typeof payload.reasoning === "string") nextResults.agent_decision = payload.reasoning;
           }
 
-          if (["decision_final", "final_decision", "resultado_final"].includes(paso)) {
+          // 5. Final/Result step
+          if (["final_decision", "result_final"].includes(paso) || paso === "decision_final") {
             nextResults.agent_decision = detalle || nextResults.agent_decision;
+            if (typeof payload.decision === "string") nextResults.agent_decision = payload.decision;
           }
 
-          if (paso === "contrato_activo" || paso === "contract_active") {
-            if (typeof data.data === "object" && data.data !== null) {
-              const d = data.data as Record<string, unknown>;
-              if (typeof d.address === "string") nextResults.contract_type = d.address;
-            }
+          // 6. Active Contract step
+          if (paso === "contract_active" || paso === "contrato_activo") {
+            if (typeof payload.address === "string") nextResults.contract_type = payload.address;
           }
 
-          if (typeof data.accion_recomendada === "string") {
-            nextResults.recommended_action = data.accion_recomendada;
+          // Global overrides from payload
+          if (typeof payload.accion_recomendada === "string") {
+            nextResults.recommended_action = payload.accion_recomendada;
           }
-            if (typeof data.data === "object" && data.data !== null) {
-              const payload = data.data as Record<string, unknown>;
-              if (typeof payload.accion_recomendada === "string") {
-                nextResults.recommended_action = payload.accion_recomendada;
-              }
-              if (typeof payload.decision === "string") {
-                nextResults.agent_decision = payload.decision;
-              }
-              if (!nextResults.contract_type && typeof payload.tipo_contrato === "string") {
-                nextResults.contract_type = payload.tipo_contrato;
-              }
-              if (!nextResults.risk_score && typeof payload.risk === "number") {
-                nextResults.risk_score = payload.risk;
-              }
-              if (!nextResults.activity_score && typeof payload.activity === "number") {
-                nextResults.activity_score = payload.activity;
-              }
-            }
-          // Fallback parse for detail text
-          const riskMatch = /Riesgo:\s*(\d+)/i.exec(detalle);
-          const activityMatch = /Actividad:\s*(\d+)/i.exec(detalle);
-          if (riskMatch) {
-            nextResults.risk_score = Number(riskMatch[1]);
+          if (typeof payload.tipo_contrato === "string") {
+            nextResults.contract_type = payload.tipo_contrato;
           }
-          if (activityMatch) {
-            nextResults.activity_score = Number(activityMatch[1]);
-          }
-          if (/monitorear|monitoring/i.test(detalle)) {
-            nextResults.recommended_action = "monitorear";
-          }
+          if (typeof payload.risk === "number") nextResults.risk_score = payload.risk;
+          if (typeof payload.activity === "number") nextResults.activity_score = payload.activity;
 
           return nextResults;
         });
 
-        const finalPuntos = ["decision_final", "result_final", "resultado_final", "contrato_activo", "operacion_financiera", "generando_contrato", "compilando_contrato", "deployando_contrato"];
-        if (finalPuntos.includes(paso) && estado === "completado") {
+        const finalPuntos = [
+          "decision_final", "final_decision", "result_final", "resultado_final", 
+          "contract_active", "financial_operation",
+          "contract_generation", "contract_compilation", 
+          "contract_deployment"
+        ];
+        
+        const isCompleted = estado === "completed";
+        const isError = estado === "error" || estado === "failed";
+
+        if (finalPuntos.includes(paso) && isCompleted) {
           setStatus("completed");
           setError(null);
           if (eventSourceRef.current) {
             eventSourceRef.current.close();
             eventSourceRef.current = null;
           }
-        } else if (estado === "error" || estado === "failed") {
+        } else if (isError) {
           setStatus("error");
-          setError(detalle || "Error durante la ejecución.");
+          setError(detalle || "Error during execution.");
           if (eventSourceRef.current) {
             eventSourceRef.current.close();
             eventSourceRef.current = null;

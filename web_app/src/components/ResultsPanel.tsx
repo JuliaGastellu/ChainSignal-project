@@ -122,8 +122,8 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
           value={results.contract_type || "N/A"}
           subtext={
             results.contract_type
-              ? "Tipo de contrato de mitigación sugerido por el agente."
-              : "No se identificó tipo de contrato aún."
+              ? "Mitigation contract type suggested by the agent."
+              : "No contract type identified yet."
           }
           delay={0.2}
         />
@@ -133,8 +133,8 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
           value={results.recommended_action || "N/A"}
           subtext={
             results.recommended_action
-              ? "Acción sugerida para la wallet basada en riesgo y perfil."
-              : "No se generó acción aún."
+              ? "Suggested action based on risk and profile."
+              : "No action generated yet."
           }
           delay={0.3}
         />

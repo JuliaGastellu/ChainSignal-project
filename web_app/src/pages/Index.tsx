@@ -18,11 +18,11 @@ const Index = () => {
 
   const checkHealth = async () => {
     try {
-      const res = await fetch("https://chainsignal-project.onrender.com/salud");
+      const res = await fetch("/salud");
       const data = await res.json();
       setHealth(JSON.stringify(data, null, 2));
     } catch {
-      setHealth("No se pudo conectar con la API.");
+      setHealth("Could not connect to API.");
     }
   };
 
@@ -30,7 +30,7 @@ const Index = () => {
     setReport(null);
     setReportError(null);
     if (!wallet) {
-      setReportError("Ingresa primero la wallet en el input de análisis.");
+      setReportError("Please enter a wallet address first.");
       return;
     }
     try {
@@ -38,7 +38,7 @@ const Index = () => {
       if (paymentHash.trim()) {
         headers["X-Payment"] = paymentHash.trim();
       }
-      const res = await fetch(`https://chainsignal-project.onrender.com/report/${wallet}`, {
+      const res = await fetch(`/report/${wallet}`, {
         headers,
       });
       const data = await res.json();
@@ -48,7 +48,7 @@ const Index = () => {
         setReport(data);
       }
     } catch {
-      setReportError("No se pudo obtener el reporte.");
+      setReportError("Could not retrieve report.");
     }
   };
 
@@ -91,11 +91,11 @@ const Index = () => {
             </div>
             <div className="space-y-2 text-xs text-muted-foreground">
               <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-secondary/40">
-                <div><span className="font-semibold text-foreground">GET /salud</span><br/>Check health</div>
+                <div><span className="font-semibold text-foreground">GET /health</span><br/>Check health</div>
                 <button onClick={checkHealth} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">Fetch</button>
               </div>
               <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-secondary/40">
-                <div><span className="font-semibold text-foreground">GET /ejecutar-agente/{'{wallet}'}</span><br/>Stream agent analysis</div>
+                <div><span className="font-semibold text-foreground">GET /run-agent/{'{wallet}'}</span><br/>Stream agent analysis</div>
                 <button onClick={() => handleWalletSubmit(wallet || "0x0000000000000000000000000000000000000000")} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">Run Stream</button>
               </div>
               <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-secondary/40">
@@ -105,7 +105,7 @@ const Index = () => {
             </div>
             <div className="mt-3 space-y-2 text-xs text-muted-foreground">
               <div>
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Wallet actual</label>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Current Wallet</label>
                 <input
                   value={wallet}
                   onChange={(e) => setWallet(e.target.value)}
@@ -114,7 +114,7 @@ const Index = () => {
                 />
               </div>
               <div>
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">X-Payment (opcional)</label>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">X-Payment (optional)</label>
                 <input
                   value={paymentHash}
                   onChange={(e) => setPaymentHash(e.target.value)}
@@ -129,7 +129,7 @@ const Index = () => {
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2"><Shield className="h-4 w-4" /> Health & Report</div>
             <div className="text-xs text-muted-foreground">
               <p className="font-medium text-foreground">Health:</p>
-              <pre className="mt-1 p-2 bg-secondary/40 border border-border rounded text-[11px] whitespace-pre-wrap break-all">{health || "Presiona Fetch para ver estado."}</pre>
+              <pre className="mt-1 p-2 bg-secondary/40 border border-border rounded text-[11px] whitespace-pre-wrap break-all">{health || "Click Fetch to see status."}</pre>
             </div>
             <div className="mt-3 text-xs text-muted-foreground">
               <p className="font-medium text-foreground">Report:</p>
@@ -141,7 +141,7 @@ const Index = () => {
 
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold text-foreground"><FileText className="h-4 w-4 inline-block mr-1" /> Ejecutar agente</div>
+            <div className="text-sm font-semibold text-foreground"><FileText className="h-4 w-4 inline-block mr-1" /> Run agent</div>
             <span className="text-xs text-muted-foreground">SSE stream</span>
           </div>
           <WalletInput onSubmit={handleWalletSubmit} isLoading={isLoading} />

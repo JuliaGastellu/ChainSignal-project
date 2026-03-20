@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     def validate(self):
         if not self.ETHERSCAN_API_KEY:
-            print("ADVERTENCIA: ETHERSCAN_API_KEY no configurada. La demo podría fallar sin datos mock.")
+            print("WARNING: ETHERSCAN_API_KEY not configured. Demo might fail without mock data.")
         return True
 
 settings = Settings()

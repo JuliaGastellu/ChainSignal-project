@@ -8,42 +8,43 @@ interface AgentTimelineProps {
 }
 
 const STEP_ORDER = [
-  "analizando_wallet",
-  "calculando_scores",
-  "clasificando_perfil",
-  "generando_insight",
-  "evaluando_decision",
+  "analyzing_wallet",
+  "calculating_scores",
+  "classifying_profile",
+  "generating_insight",
+  "evaluating_decision",
   "decision_final",
-  "contrato_activo",
-  "operacion_financiera",
-  "generando_contrato",
-  "compilando_contrato",
-  "deployando_contrato",
+  "contract_active",
+  "financial_operation",
+  "contract_generation",
+  "contract_compilation",
+  "contract_deployment",
 ];
 
 const STEP_LABELS: Record<string, string> = {
-  analizando_wallet: "Analyzing Wallet",
-  calculando_scores: "Calculating Scores",
-  clasificando_perfil: "Classifying Profile",
-  generando_insight: "Generating Insight",
-  evaluando_decision: "Evaluating Decision",
+  analyzing_wallet: "Analyzing Wallet",
+  calculating_scores: "Calculating Scores",
+  classifying_profile: "Classifying Profile",
+  generating_insight: "Generating Insight",
+  evaluating_decision: "Evaluating Decision",
   decision_final: "Final Decision",
-  contrato_activo: "Contract Active",
-  operacion_financiera: "Financial Operation",
-  generando_contrato: "Generating Contract",
-  compilando_contrato: "Compiling Contract",
-  deployando_contrato: "Deploying Contract",
+  contract_active: "Contract Active",
+  financial_operation: "Financial Operation",
+  contract_generation: "Generating Contract",
+  contract_compilation: "Compiling Contract",
+  contract_deployment: "Deploying Contract",
 };
 
 function getStepIcon(estado: string) {
-  switch (estado) {
-    case "completado":
+  const status = estado.toLowerCase();
+  switch (status) {
     case "completed":
+    case "success":
       return <CheckCircle2 className="h-4 w-4 text-risk-low" />;
     case "error":
     case "failed":
       return <AlertCircle className="h-4 w-4 text-destructive" />;
-    case "iniciando":
+    case "starting":
     case "processing":
     case "running":
       return <Loader2 className="h-4 w-4 text-primary animate-spin" />;
@@ -54,11 +55,12 @@ function getStepIcon(estado: string) {
 
 function getStatusBadge(estado: string) {
   const base = "text-[10px] font-semibold px-2 py-0.5 rounded-full";
-  switch (estado) {
-    case "completado":
+  const status = estado.toLowerCase();
+  switch (status) {
     case "completed":
+    case "success":
       return <span className={`${base} bg-risk-low/15 text-risk-low`}>Completed</span>;
-    case "iniciando":
+    case "starting":
     case "processing":
     case "running":
       return <span className={`${base} bg-primary/15 text-primary`}>Running</span>;
