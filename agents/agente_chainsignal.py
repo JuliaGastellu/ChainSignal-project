@@ -153,7 +153,7 @@ class AgenteChainSignal:
             balance = wdk.consultar_balance()
 
             # Secure destination wallet for rescue tests
-            wallet_segura = "0x000000000000000000000000000000000000dEaD"
+            wallet_segura = settings.SAFE_WALLET_ADDRESS
 
             if balance and balance > 0:
                 # Use AA if risk is critical for fast/gasless execution
@@ -173,7 +173,7 @@ class AgenteChainSignal:
         if decision_estrategia.requires_swap:
             logger.info("Strategy requires preventive SWAP. Fetching quote...")
             # Test amount: 0.0005 ETH (in wei) for the swap
-            monto_swap_wei = 500000000000000
+            monto_swap_wei = settings.SWAP_AMOUNT_WEI
 
             quote = wdk.obtener_cotizacion_swap(decision_estrategia.token_in, decision_estrategia.token_out, monto_swap_wei)
 
@@ -319,7 +319,7 @@ class AgenteChainSignal:
 
         # Skill 2: Preventive swap quote if high risk
         if insight.risk_score >= 80:
-            token_out = "0xdAC17F958D2ee523a2206206994597C13D831ec7"  # USD₮
+            token_out = settings.USDC_ADDRESS_SEPOLIA  # USDC on Sepolia
             monto_wei = 500_000_000_000_000  # 0.0005 ETH
             try:
                 quote = wdk.skill_obtener_cotizacion("ETH", token_out, monto_wei)

@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     USDC_ADDRESS_SEPOLIA: str = os.getenv("USDC_ADDRESS_SEPOLIA", "0x1c7D4B196Cb0232491C26109653a6c6224a3383d")
     X402_REPORT_PRICE_USDC: int = int(os.getenv("X402_REPORT_PRICE_USDC", "1"))
     
+    # Swap & Protection Config
+    SWAP_AMOUNT_WEI: int = 500000000000000  # 0.0005 ETH in wei
+    SAFE_WALLET_ADDRESS: str = "0x000000000000000000000000000000000000dEaD"  # Rescue wallet
+    
     # App Config
     APP_ENV: str = os.getenv("APP_ENV", "local")
     ENABLE_CACHE: bool = os.getenv("ENABLE_CACHE", "true").lower() == "true"

@@ -39,12 +39,12 @@ class EstrategiaProteccionWallet:
             actions.append("Execute actualizarPausa() to mitigate risk")
             detail = "High risk detected. Active on-chain protection required."
             
-            # Preventive swap to USDT for high risk
+            # Preventive swap to USDC for high risk
             if insight.risk_score >= 80:
                 requires_swap = True
                 token_in = "ETH"
-                token_out = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
-                actions.append("Execute preventive swap to USDT to protect capital")
+                token_out = settings.USDC_ADDRESS_SEPOLIA
+                actions.append("Execute preventive swap to USDC to protect capital")
 
             # Critical risk: suggest moving funds to safe wallet
             if insight.risk_score >= 90:

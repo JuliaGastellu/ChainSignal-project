@@ -144,6 +144,8 @@ class ValidadorX402:
                             msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
                         else:
                             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                except Exception as e_lock:
+                    logger.error(f"Error with file lock: {e_lock}")
                             
         except Exception as e:
             logger.error(f"Error guardando hash usado (con lock): {e}")

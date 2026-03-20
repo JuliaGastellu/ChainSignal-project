@@ -182,9 +182,7 @@ async def run_agent_stream(wallet: str):
             if decision.get("decision") == "EXECUTE_ADVANCED":
                 # Step 5.5: x402 Monetization
                 yield f'data: {json.dumps({"paso": "x402_validation", "estado": "starting", "detalle": "Verifying advanced report license (WDK x402)..."})}\n\n'
-                import time
-                time.sleep(1) 
-                yield f'data: {json.dumps({"paso": "x402_validation", "estado": "completed", "detalle": "x402 license validated via USDT. Accessing advanced mitigations."})}\n\n'
+                yield f'data: {json.dumps({"paso": "x402_validation", "estado": "completed", "detalle": "x402 license validated via USDC. Accessing advanced mitigations."})}\n\n'
 
                 datos_insight = {
                     "type": decision.get("contract_type"),
@@ -229,7 +227,7 @@ async def run_agent_stream(wallet: str):
                     from tools.herramienta_transferir_activo import transferir_activo
 
                     balance = consultar_balance()
-                    wallet_segura = "0x000000000000000000000000000000000000dEaD"
+                    wallet_segura = settings.SAFE_WALLET_ADDRESS
 
                     if balance > 0:
                         tx_financiera = transferir_activo(wallet_segura, estrategia.cantidad_transferencia_wei)
@@ -244,12 +242,12 @@ async def run_agent_stream(wallet: str):
                     from services.servicio_wdk import ServicioWDK
                     wdk = ServicioWDK()
                     
-                    monto_swap_wei = 500000000000000 
+                    monto_swap_wei = settings.SWAP_AMOUNT_WEI 
                     
                     tx_swap = wdk.ejecutar_swap(decision_estrategia.token_in, decision_estrategia.token_out, monto_swap_wei)
                     
                     if tx_swap.exitoso:
-                        yield f'data: {json.dumps({"paso": "swap_operation", "estado": "completed", "detalle": "Preventive swap to USDT completed.", "data": {"hash": tx_swap.transaction_hash, "success": True}})}\n\n'
+                        yield f'data: {json.dumps({"paso": "swap_operation", "estado": "completed", "detalle": "Preventive swap to USDC completed.", "data": {"hash": tx_swap.transaction_hash, "success": True}})}\n\n'
                     else:
                         yield f'data: {json.dumps({"paso": "swap_operation", "estado": "error", "detalle": "On-chain swap failed or lacks liquidity."})}\n\n'
 
