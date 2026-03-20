@@ -185,7 +185,7 @@ Retorna análisis protegido con desafío de pago x402:
 ```json
 {
   "challenge": {
-    "token_address": "0x1c7D4B196Cb0232491C26109653a6c6224a3383d",
+    "token_address": "0x1C7D4b196cB0232491C26109653A6c6224a3383D",
     "amount": "1000000",  // 1 USDC
     "recipient": "0x...",
     "instructions": "Send 1.00 USDC on sepolia..."

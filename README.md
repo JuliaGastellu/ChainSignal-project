@@ -1,4 +1,4 @@
-﻿# ChainSignal Autonomous On-Chain Agent
+# ChainSignal Autonomous On-Chain Agent
 
 ChainSignal is an autonomous deterministic agent that analyzes on-chain wallet behavior, generates structured mitigation insights, and executes protective operations through the Tether Wallet Development Kit (WDK).
 
@@ -65,7 +65,7 @@ The endpoint `GET /report/{wallet_address}` is protected by the x402 protocol. T
 3. Re-call the endpoint with the transaction hash in the `X-Payment` header.
 
 **Sepolia Testnet Info:**
-- **USDC Contract**: `0x1c7D4B196Cb0232491C26109653a6c6224a3383d`
+- **USDC Contract**: `0x1C7D4b196cB0232491C26109653A6c6224a3383D`
 - **Network**: Sepolia (Chain ID: 11155111)
 
 **How to pay with MetaMask:**

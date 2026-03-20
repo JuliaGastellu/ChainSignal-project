@@ -5,7 +5,7 @@ import os
 from contextlib import asynccontextmanager
 
 from typing import AsyncGenerator
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from loguru import logger
@@ -20,7 +20,10 @@ from perfil_wallet.clasificador import ClasificadorWallet
 from perfil_wallet.behavioral_scoring import BehavioralScorer
 from decision_engine.engine import DecisionEngine
 
-
+# Nuevo: Herramientas para el reporte extendido
+from tools.herramienta_generar_contrato import generar_contrato
+from tools.herramienta_compilar_contrato import compilar_contrato_tool
+from tools.herramienta_desplegar_contrato import desplegar_contrato
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,19 +67,27 @@ def health():
     """Service health check endpoint."""
     return {"status": "ok", "service": "ChainSignal API", "version": "0.2.0"}
 
+def _ejecutar_despliegue_background(compilado, wallet_address):
+    """Tarea en segundo plano para desplegar el contrato si aplica."""
+    try:
+        logger.info(f"Iniciando despliegue en segundo plano para {wallet_address}...")
+        desplegado = desplegar_contrato(compilado)
+        if desplegado:
+            logger.info(f"Contrato desplegado con éxito en {desplegado.address}")
+        else:
+            logger.warning("El despliegue en segundo plano no retornó datos (WDK inactivo?)")
+    except Exception as e:
+        logger.error(f"Error en despliegue background: {e}")
 
-@app.get(
-    "/report/{wallet_address}",
-    summary="Protected analysis report",
-    description="Returns a protected behavior analysis report for the wallet + x402 payment challenge flow.",
-)
-def get_report(wallet_address: str, request: Request):
-    """Protected analysis report endpoint with x402 payment challenge."""
+@app.get("/report/{wallet_address}", summary="Protected analysis report")
+def get_report(wallet_address: str, request: Request, background_tasks: BackgroundTasks):
+    """Protected analysis report endpoint with x402 payment challenge and behavior analysis."""
     x402 = GatewayX402()
-    valid, reason = x402.verificar_acceso({k.lower(): v for k, v in request.headers.items()})
+    headers_lower = {k.lower(): v for k, v in request.headers.items()}
+    valid, reason = x402.verificar_acceso(headers_lower)
+    
     if not valid:
         challenge = x402.emitir_challenge(f"analysis report for wallet {wallet_address}")
-        # The to_dict already contains the correct structure for the 402 response
         challenge_dict = challenge.to_dict()
         challenge_dict["message"] = reason
         challenge_dict["simulation_mode"] = not settings.is_production
@@ -84,28 +95,98 @@ def get_report(wallet_address: str, request: Request):
 
     try:
         wallet = wallet_address.lower()
+        # 1. Ingestión y Extracción
         raw_data = _cliente.obtener_datos_wallet(wallet)
         metrics = _extractor.extraer(raw_data)
+        
+        # 2. Perfilado y Scoring
         profile = _clasificador.clasificar(metrics)
         scorer = BehavioralScorer()
         scores_obj = scorer.calcular_scores(metrics)
+        
+        # 3. Decisión del Agente
+        scores_dict = {
+            "activity": scores_obj.activity_score.value,
+            "risk": scores_obj.risk_score.value,
+            "defi_engagement": scores_obj.defi_engagement.value,
+        }
+        engine = DecisionEngine()
+        decision = engine.evaluate(scores_dict, metrics={"transaction_count": metrics.total_transacciones})
+        
+        # 4. Generación de Contrato (si aplica)
+        contract_data = None
+        if decision.get("decision") == "EXECUTE_ADVANCED":
+            # Crear insight para el generador
+            from domain.modelos_contrato import InsightContrato
+            insight_obj = InsightContrato(
+                type=decision.get("contract_type", "signal_lock"),
+                analyzed_wallet=wallet,
+                risk_score=scores_dict["risk"],
+                activity_score=scores_dict["activity"],
+            )
+            
+            # Generar y compilar (Sincrónico)
+            source_code = generar_contrato(insight_obj)
+            compilado = compilar_contrato_tool(source_code)
+            
+            contract_data = {
+                "type": decision.get("contract_type"),
+                "source_code": source_code,
+                "abi": compilado.abi,
+                "bytecode": compilado.bytecode,
+                "status": "compiled_and_deploying"
+            }
+            
+            # Lanzar despliegue en segundo plano
+            background_tasks.add_task(_ejecutar_despliegue_background, compilado, wallet)
 
+        # 5. Construcción de Respuesta Premium
         return {
             "wallet": wallet,
-            "profile": profile.type,
-            "scores": {
-                "risk": scores_obj.risk_score.value,
-                "activity": scores_obj.activity_score.value,
-                "defi_engagement": scores_obj.defi_engagement.value,
+            "profile": {
+                "type": profile.type,
+                "confidence": profile.confidence,
+                "description": profile.description,
+                "signals": profile.signals
             },
-            "insight": f"Wallet {wallet} classified as {profile.type} with risk {scores_obj.risk_score.value}.",
+            "scores": {
+                "risk": {
+                    "value": scores_obj.risk_score.value,
+                    "interpretation": scores_obj.risk_score.interpretation
+                },
+                "activity": {
+                    "value": scores_obj.activity_score.value,
+                    "interpretation": scores_obj.activity_score.interpretation
+                },
+                "defi": {
+                    "value": scores_obj.defi_engagement.value,
+                    "interpretation": scores_obj.defi_engagement.interpretation
+                },
+                "web3_index": {
+                    "value": scores_obj.web3_activity_index.value,
+                    "interpretation": scores_obj.web3_activity_index.interpretation
+                }
+            },
+            "metrics": {
+                "total_transactions": metrics.total_transacciones,
+                "eth_balance": metrics.balance_eth_actual,
+                "days_active": metrics.dias_activo,
+                "tx_per_day": metrics.frecuencia_transacciones_por_dia,
+                "contract_interactions_pct": metrics.porcentaje_interacciones_contratos
+            },
+            "agent_decision": {
+                "decision": decision.get("decision"),
+                "reasoning": decision.get("reasoning"),
+                "recommended_action": decision.get("recommended_action")
+            },
+            "contract": contract_data,
             "x402_payment": "validated",
         }
     except Exception as e:
-        logger.error("Error generating x402 report: {}", e)
+        logger.error("Error generating advanced x402 report: {}", e)
         return JSONResponse(status_code=500, content={
             "error": "internal_server_error",
-            "message": "Could not generate report. Check wallet and retry.",
+            "message": f"Could not generate advanced report: {str(e)}",
         })
 
 
