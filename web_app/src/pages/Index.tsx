@@ -1,7 +1,7 @@
 import { WalletInput } from "@/components/WalletInput";
 import { AgentTimeline } from "@/components/AgentTimeline";
 import { ResultsPanel } from "@/components/ResultsPanel";
-import { useAgentSSE } from "@/hooks/useAgentSSE";
+import { useAgentSSE, API_BASE } from "@/hooks/useAgentSSE";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, AlertCircle, RotateCcw, Shield, FileText, Monitor } from "lucide-react";
 import { useState } from "react";
@@ -18,7 +18,7 @@ const Index = () => {
 
   const checkHealth = async () => {
     try {
-      const res = await fetch("/health");
+      const res = await fetch(`${API_BASE}/health`);
       const data = await res.json();
       setHealth(JSON.stringify(data, null, 2));
     } catch {
@@ -38,7 +38,7 @@ const Index = () => {
       if (paymentHash.trim()) {
         headers["X-Payment"] = paymentHash.trim();
       }
-      const res = await fetch(`/report/${wallet}`, {
+      const res = await fetch(`${API_BASE}/report/${wallet}`, {
         headers,
       });
       const data = await res.json();

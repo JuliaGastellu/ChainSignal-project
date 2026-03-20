@@ -22,7 +22,9 @@ export interface AgentResults {
 
 type AgentStatus = "idle" | "connecting" | "streaming" | "completed" | "error";
 
-const API_BASE = "";
+export const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "::"
+  ? ""
+  : "https://chainsignal-project.onrender.com";
 
 export function useAgentSSE() {
   const [events, setEvents] = useState<AgentEvent[]>([]);
@@ -50,7 +52,7 @@ export function useAgentSSE() {
     reset();
     setStatus("connecting");
 
-    const url = `${API_BASE}/ejecutar-agente/${wallet}`;
+    const url = `${API_BASE}/run-agent/${wallet}`;
 
     try {
       const es = new EventSource(url);

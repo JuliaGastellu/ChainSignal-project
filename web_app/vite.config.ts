@@ -6,13 +6,29 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
-    port: 8080,
+    host: true,
+    port: 8081,
     proxy: {
-      "/health": "http://127.0.0.1:8001",
-      "/report": "http://127.0.0.1:8001",
-      "/run-agent": "http://127.0.0.1:8001",
-      "/ejecutar-agente": "http://127.0.0.1:8001",
+      "/health": {
+        target: "http://127.0.0.1:8001",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/report": {
+        target: "http://127.0.0.1:8001",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/run-agent": {
+        target: "http://127.0.0.1:8001",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/ejecutar-agente": {
+        target: "http://127.0.0.1:8001",
+        changeOrigin: true,
+        secure: false,
+      },
     },
     hmr: {
       overlay: false,
