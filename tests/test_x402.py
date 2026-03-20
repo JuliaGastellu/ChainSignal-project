@@ -4,9 +4,8 @@ Cubre el ValidadorX402, el GatewayX402 y el endpoint /report/{wallet}
 usando TestClient de FastAPI. Las pruebas son independientes del WDK y de
 Etherscan (se mockea la infraestructura externa).
 """
-
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,36 +30,39 @@ def test_validador_acepta_hash_valido():
     """Un hash con formato correcto y no usado pasa la validación."""
     from services.servicio_x402 import ValidadorX402
 
-    v = ValidadorX402()
-    hash_valido = "0x" + "b" * 64
-    valido, motivo = v.validar(hash_valido)
-    assert valido is True
-    assert "válido" in motivo.lower()
+    with patch("services.servicio_x402.settings.is_production", new_callable=PropertyMock, return_value=False):
+        v = ValidadorX402()
+        hash_valido = "0x" + "b" * 64
+        valido, motivo = v.validar(hash_valido)
+        assert valido is True
+        assert "valid" in motivo.lower() or "válido" in motivo.lower()
 
 
 def test_validador_rechaza_hash_corto():
     """Un hash con formato incorrecto es rechazado."""
     from services.servicio_x402 import ValidadorX402
 
-    v = ValidadorX402()
-    valido, motivo = v.validar("0xabc123")
-    assert valido is False
-    assert "inválido" in motivo.lower()
+    with patch("services.servicio_x402.settings.is_production", new_callable=PropertyMock, return_value=False):
+        v = ValidadorX402()
+        valido, motivo = v.validar("0xabc123")
+        assert valido is False
+        assert "invalid" in motivo.lower() or "inválido" in motivo.lower()
 
 
 def test_validador_rechaza_replay():
     """El mismo hash no puede usarse dos veces (anti-replay)."""
     from services.servicio_x402 import ValidadorX402
 
-    v = ValidadorX402()
-    hash_valido = "0x" + "c" * 64
+    with patch("services.servicio_x402.settings.is_production", False):
+        v = ValidadorX402()
+        hash_valido = "0x" + "c" * 64
 
-    valido1, _ = v.validar(hash_valido)
-    assert valido1 is True
+        valido1, _ = v.validar(hash_valido)
+        assert valido1 is True
 
-    valido2, motivo2 = v.validar(hash_valido)
-    assert valido2 is False
-    assert "ya fue utilizado" in motivo2.lower()
+        valido2, motivo2 = v.validar(hash_valido)
+        assert valido2 is False
+        assert "used" in motivo2.lower() or "utilizado" in motivo2.lower()
 
 
 def test_gateway_emite_challenge():
@@ -72,10 +74,10 @@ def test_gateway_emite_challenge():
     datos = challenge.to_dict()
 
     assert datos["payment_required"] is True
-    assert "monto_base" in datos
-    assert "token" in datos
-    assert "receptor" in datos
-    assert "instrucciones" in datos
+    assert "amount" in datos["challenge"]
+    assert "token" in datos["challenge"]
+    assert "recipient" in datos["challenge"]
+    assert "instructions" in datos["challenge"]
 
 
 def test_gateway_deshabilitado_retorna_false():
@@ -87,7 +89,7 @@ def test_gateway_deshabilitado_retorna_false():
         acceso, motivo = gw.verificar_acceso({})
 
         assert acceso is False
-        assert "deshabilitado" in motivo.lower()
+        assert "disabled" in motivo.lower() or "deshabilitado" in motivo.lower()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -122,8 +124,8 @@ def test_report_sin_pago_retorna_402(cliente_api):
     assert response.status_code == 402
     datos = response.json()
     assert datos["payment_required"] is True
-    assert "monto_base" in datos
-    assert "token" in datos
+    assert "amount" in datos["challenge"]
+    assert "token" in datos["challenge"]
 
 
 def test_report_con_pago_invalido_retorna_401(cliente_api):
@@ -137,8 +139,10 @@ def test_report_con_pago_invalido_retorna_401(cliente_api):
     assert response.status_code == 401
     datos = response.json()
     assert (
-        "inválido" in datos.get("error", "").lower()
-        or "inválido" in datos.get("motivo", "").lower()
+        "invalid" in datos.get("error", "").lower()
+        or "inválido" in datos.get("error", "").lower()
+        or "invalid" in datos.get("message", "").lower()
+        or "inválido" in datos.get("message", "").lower()
     )
 
 
@@ -158,7 +162,7 @@ def test_report_x402_deshabilitado_retorna_false_en_gateway():
 
     assert response.status_code == 503
     datos = response.json()
-    assert "deshabilitado" in datos.get("detalle", "").lower() or "X402_ENABLED" in datos.get("detalle", "")
+    assert "disabled" in datos.get("error", "").lower() or "deshabilitado" in datos.get("error", "").lower() or "X402_ENABLED" in datos.get("message", "")
 
 
 def test_report_con_pago_valido_retorna_datos():
@@ -204,18 +208,19 @@ def test_report_con_pago_valido_retorna_datos():
         }
         mock_engine_cls.return_value.evaluate.return_value = decision_mock
 
-        with patch.dict(os.environ, {"X402_ENABLED": "true"}):
-            from api.main import app
-            # Forzar reset del gateway para tomar el env actualizado
-            import api.main as api_module
-            from services.servicio_x402 import GatewayX402
-            api_module._gateway_x402 = GatewayX402()
+        with patch("services.servicio_x402.settings.is_production", new_callable=PropertyMock, return_value=False):
+            with patch.dict(os.environ, {"X402_ENABLED": "true"}):
+                from api.main import app
+                # Forzar reset del gateway para tomar el env actualizado
+                import api.main as api_module
+                from services.servicio_x402 import GatewayX402
+                api_module._gateway_x402 = GatewayX402()
 
-            with TestClient(app, raise_server_exceptions=False) as cliente:
-                response = cliente.get(
-                    f"/report/{WALLET_TEST}",
-                    headers={"X-Payment": hash_pago},
-                )
+                with TestClient(app, raise_server_exceptions=False) as cliente:
+                    response = cliente.get(
+                        f"/report/{WALLET_TEST}",
+                        headers={"X-Payment": hash_pago},
+                    )
 
     assert response.status_code in (200, 500)
     if response.status_code == 200:

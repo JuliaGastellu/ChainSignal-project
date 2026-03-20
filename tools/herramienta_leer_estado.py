@@ -31,11 +31,11 @@ def leer_estado(
             "Microservicio WDK no disponible. Lectura de '{}' cancelada.", campo
         )
         return EstadoContrato(
-            contrato_direccion=contrato.direccion,
-            campo=campo,
-            valor=None,
-            exitoso=False,
-            detalle="Microservicio WDK no disponible.",
+            contract_address=contrato.address,
+            field=campo,
+            value=None,
+            success=False,
+            detail="Microservicio WDK no disponible.",
         )
 
     return servicio.leer_estado(contrato, campo, args=args)

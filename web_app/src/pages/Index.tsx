@@ -128,12 +128,10 @@ const Index = () => {
       <header className="border-b border-border">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-primary" />
-            </div>
+            <img src="/static/chainsignal_logo.svg" alt="ChainSignal" className="h-8 w-8" />
             <div>
-              <h1 className="text-sm font-semibold text-foreground leading-none">On-Chain Agent</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">Autonomous Financial Analysis</p>
+              <h1 className="text-sm font-semibold text-foreground leading-none">ChainSignal</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">On-Chain Risk Analysis</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

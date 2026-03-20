@@ -30,10 +30,10 @@ def transferir_activo(direccion_destino: str, cantidad_wei: int) -> ResultadoTra
         )
         return ResultadoTransaccion(
             transaction_hash="",
-            contrato_direccion="",
-            funcion="transferencia_nativa",
-            exitoso=False,
-            detalle="Microservicio WDK no está disponible para transferir.",
+            contract_address="",
+            function="transferencia_nativa",
+            success=False,
+            detail="Microservicio WDK no está disponible para transferir.",
         )
 
     resultado = servicio.transferir_activo(direccion_destino, cantidad_wei)

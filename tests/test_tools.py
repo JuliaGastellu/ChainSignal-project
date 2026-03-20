@@ -11,9 +11,9 @@ class TestHerramientaGenerarContrato:
         from tools.herramienta_generar_contrato import generar_contrato
 
         insight = InsightContrato(
-            tipo="risk_guard",
-            wallet_analizada="0x1234567890123456789012345678901234567890",
-            score_riesgo=80,
+            type="risk_guard",
+            analyzed_wallet="0x1234567890123456789012345678901234567890",
+            risk_score=80,
         )
         codigo = generar_contrato(insight)
 
@@ -24,9 +24,9 @@ class TestHerramientaGenerarContrato:
         from tools.herramienta_generar_contrato import generar_contrato
 
         insight = InsightContrato(
-            tipo="signal_lock",
-            wallet_analizada="0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            score_riesgo=10,
+            type="signal_lock",
+            analyzed_wallet="0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            risk_score=10,
         )
         codigo = generar_contrato(insight)
         assert "contract SignalLock" in codigo
@@ -35,10 +35,10 @@ class TestHerramientaGenerarContrato:
         from tools.herramienta_generar_contrato import generar_contrato
 
         insight = InsightContrato(
-            tipo="treasury_manager",
-            wallet_analizada="0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-            score_riesgo=20,
-            score_actividad=90,
+            type="treasury_manager",
+            analyzed_wallet="0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            risk_score=20,
+            activity_score=90,
         )
         codigo = generar_contrato(insight)
         assert "contract TreasuryManager" in codigo
@@ -46,9 +46,9 @@ class TestHerramientaGenerarContrato:
     def test_tipo_invalido_lanza_excepcion(self):
         with pytest.raises(ValueError):
             InsightContrato(
-                tipo="tipo_invalido",
-                wallet_analizada="0x1234",
-                score_riesgo=50,
+                type="tipo_invalido",
+                analyzed_wallet="0x1234",
+                risk_score=50,
             )
 
 
@@ -59,9 +59,9 @@ class TestHerramientaCompilarContrato:
         from tools.herramienta_compilar_contrato import compilar_contrato_tool
 
         insight = InsightContrato(
-            tipo="risk_guard",
-            wallet_analizada="0x1234567890123456789012345678901234567890",
-            score_riesgo=80,
+            type="risk_guard",
+            analyzed_wallet="0x1234567890123456789012345678901234567890",
+            risk_score=80,
         )
         codigo = generar_contrato(insight)
         compilado = compilar_contrato_tool(codigo)
@@ -87,7 +87,7 @@ class TestHerramientaDesplegar:
         instancia = MockServicio.return_value
         instancia.activo = False
 
-        compilado = ContratoCompilado(nombre="Test", abi=[], bytecode="0x00")
+        compilado = ContratoCompilado(name="Test", abi=[], bytecode="0x00")
         resultado = desplegar_contrato(compilado)
 
         assert resultado is None
@@ -97,13 +97,13 @@ class TestHerramientaDesplegar:
         from tools.herramienta_desplegar_contrato import desplegar_contrato
 
         esperado = ContratoDeplegado(
-            nombre="RiskGuard", direccion="0xABCD", transaction_hash="0xHASH"
+            name="RiskGuard", address="0xABCD", transaction_hash="0xHASH"
         )
         instancia = MockServicio.return_value
         instancia.activo = True
         instancia.desplegar_contrato.return_value = esperado
 
-        compilado = ContratoCompilado(nombre="RiskGuard", abi=[], bytecode="0xABC")
+        compilado = ContratoCompilado(name="RiskGuard", abi=[], bytecode="0xABC")
         resultado = desplegar_contrato(compilado)
 
         assert resultado == esperado
@@ -119,11 +119,11 @@ class TestHerramientaEjecutarFuncion:
         instancia.activo = False
 
         contrato = ContratoDeplegado(
-            nombre="RiskGuard", direccion="0xABCD", transaction_hash="0xHASH"
+            name="RiskGuard", address="0xABCD", transaction_hash="0xHASH"
         )
         resultado = ejecutar_funcion(contrato, "actualizarPausa", args=[80])
 
-        assert resultado.exitoso is False
+        assert resultado.success is False
         assert resultado.transaction_hash == ""
 
 
@@ -136,9 +136,9 @@ class TestHerramientaLeerEstado:
         instancia.activo = False
 
         contrato = ContratoDeplegado(
-            nombre="RiskGuard", direccion="0xABCD", transaction_hash="0xHASH"
+            name="RiskGuard", address="0xABCD", transaction_hash="0xHASH"
         )
         resultado = leer_estado(contrato, "pausado")
 
-        assert resultado.exitoso is False
-        assert resultado.valor is None
+        assert resultado.success is False
+        assert resultado.value is None

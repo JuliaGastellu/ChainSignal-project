@@ -40,17 +40,17 @@ def test_transferir_activo_exitoso(mock_servicio_class):
     
     resultado_mock = ResultadoTransaccion(
         transaction_hash="0xTxHash123",
-        contrato_direccion="",
-        funcion="transferencia_nativa",
-        exitoso=True,
-        detalle="Transferencia enviada."
+        contract_address="",
+        function="transferencia_nativa",
+        success=True,
+        detail="Transferencia enviada."
     )
     mock_instancia.transferir_activo.return_value = resultado_mock
     mock_servicio_class.return_value = mock_instancia
 
     resultado = transferir_activo("0xDestino", 10000)
     
-    assert resultado.exitoso is True
+    assert resultado.success is True
     assert resultado.transaction_hash == "0xTxHash123"
     mock_instancia.transferir_activo.assert_called_once_with("0xDestino", 10000)
 
@@ -64,6 +64,6 @@ def test_transferir_activo_inactivo(mock_servicio_class):
 
     resultado = transferir_activo("0xDestino", 10000)
     
-    assert resultado.exitoso is False
-    assert resultado.detalle == "Microservicio WDK no está disponible para transferir."
+    assert resultado.success is False
+    assert resultado.detail == "Microservicio WDK no está disponible para transferir."
     mock_instancia.transferir_activo.assert_not_called()

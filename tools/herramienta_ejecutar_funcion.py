@@ -35,10 +35,10 @@ def ejecutar_funcion(
         )
         return ResultadoTransaccion(
             transaction_hash="",
-            contrato_direccion=contrato.direccion,
-            funcion=funcion,
-            exitoso=False,
-            detalle="Microservicio WDK no disponible.",
+            contract_address=contrato.address,
+            function=funcion,
+            success=False,
+            detail="Microservicio WDK no disponible.",
         )
 
     return servicio.ejecutar_funcion(contrato, funcion, args=args, valor_wei=valor_wei)

@@ -26,7 +26,7 @@ def desplegar_contrato(
     if not servicio.activo:
         logger.warning(
             "Microservicio WDK no disponible. Despliegue de '{}' cancelado.",
-            contrato.nombre,
+            contrato.name,
         )
         return None
 
