@@ -22,8 +22,12 @@ from decision_engine.engine import DecisionEngine
 
 # Nuevo: Herramientas para el reporte extendido
 from tools.herramienta_generar_contrato import generar_contrato
-from tools.herramienta_compilar_contrato import compilar_contrato_tool
 from tools.herramienta_desplegar_contrato import desplegar_contrato
+from tools.herramienta_transferir_activo import transferir_activo
+from tools.herramienta_consultar_balance import consultar_balance
+from services.servicio_wdk import ServicioWDK
+from strategy.estrategia_proteccion_wallet import EstrategiaProteccionWallet
+from domain.modelos_contrato import InsightContrato
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -79,6 +83,37 @@ def _ejecutar_despliegue_background(compilado, wallet_address):
     except Exception as e:
         logger.error(f"Error en despliegue background: {e}")
 
+
+def _ejecutar_swap_background(token_in, token_out, amount_wei, wallet_address):
+    """Tarea en segundo plano para realizar un swap preventivo."""
+    try:
+        logger.info(f"Iniciando swap preventivo para {wallet_address} ({token_in} -> {token_out})...")
+        wdk = ServicioWDK()
+        tx = wdk.ejecutar_swap(token_in, token_out, amount_wei)
+        if tx.exitoso:
+            logger.info(f"Swap en background completado: {tx.transaction_hash}")
+        else:
+            logger.warning("El swap en segundo plano falló.")
+    except Exception as e:
+        logger.error(f"Error en swap de background: {e}")
+
+
+def _ejecutar_transferencia_background(monto_wei, wallet_address):
+    """Tarea en segundo plano para transferir fondos a una wallet segura."""
+    try:
+        logger.info(f"Iniciando transferencia de rescate para {wallet_address} ({monto_wei} wei)...")
+        balance = consultar_balance()
+        if balance >= monto_wei:
+            tx = transferir_activo(settings.SAFE_WALLET_ADDRESS, monto_wei)
+            if tx.exitoso:
+                logger.info(f"Rescate en background completado: {tx.transaction_hash}")
+            else:
+                logger.warning("La transferencia de rescate falló.")
+        else:
+            logger.warning(f"Balance insuficiente para rescate: {balance} < {monto_wei}")
+    except Exception as e:
+        logger.error(f"Error en transferencia de background: {e}")
+
 @app.get("/report/{wallet_address}", summary="Protected analysis report")
 def get_report(wallet_address: str, request: Request, background_tasks: BackgroundTasks):
     """Protected analysis report endpoint with x402 payment challenge and behavior analysis."""
@@ -104,43 +139,69 @@ def get_report(wallet_address: str, request: Request, background_tasks: Backgrou
         scorer = BehavioralScorer()
         scores_obj = scorer.calcular_scores(metrics)
         
-        # 3. Decisión del Agente
-        scores_dict = {
-            "activity": scores_obj.activity_score.value,
-            "risk": scores_obj.risk_score.value,
-            "defi_engagement": scores_obj.defi_engagement.value,
-        }
-        engine = DecisionEngine()
-        decision = engine.evaluate(scores_dict, metrics={"transaction_count": metrics.total_transacciones})
+        # 3. Evaluación de Estrategia de Protección
+        insight_obj = InsightContrato(
+            type=decision.get("contract_type"),
+            analyzed_wallet=wallet,
+            risk_score=scores_dict["risk"],
+            activity_score=scores_dict["activity"]
+        )
         
-        # 4. Generación de Contrato (si aplica)
-        contract_data = None
-        if decision.get("decision") == "EXECUTE_ADVANCED":
-            # Crear insight para el generador
-            from domain.modelos_contrato import InsightContrato
-            insight_obj = InsightContrato(
-                type=decision.get("contract_type", "signal_lock"),
-                analyzed_wallet=wallet,
-                risk_score=scores_dict["risk"],
-                activity_score=scores_dict["activity"],
+        estrategia = EstrategiaProteccionWallet()
+        decision_estrategia = estrategia.evaluar(insight_obj)
+        
+        financial_actions = []
+        
+        # 3.1. Swap preventivo (USDC)
+        if decision_estrategia.requires_swap:
+            logger.info(f"Programando SWAP preventivo ({decision_estrategia.token_in} -> {decision_estrategia.token_out})")
+            background_tasks.add_task(
+                _ejecutar_swap_background,
+                decision_estrategia.token_in,
+                decision_estrategia.token_out,
+                settings.SWAP_AMOUNT_WEI,
+                wallet
             )
-            
-            # Generar y compilar (Sincrónico)
+            financial_actions.append({
+                "type": "preventive_swap",
+                "detail": f"Swapping {decision_estrategia.token_in} to {decision_estrategia.token_out} to protect capital",
+                "status": "scheduled"
+            })
+
+        # 3.2. Movimiento de fondos (Rescate)
+        if decision_estrategia.requires_funds_movement:
+            logger.info(f"Programando RESCATE de fondos ({estrategia.cantidad_transferencia_wei} wei)")
+            background_tasks.add_task(
+                _ejecutar_transferencia_background,
+                estrategia.cantidad_transferencia_wei,
+                wallet
+            )
+            financial_actions.append({
+                "type": "rescue_transfer",
+                "detail": f"Moving funds to secure vault {settings.SAFE_WALLET_ADDRESS}",
+                "status": "scheduled"
+            })
+
+        # 4. Generación y Despliegue de Contrato
+        contract_data = None
+        if decision_estrategia.requires_contract:
+            logger.info("Generando y programando despliegue de contrato")
+            # Generar y compilar (Sincrónico para incluir en el reporte)
             source_code = generar_contrato(insight_obj)
             compilado = compilar_contrato_tool(source_code)
             
+            # El despliegue real es asíncrono
+            background_tasks.add_task(_ejecutar_despliegue_background, compilado, wallet)
+            
             contract_data = {
-                "type": decision.get("contract_type"),
+                "type": decision_estrategia.actions[0] if decision_estrategia.actions else "mitigation_contract",
                 "source_code": source_code,
                 "abi": compilado.abi,
                 "bytecode": compilado.bytecode,
-                "status": "compiled_and_deploying"
+                "status": "scheduled_for_deployment"
             }
-            
-            # Lanzar despliegue en segundo plano
-            background_tasks.add_task(_ejecutar_despliegue_background, compilado, wallet)
 
-        # 5. Construcción de Respuesta Premium
+        # 5. Construcción de Respuesta Premium Enriquecida
         return {
             "wallet": wallet,
             "profile": {
@@ -176,10 +237,11 @@ def get_report(wallet_address: str, request: Request, background_tasks: Backgrou
             },
             "agent_decision": {
                 "decision": decision.get("decision"),
-                "reasoning": decision.get("reasoning"),
+                "reasoning": decision_estrategia.detail,
                 "recommended_action": decision.get("recommended_action")
             },
             "contract": contract_data,
+            "financial_actions": financial_actions,
             "x402_payment": "validated",
         }
     except Exception as e:

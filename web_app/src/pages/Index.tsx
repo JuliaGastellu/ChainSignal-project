@@ -5,7 +5,14 @@ import { useAgentSSE, API_BASE } from "@/hooks/useAgentSSE";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, AlertCircle, RotateCcw, Shield, FileText, Monitor, Wallet, CheckCircle2, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { BrowserProvider, Contract, parseUnits } from "ethers";
+import { BrowserProvider, Contract } from "ethers";
+import { PremiumReportPanel } from "@/components/PremiumReportPanel";
+
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
 // Minimal ERC20 ABI for transfer
 const ERC20_ABI = [
@@ -289,7 +296,7 @@ const Index = () => {
                   <div className="mb-2 flex items-center gap-1.5 text-green-500 text-[10px] font-bold uppercase">
                     <CheckCircle2 className="h-3 w-3" /> Payment Verified
                   </div>
-                  <pre className="p-2 bg-secondary/40 border border-border rounded text-[11px] whitespace-pre-wrap break-all">{JSON.stringify(report, null, 2)}</pre>
+                  <PremiumReportPanel report={report} />
                 </div>
               )}
             </div>
