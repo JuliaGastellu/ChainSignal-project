@@ -52,3 +52,29 @@ def test_estrategia_actividad_alta():
     assert decision.requiere_contrato is True
     assert decision.requiere_movimiento_fondos is False
     assert decision.requiere_ejecucion is False
+
+
+def test_decision_engine_datos_insuficientes_tipo_nulo():
+    """DATOS_INSUFICIENTES debe retornar tipo null y acción monitorear."""
+    from decision_engine.engine import DecisionEngine
+
+    engine = DecisionEngine()
+    resultado = engine.evaluate({"activity": 5, "risk": 10, "defi_engagement": 0}, metrics={"transaction_count": 3})
+
+    assert resultado["decision"] == "DATOS_INSUFICIENTES"
+    assert resultado["tipo_contrato"] is None
+    assert resultado["accion_recomendada"] == "monitorear"
+
+
+def test_agente_analisis_tipo_none_por_actividad_baja():
+    """Con actividad muy baja el insight no debe proponer contrato."""
+    from agente_ia.agente import AgenteAnalisis
+    from types import SimpleNamespace
+
+    agente = AgenteAnalisis()
+    metrics = SimpleNamespace(total_transacciones=1, transacciones_con_error=0, frecuencia_transacciones_por_dia=1, ratio_envios_vs_recepciones=0)
+    perfil = SimpleNamespace(wallet="0xTEST")
+
+    insight = agente.analizar(metrics, perfil)
+    assert insight.tipo is None
+    assert insight.accion_recomendada == "monitorear"

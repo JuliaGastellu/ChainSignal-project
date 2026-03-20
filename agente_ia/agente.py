@@ -76,24 +76,43 @@ class AgenteAnalisis:
         score += min(50, int(total / 10))
         return max(0, min(100, score))
 
-    def _decidir_tipo_contrato(self, risk: int, actividad: int, perfil: Any) -> str:
-        """Decide qué tipo de contrato se debe generar."""
-        if risk >= 70:
+    def _resolver_tipo_contrato(self, risk: int, actividad: int, perfil: Any, decision: str | None = None) -> str | None:
+        """Reglas deterministas de asignación de tipo de contrato."""
+        # Regla 1: Si no hay decisión confiable, no hay contrato.
+        if decision == "DATOS_INSUFICIENTES":
+            return None
+
+        # Regla 2: Actividad muy baja no justifica despliegue.
+        if actividad < 20:
+            return None
+
+        # Regla 4: Riesgo alto exige mitigación de protección.
+        if risk > 70:
             return "risk_guard"
+
+        # Regla 3: Treasury Manager solo con actividad alta.
         if actividad >= 80:
             return "treasury_manager"
-        if risk >= 40:
+
+        # Regla general: señal pasiva para riesgo moderado.
+        if 40 <= risk <= 70:
             return "signal_lock"
-        return "treasury_manager"
+
+        return None
+
+    def _decidir_tipo_contrato(self, risk: int, actividad: int, perfil: Any) -> str | None:
+        """Decide qué tipo de contrato se debe generar en el insight."""
+        return self._resolver_tipo_contrato(risk, actividad, perfil)
 
     def _determinar_accion(self, risk: int, actividad: int, perfil: Any) -> str:
         """Sugerencia de acción principal para reportar en el insight."""
-        if risk >= 85:
-            return "desplegar_risk_guard"
-        if risk >= 60:
-            return "desplegar_signal_lock"
-        if actividad >= 80:
-            return "desplegar_treasury_manager"
+        tipo = self._resolver_tipo_contrato(risk, actividad, perfil)
+        if tipo == "risk_guard":
+            return "proteger"
+        if tipo == "treasury_manager":
+            return "optimizar"
+        if tipo == "signal_lock":
+            return "proteger"
         return "monitorear"
 
     def _orquestar_con_openclaw(self, insight: InsightContrato, metrics: Any, perfil: Any) -> None:

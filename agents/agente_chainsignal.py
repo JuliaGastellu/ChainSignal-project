@@ -104,6 +104,12 @@ class AgenteChainSignal:
             resultado["error"] = str(error)
             return resultado
 
+        # Guardia crítica: cuando no hay tipo, no se despliega.
+        if insight.tipo is None:
+            logger.info("Sin contrato a desplegar (tipo=None). Solo monitoreo.")
+            resultado["motivo_sin_accion"] = "Sin contrato a desplegar por falta de datos o criterio."
+            return resultado
+
         # Paso 2: Evaluación de Estrategia de Protección.
         from strategy.estrategia_proteccion_wallet import EstrategiaProteccionWallet
         estrategia = EstrategiaProteccionWallet()

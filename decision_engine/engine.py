@@ -39,29 +39,37 @@ class DecisionEngine:
             decision = "DATOS_INSUFICIENTES"
             action_allowed = "NONE"
             reasoning = f"actividad ({tx_count} txs) insuficiente para establecer perfil."
+            tipo_contrato = None
+            accion_recomendada = "monitorear"
         elif risk > 60:
             decision = "BLOCK"
             action_allowed = "NONE"
             reasoning = "riesgo elevado detectado en el comportamiento de la wallet."
+            tipo_contrato = None
+            accion_recomendada = "proteger"
         elif confidence > 0.80 and activity > 70 and defi > 50:
             decision = "EXECUTE_ADVANCED"
             action_allowed = "ALL"
             reasoning = "perfil experto con alta confianza; se permiten operaciones avanzadas."
-            
-            # Selección de tipo de contrato
-            if risk > 40:
+
+            # Selección de tipo de contrato determinista
+            if risk > 70:
                 tipo_contrato = "risk_guard"
+                accion_recomendada = "proteger"
             elif activity > 80:
                 tipo_contrato = "treasury_manager"
+                accion_recomendada = "optimizar"
             else:
                 tipo_contrato = "signal_lock"
-            
+                accion_recomendada = "proteger"
+
             return {
                 "decision": decision,
                 "action_allowed": action_allowed,
                 "confidence": round(confidence, 2),
                 "reasoning": reasoning,
                 "tipo_contrato": tipo_contrato,
+                "accion_recomendada": accion_recomendada,
                 "limits": {
                     "max_eth": max_amount_eth,
                     "gas_limit": gas_limit
@@ -72,16 +80,22 @@ class DecisionEngine:
             decision = "EXECUTE_BASIC"
             action_allowed = "TRANSFER_CALL"
             reasoning = "perfil estable; se permiten transferencias e interacciones estándar."
+            tipo_contrato = None
+            accion_recomendada = "monitorear"
         else:
             decision = "MONITOR"
             action_allowed = "NONE"
             reasoning = "confianza insuficiente para ejecutar operaciones automáticas."
-            
+            tipo_contrato = None
+            accion_recomendada = "monitorear"
+
         return {
             "decision": decision,
             "action_allowed": action_allowed,
             "confidence": round(confidence, 2),
             "reasoning": reasoning,
+            "tipo_contrato": tipo_contrato,
+            "accion_recomendada": accion_recomendada,
             "limits": {
                 "max_eth": max_amount_eth,
                 "gas_limit": gas_limit

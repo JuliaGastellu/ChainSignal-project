@@ -31,6 +31,20 @@ def test_agente_no_actua_con_riesgo_bajo():
     assert "motivo_sin_accion" in resultado
 
 
+def test_agente_no_actua_si_tipo_none():
+    """El agente no debe ejecutar ciclo on-chain cuando insight.tipo es None."""
+    agente = AgenteChainSignal()
+    resultado = agente.ejecutar({
+        "tipo": None,
+        "wallet_analizada": "0x123",
+        "score_riesgo": 10,
+        "score_actividad": 10,
+    })
+
+    assert resultado["requiere_accion"] is False
+    assert "motivo_sin_accion" in resultado
+
+
 @patch("agents.agente_chainsignal.generar_contrato")
 @patch("agents.agente_chainsignal.compilar_contrato_tool")
 @patch("agents.agente_chainsignal.desplegar_contrato")

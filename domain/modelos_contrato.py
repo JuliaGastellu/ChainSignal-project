@@ -1,6 +1,7 @@
 """Modelos de dominio para contratos inteligentes generados por el agente."""
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 
 
@@ -8,18 +9,18 @@ from dataclasses import dataclass, field
 class InsightContrato:
     """Contexto de análisis que dispara la generación de un contrato."""
 
-    tipo: str
+    tipo: Optional[str]
     wallet_analizada: str
     score_riesgo: int
     score_actividad: int = 0
     accion_recomendada: str = "monitorear"
 
     def __post_init__(self):
-        tipos_validos = {"risk_guard", "signal_lock", "treasury_manager"}
+        tipos_validos = {None, "risk_guard", "signal_lock", "treasury_manager"}
         if self.tipo not in tipos_validos:
             raise ValueError(
                 f"Tipo de contrato no soportado: '{self.tipo}'. "
-                f"Válidos: {tipos_validos}"
+                f"Válidos: {tipos_validos - {None}} o null"
             )
 
 

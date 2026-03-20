@@ -150,6 +150,10 @@ async def ejecutar_agente_stream(wallet: str):
             yield f'data: {json.dumps({"paso": "evaluando_decision", "estado": "iniciando", "detalle": "Ejecutando motor de decisiones..."})}\n\n'
             engine = DecisionEngine()
             decision = engine.evaluate(scores_dict, metrics={"transaction_count": metrics.total_transacciones})
+            if decision.get("decision") == "DATOS_INSUFICIENTES":
+                insight_obj.tipo = None
+                decision["accion_recomendada"] = "monitorear"
+                decision["reasoning"] = "No hay suficiente información; no se desplegará contrato."
             msg5 = f"Decisión: {decision.get('decision', 'MONITOR')}"
             yield f'data: {json.dumps({"paso": "evaluando_decision", "estado": "completado", "detalle": msg5, "data": decision})}\n\n'
 
@@ -290,7 +294,10 @@ async def ejecutar_agente_stream(wallet: str):
                 yield f'data: {json.dumps({"paso": "contrato_activo", "estado": "completado", "detalle": "Contrato verificado y activo.", "data": {"address": desplegado.direccion, "hash": desplegado.transaction_hash, "metricas": metricas_dict, "etherscan": msg10}})}\n\n'
 
             else:
-                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": decision["reasoning"], "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada")}})}\n\n'
+                detalle_final = decision.get("reasoning", "No action required.")
+                if decision.get("decision") == "DATOS_INSUFICIENTES":
+                    detalle_final = "no_execution_due_to_low_confidence"
+                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": detalle_final, "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada")}})}\n\n'
 
         except Exception as e:
             logger.error(f"Error en stream: {e}")
