@@ -160,17 +160,38 @@ const Index = () => {
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-primary/5 border border-primary/20 rounded-xl p-6 shadow-sm"
+            className="space-y-4"
           >
-            <div className="flex items-start gap-4">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Wallet className="h-5 w-5 text-primary" />
+            {challenge.simulation_mode && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-700">
+                      ⚠️ SIMULATION MODE
+                    </p>
+                    <p className="text-xs text-yellow-600 mt-1">
+                      This is a test environment. Payments are <strong>NOT validated on-chain</strong>. Any valid transaction hash will be accepted.
+                    </p>
+                    <p className="text-xs text-yellow-600 mt-2">
+                      In production, all payments must be valid USDC transfers verified on the Sepolia blockchain.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-bold text-foreground">Payment Required (x402)</h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  This report is protected. Please pay <strong>{challenge.formatted_amount}</strong> to access it.
-                </p>
+            )}
+            <div 
+              className="bg-primary/5 border border-primary/20 rounded-xl p-6 shadow-sm"
+            >
+              <div className="flex items-start gap-4">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Wallet className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-foreground">Payment Required (x402)</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This report is protected. Please pay <strong>{challenge.formatted_amount}</strong> to access it.
+                  </p>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px]">
                   <div className="space-y-1">
                     <p className="text-muted-foreground uppercase tracking-wider">Network</p>
@@ -199,6 +220,7 @@ const Index = () => {
                   </p>
                 </div>
               </div>
+            </div>
             </div>
           </motion.div>
         )}

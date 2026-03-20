@@ -15,6 +15,7 @@ sin crash (degradación limpia).
 
 import os
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
@@ -22,6 +23,12 @@ from typing import Optional, Tuple
 from loguru import logger
 from web3 import Web3
 from infra.config import settings
+
+# Platform-specific file locking
+if sys.platform == "win32":
+    import msvcrt
+else:
+    import fcntl
 
 # Paths for persistence
 _USED_HASHES_FILE = Path("cache/used_payments.json")
@@ -96,14 +103,50 @@ class ValidadorX402:
         return set()
 
     def _guardar_hash_usado(self, hash_pago: str):
-        """Guarda un hash en el archivo de persistencia."""
-        self._hashes_usados.add(hash_pago.lower())
+        """Guarda un hash en el archivo de persistencia (thread-safe con file locking)."""
+        hash_lower = hash_pago.lower()
         try:
             _USED_HASHES_FILE.parent.mkdir(exist_ok=True)
-            with open(_USED_HASHES_FILE, "w") as f:
-                json.dump(list(self._hashes_usados), f)
+            
+            # Abrir archivo en modo a+ (append+read) para crear si no existe
+            with open(_USED_HASHES_FILE, "a+") as f:
+                # Aplicar file lock (platform-specific)
+                try:
+                    if sys.platform == "win32":
+                        msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                    else:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                    
+                    try:
+                        # Recargar desde disco (otro proceso pudo modificar)
+                        f.seek(0)
+                        existing = set()
+                        try:
+                            content = f.read()
+                            if content.strip():
+                                data = json.loads(content)
+                                existing = set(data)
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                        
+                        # Agregar hash nuevo
+                        existing.add(hash_lower)
+                        self._hashes_usados = existing  # Actualizar en memoria
+                        
+                        # Escribir archivo completo
+                        f.seek(0)
+                        f.truncate()
+                        json.dump(sorted(list(existing)), f)
+                        
+                    finally:
+                        # Liberar lock
+                        if sys.platform == "win32":
+                            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                        else:
+                            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                            
         except Exception as e:
-            logger.error(f"Error guardando hash usado: {e}")
+            logger.error(f"Error guardando hash usado (con lock): {e}")
 
     def esta_habilitado(self) -> bool:
         """Returns True if x402 is enabled in the environment."""

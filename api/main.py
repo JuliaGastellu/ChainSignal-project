@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from loguru import logger
 
 from services.servicio_x402 import GatewayX402
-
+from infra.config import settings
 
 from agente_ia.agente import AgenteAnalisis
 from generacion_features.extractor import ExtractorFeatures
@@ -79,6 +79,7 @@ def get_report(wallet_address: str, request: Request):
         # The to_dict already contains the correct structure for the 402 response
         challenge_dict = challenge.to_dict()
         challenge_dict["message"] = reason
+        challenge_dict["simulation_mode"] = not settings.is_production
         return JSONResponse(status_code=402, content=challenge_dict)
 
     try:
