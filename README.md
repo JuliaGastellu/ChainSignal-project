@@ -56,6 +56,27 @@ python -m uvicorn api.main:app --host 0.0.0.0 --port 8001
 
 - https://chainsignal-project.onrender.com/docs
 
+## x402 Payment System (Protected Reports)
+
+The endpoint `GET /report/{wallet_address}` is protected by the x402 protocol. To access a report:
+
+1. Call the endpoint. It will return `402 Payment Required` with a challenge.
+2. Pay the required amount (1.00 USDC) on **Sepolia Testnet**.
+3. Re-call the endpoint with the transaction hash in the `X-Payment` header.
+
+**Sepolia Testnet Info:**
+- **USDC Contract**: `0x1c7D4B196Cb0232491C26109653a6c6224a3383d`
+- **Network**: Sepolia (Chain ID: 11155111)
+
+**How to pay with MetaMask:**
+- The UI provides a "Pay with MetaMask" button when a 402 is received.
+- It executes a standard ERC20 `transfer` to the agent's recipient address.
+
+**Manual usage (curl):**
+```bash
+curl -H "X-Payment: <tx_hash>" https://chainsignal-project.onrender.com/report/0x...
+```
+
 ## API and UI
 
 The FastAPI backend provides:
@@ -68,8 +89,8 @@ The UI is served via FastAPI from `web_app/app.py` and uses SSE to display real-
 
 ## Operational Modes
 
-- Production mode (`APP_ENV=production`) executes real blockchain operations.
-- Simulation mode runs deterministic flows without real on-chain transactions.
+- Production mode (`APP_ENV=production`) executes real blockchain operations and **verifies x402 payments on-chain**.
+- Simulation mode runs deterministic flows without real on-chain transactions and accepts any valid-looking hash for x402.
 
 ## Production Mode Requirements
 

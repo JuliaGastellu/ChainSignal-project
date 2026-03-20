@@ -76,11 +76,10 @@ def get_report(wallet_address: str, request: Request):
     valid, reason = x402.verificar_acceso({k.lower(): v for k, v in request.headers.items()})
     if not valid:
         challenge = x402.emitir_challenge(f"analysis report for wallet {wallet_address}")
-        return JSONResponse(status_code=402, content={
-            "error": "payment_required",
-            "message": reason,
-            "challenge": challenge.to_dict(),
-        })
+        # The to_dict already contains the correct structure for the 402 response
+        challenge_dict = challenge.to_dict()
+        challenge_dict["message"] = reason
+        return JSONResponse(status_code=402, content=challenge_dict)
 
     try:
         wallet = wallet_address.lower()

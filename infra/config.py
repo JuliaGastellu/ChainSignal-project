@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     # OpenClaw / AI Config
     OPENCLAW_ENABLED: bool = os.getenv("OPENCLAW_ENABLED", "true").lower() == "true"
     
+    # Web3 / Payment Config
+    SEPOLIA_RPC_URL: str = os.getenv("SEPOLIA_RPC_URL", "")
+    X402_PAYMENT_RECIPIENT: str = os.getenv("X402_PAYMENT_RECIPIENT", "")
+    USDC_ADDRESS_SEPOLIA: str = os.getenv("USDC_ADDRESS_SEPOLIA", "0x1c7D4B196Cb0232491C26109653a6c6224a3383d")
+    X402_REPORT_PRICE_USDC: int = int(os.getenv("X402_REPORT_PRICE_USDC", "1"))
+    
     # App Config
     APP_ENV: str = os.getenv("APP_ENV", "local")
     ENABLE_CACHE: bool = os.getenv("ENABLE_CACHE", "true").lower() == "true"
