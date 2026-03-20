@@ -32,6 +32,7 @@ class FeaturesWallet:
     interacciones_contratos: int = 0
     porcentaje_interacciones_contratos: float = 0.0
     transacciones_con_error: int = 0
+    diversidad_protocolos: float = 0.0
 
     # Contexto temporal
     primera_transaccion_timestamp: int = 0
@@ -135,3 +136,10 @@ class ExtractorFeatures:
         features.porcentaje_interacciones_contratos = round(
             contratos / total * 100 if total > 0 else 0.0, 2
         )
+
+        # Cálculo de diversidad de protocolos (basado en destinos únicos que son contratos)
+        destinos_contratos = {tx.destino for tx in txs if tx.es_contrato and tx.destino}
+        if total > 0:
+            features.diversidad_protocolos = round(len(destinos_contratos) / 10.0, 4) if len(destinos_contratos) < 10 else 1.0
+        else:
+            features.diversidad_protocolos = 0.0

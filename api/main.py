@@ -122,7 +122,7 @@ async def run_agent_stream(wallet: str):
             # Step 1: Validate input for invalid wallets (burn address)
             if wallet_addr == "0x0000000000000000000000000000000000000000":
                 yield f'data: {json.dumps({"paso": "evaluating_decision", "estado": "completed", "detalle": "Decision: INSUFFICIENT_DATA", "data": {"decision": "INSUFFICIENT_DATA", "confidence": 0.0, "reasoning": "Null address; no analysis or deployment executed."}})}\n\n'
-                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completed", "detalle": "no_execution_due_to_invalid_wallet", "data": {"decision": "INSUFFICIENT_DATA", "tipo_contrato": None, "accion_recomendada": "monitor", "ejecucion": False, "motivo": "invalid_wallet", "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
+                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completed", "detalle": "no_execution_due_to_invalid_wallet", "data": {"decision": "INSUFFICIENT_DATA", "contract_type": None, "recommended_action": "monitor", "execution": False, "motivo": "invalid_wallet", "simulation_mode": os.getenv("APP_ENV", "local") != "production"}})}\n\n'
                 return
 
             # Step 1: Analyzing wallet

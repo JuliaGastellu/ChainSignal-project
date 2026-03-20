@@ -18,7 +18,7 @@ const Index = () => {
 
   const checkHealth = async () => {
     try {
-      const res = await fetch("/salud");
+      const res = await fetch("/health");
       const data = await res.json();
       setHealth(JSON.stringify(data, null, 2));
     } catch {

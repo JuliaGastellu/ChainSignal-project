@@ -6,8 +6,12 @@ from generacion_features.extractor import ExtractorFeatures
 from perfil_wallet.clasificador import ClasificadorWallet
 from tests.fixtures import datos_wallet_activo, datos_wallet_inactivo
 
-TIPOS_VALIDOS = {"trader", "defi_user", "high_activity_wallet", "low_activity_wallet", "long_term_holder"}
-CONFIANZAS_VALIDAS = {"alta", "media", "baja"}
+TIPOS_VALIDOS = {
+    "trader", "defi_user", "high_activity_wallet", "low_activity_wallet", 
+    "long_term_holder", "defi_power_user", "protocol_explorer", 
+    "active_trader", "liquidity_provider_candidate", "experimental_wallet"
+}
+CONFIANZAS_VALIDAS = {"high", "medium", "low"}
 
 
 @pytest.fixture
@@ -24,21 +28,21 @@ def test_clasificacion_retorna_tipo_valido(extractor, clasificador):
     datos = datos_wallet_activo()
     features = extractor.extraer(datos)
     perfil = clasificador.clasificar(features)
-    assert perfil.tipo in TIPOS_VALIDOS
+    assert perfil.type in TIPOS_VALIDOS
 
 
 def test_clasificacion_retorna_confianza_valida(extractor, clasificador):
     datos = datos_wallet_activo()
     features = extractor.extraer(datos)
     perfil = clasificador.clasificar(features)
-    assert perfil.confianza in CONFIANZAS_VALIDAS
+    assert perfil.confidence in CONFIANZAS_VALIDAS
 
 
 def test_wallet_inactiva_clasificada_como_low_activity(extractor, clasificador):
     datos = datos_wallet_inactivo()
     features = extractor.extraer(datos)
     perfil = clasificador.clasificar(features)
-    assert perfil.tipo == "low_activity_wallet"
+    assert perfil.type == "low_activity_wallet"
 
 
 def test_wallet_passive_holder(extractor, clasificador):
@@ -54,18 +58,18 @@ def test_wallet_passive_holder(extractor, clasificador):
     # Forzar dias_activo alto para el test ya que extractor usa time.time()
     features.dias_activo = 500 
     perfil = clasificador.clasificar(features)
-    assert perfil.tipo == "long_term_holder"
+    assert perfil.type == "long_term_holder"
 
 
 def test_descripcion_no_vacia(extractor, clasificador):
     datos = datos_wallet_activo()
     features = extractor.extraer(datos)
     perfil = clasificador.clasificar(features)
-    assert len(perfil.descripcion) > 10
+    assert len(perfil.description) > 10
 
 
 def test_senales_es_lista(extractor, clasificador):
     datos = datos_wallet_activo()
     features = extractor.extraer(datos)
     perfil = clasificador.clasificar(features)
-    assert isinstance(perfil.senales, list)
+    assert isinstance(perfil.signals, list)
