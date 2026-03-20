@@ -60,15 +60,18 @@ def obtener_agente() -> AgenteAnalisis:
 
 
 @app.get("/health", summary="Service health check")
-@app.get("/salud", summary="Service health check")
 def health():
     """Service health check endpoint."""
     return {"status": "ok", "service": "ChainSignal API", "version": "0.2.0"}
 
 
-@app.get("/report/{wallet_address}", summary="Protected analysis report")
+@app.get(
+    "/report/{wallet_address}",
+    summary="Protected analysis report",
+    description="Returns a protected behavior analysis report for the wallet + x402 payment challenge flow.",
+)
 def get_report(wallet_address: str, request: Request):
-    """Protected analysis report endpoint with x402 payment challenge flow."""
+    """Protected analysis report endpoint with x402 payment challenge."""
     x402 = GatewayX402()
     valid, reason = x402.verificar_acceso({k.lower(): v for k, v in request.headers.items()})
     if not valid:
@@ -79,7 +82,6 @@ def get_report(wallet_address: str, request: Request):
             "challenge": challenge.to_dict(),
         })
 
-    # Return a lightweight demo analysis report.
     try:
         wallet = wallet_address.lower()
         raw_data = _cliente.obtener_datos_wallet(wallet)
@@ -90,7 +92,7 @@ def get_report(wallet_address: str, request: Request):
 
         return {
             "wallet": wallet,
-            "perfil": profile.tipo,
+            "profile": profile.tipo,
             "scores": {
                 "risk": scores_obj.risk_score.valor,
                 "activity": scores_obj.activity_score.valor,
@@ -108,7 +110,7 @@ def get_report(wallet_address: str, request: Request):
 
 
 @app.get("/run-agent/{wallet}", summary="Run agent analysis stream")
-@app.get("/ejecutar-agente/{wallet}", summary="Run agent analysis stream")
+@app.get("/ejecutar-agente/{wallet}", include_in_schema=False)
 async def run_agent_stream(wallet: str):
     """
     Runs the full agent pipeline with real-time SSE event streaming.
