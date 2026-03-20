@@ -91,6 +91,9 @@
                             <p id="decision-reasoning"
                                 style="font-size: 0.95rem; line-height: 1.5; color: var(--text-main); margin-bottom: 12px;">
                             </p>
+                            <div id="decision-meta" style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;
+                                border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; margin-top: 8px; display:none;">
+                            </div>
                         </div>
 
                         <!-- Panel de Pasos de Ejecución (SSE) -->
@@ -270,6 +273,12 @@
             text.innerText = decision.decision.replace(/_/g, ' ');
             reasoning.innerText = decision.reasoning;
             conf.innerText = `${Math.round(decision.confidence * 100)}%`;
+
+            const meta = document.getElementById('decision-meta');
+            meta.style.display = 'block';
+            const ejecucion = decision.ejecucion === true || decision.ejecucion === 'true';
+            const motivo = decision.motivo || (decision.decision === 'DATOS_INSUFICIENTES' ? 'low_confidence' : 'none');
+            meta.innerHTML = `Ejecución: <strong>${ejecucion ? 'true' : 'false'}</strong> • Motivo: <strong>${motivo}</strong>`;
 
             if (decision.decision === 'EXECUTE_ADVANCED') {
                 text.style.color = 'var(--secondary-light)';

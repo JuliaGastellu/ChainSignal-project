@@ -230,6 +230,13 @@
       "tipo": "risk_guard",
       "direccion": "0xDEADBEEF",
       "transaction_hash": "0xHASH"
+    },
+    {
+      "timestamp": "2026-03-20T09:09:30.786424",
+      "wallet_analizada": "0x1234567890123456789012345678901234567890",
+      "tipo": "risk_guard",
+      "direccion": "0xDEADBEEF",
+      "transaction_hash": "0xHASH"
     }
   ]
 }
