@@ -10,11 +10,11 @@ from generacion_features.extractor import FeaturesWallet
 class PerfilWallet:
     """Classified wallet profile with type and support signals."""
 
-    tipo: str
-    confianza: str
-    score_confianza: float
-    senales: List[str]
-    descripcion: str
+    type: str
+    confidence: str
+    confidence_score: float
+    signals: List[str]
+    description: str
 
 
 class ClasificadorWallet:
@@ -47,17 +47,17 @@ class ClasificadorWallet:
         senales = self._recolectar_senales(features)
 
         # Confidence calculation
-        score_confianza = min(puntaje_maximo / 5.0, 1.0)
-        confianza = "high" if score_confianza >= 0.8 else "medium" if score_confianza >= 0.5 else "low"
+        confidence_score = min(puntaje_maximo / 5.0, 1.0)
+        confidence = "high" if confidence_score >= 0.8 else "medium" if confidence_score >= 0.5 else "low"
 
-        descripcion = self._generar_descripcion(tipo, features)
+        description = self._generar_descripcion(tipo, features)
 
         return PerfilWallet(
-            tipo=tipo,
-            confianza=confianza,
-            score_confianza=score_confianza,
-            senales=senales,
-            descripcion=descripcion,
+            type=tipo,
+            confidence=confidence,
+            confidence_score=confidence_score,
+            signals=senales,
+            description=description,
         )
 
     def _evaluar_defi_power_user(self, f: FeaturesWallet) -> int:

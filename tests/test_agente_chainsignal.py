@@ -8,17 +8,17 @@ from domain.modelos_contrato import ContratoCompilado, ContratoDeplegado
 
 # Insight mínimo que supera el umbral de riesgo por defecto (60).
 INSIGHT_RIESGO_ALTO = {
-    "tipo": "risk_guard",
-    "wallet_analizada": "0x1234567890123456789012345678901234567890",
-    "score_riesgo": 85,
-    "score_actividad": 30,
+    "type": "risk_guard",
+    "analyzed_wallet": "0x1234567890123456789012345678901234567890",
+    "risk_score": 85,
+    "activity_score": 30,
 }
 
 INSIGHT_RIESGO_BAJO = {
-    "tipo": "risk_guard",
-    "wallet_analizada": "0x1234567890123456789012345678901234567890",
-    "score_riesgo": 20,
-    "score_actividad": 10,
+    "type": "risk_guard",
+    "analyzed_wallet": "0x1234567890123456789012345678901234567890",
+    "risk_score": 20,
+    "activity_score": 10,
 }
 
 
@@ -27,22 +27,22 @@ def test_agente_no_actua_con_riesgo_bajo():
     agente = AgenteChainSignal()
     resultado = agente.ejecutar(INSIGHT_RIESGO_BAJO)
 
-    assert resultado["requiere_accion"] is False
-    assert "motivo_sin_accion" in resultado
+    assert resultado["requires_action"] is False
+    assert "no_action_reason" in resultado
 
 
 def test_agente_no_actua_si_tipo_none():
-    """El agente no debe ejecutar ciclo on-chain cuando insight.tipo es None."""
+    """El agente no debe ejecutar ciclo on-chain cuando insight.type es None."""
     agente = AgenteChainSignal()
     resultado = agente.ejecutar({
-        "tipo": None,
-        "wallet_analizada": "0x123",
-        "score_riesgo": 10,
-        "score_actividad": 10,
+        "type": None,
+        "analyzed_wallet": "0x123",
+        "risk_score": 10,
+        "activity_score": 10,
     })
 
-    assert resultado["requiere_accion"] is False
-    assert "motivo_sin_accion" in resultado
+    assert resultado["requires_action"] is False
+    assert "no_action_reason" in resultado
 
 
 @patch("agents.agente_chainsignal.generar_contrato")
@@ -60,13 +60,13 @@ def test_agente_ciclo_completo_con_wdk(
     """El agente ejecuta el ciclo completo cuando el WDK está disponible."""
     mock_generar.return_value = "// código solidity"
     mock_compilar.return_value = ContratoCompilado(
-        nombre="RiskGuard",
+        name="RiskGuard",
         abi=[{"name": "actualizarPausa"}],
         bytecode="0xabc",
     )
     desplegado = ContratoDeplegado(
-        nombre="RiskGuard",
-        direccion="0xDEADBEEF",
+        name="RiskGuard",
+        address="0xDEADBEEF",
         transaction_hash="0xHASH",
         abi=[{"name": "actualizarPausa"}],
     )
@@ -90,10 +90,10 @@ def test_agente_ciclo_completo_con_wdk(
     agente = AgenteChainSignal()
     resultado = agente.ejecutar(INSIGHT_RIESGO_ALTO)
 
-    assert resultado["requiere_accion"] is True
-    assert resultado["contrato_desplegado"]["direccion"] == "0xDEADBEEF"
-    assert resultado["funcion_ejecutada"]["exitoso"] is True
-    assert resultado["estado_contrato"]["valor"] is True
+    assert resultado["requires_action"] is True
+    assert resultado["deployed_contract"]["address"] == "0xDEADBEEF"
+    assert resultado["executed_function"]["exitoso"] is True
+    assert resultado["contract_state"]["valor"] is True
 
     mock_generar.assert_called_once()
     mock_compilar.assert_called_once()

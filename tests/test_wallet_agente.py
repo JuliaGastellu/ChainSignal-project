@@ -17,54 +17,54 @@ def test_wallet_agente_modelo():
 
 def test_estrategia_riesgo_critico():
     """Verifica la estrategia para un caso de riesgo crítico."""
-    insight = InsightContrato(tipo="risk_guard", wallet_analizada="0x11", score_riesgo=95)
+    insight = InsightContrato(type="risk_guard", analyzed_wallet="0x11", risk_score=95)
     estrategia = EstrategiaProteccionWallet()
 
     decision = estrategia.evaluar(insight)
 
-    assert decision.requiere_contrato is True
-    assert decision.requiere_movimiento_fondos is True
-    assert decision.requiere_ejecucion is True
-    assert len(decision.acciones) == 4
+    assert decision.requires_contract is True
+    assert decision.requires_funds_movement is True
+    assert decision.requires_execution is True
+    assert len(decision.actions) == 4
 
 
 def test_estrategia_riesgo_medio():
     """Verifica la estrategia para un riesgo detectable pero no crítico."""
-    insight = InsightContrato(tipo="signal_lock", wallet_analizada="0x11", score_riesgo=50)
+    insight = InsightContrato(type="signal_lock", analyzed_wallet="0x11", risk_score=50)
     estrategia = EstrategiaProteccionWallet()
 
     decision = estrategia.evaluar(insight)
 
-    assert decision.requiere_contrato is True
-    assert decision.requiere_movimiento_fondos is False
-    assert decision.requiere_ejecucion is False
+    assert decision.requires_contract is True
+    assert decision.requires_funds_movement is False
+    assert decision.requires_execution is False
 
 
 def test_estrategia_actividad_alta():
     """Verifica la estrategia para actividad alta sin riesgo."""
     insight = InsightContrato(
-        tipo="treasury_manager", wallet_analizada="0x11", score_riesgo=10, score_actividad=90
+        type="treasury_manager", analyzed_wallet="0x11", risk_score=10, activity_score=90
     )
     estrategia = EstrategiaProteccionWallet()
 
     decision = estrategia.evaluar(insight)
 
-    assert decision.requiere_contrato is True
-    assert decision.requiere_movimiento_fondos is False
-    assert decision.requiere_ejecucion is False
+    assert decision.requires_contract is True
+    assert decision.requires_funds_movement is False
+    assert decision.requires_execution is False
 
 
 def test_decision_engine_datos_insuficientes_tipo_nulo():
-    """DATOS_INSUFICIENTES debe retornar tipo null y acción monitorear."""
+    """INSUFFICIENT_DATA debe retornar tipo null y acción monitorear."""
     from decision_engine.engine import DecisionEngine
 
     engine = DecisionEngine()
     resultado = engine.evaluate({"activity": 5, "risk": 10, "defi_engagement": 0}, metrics={"transaction_count": 3})
 
-    assert resultado["decision"] == "DATOS_INSUFICIENTES"
-    assert resultado["tipo_contrato"] is None
-    assert resultado["accion_recomendada"] == "monitor"
-    assert resultado["ejecucion"] is False
+    assert resultado["decision"] == "INSUFFICIENT_DATA"
+    assert resultado["contract_type"] is None
+    assert resultado["recommended_action"] == "monitor"
+    assert resultado["execution"] is False
 
 
 def test_agente_analisis_tipo_none_por_actividad_baja():
@@ -77,8 +77,8 @@ def test_agente_analisis_tipo_none_por_actividad_baja():
     perfil = SimpleNamespace(wallet="0xTEST")
 
     insight = agente.analizar(metrics, perfil)
-    assert insight.tipo is None
-    assert insight.accion_recomendada == "monitor"
+    assert insight.type is None
+    assert insight.recommended_action == "monitor"
 
 def test_decision_engine_execute_advanced_ejecucion_true():
     from decision_engine.engine import DecisionEngine
@@ -86,5 +86,5 @@ def test_decision_engine_execute_advanced_ejecucion_true():
     engine = DecisionEngine()
     resultado = engine.evaluate({"activity": 80, "risk": 30, "defi_engagement": 60}, metrics={"transaction_count": 20})
     assert resultado["decision"] in ["EXECUTE_ADVANCED", "EXECUTE_BASIC"]
-    assert resultado["ejecucion"] is True
+    assert resultado["execution"] is True
 

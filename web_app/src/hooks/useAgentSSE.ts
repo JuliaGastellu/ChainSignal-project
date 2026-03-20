@@ -106,19 +106,22 @@ export function useAgentSSE() {
 
           // 2. Profile step
           if (paso === "classifying_profile") {
-            const perfil = payload.tipo || payload.perfil;
-            if (typeof perfil === "string") nextResults.perfil = perfil;
+            const profile = payload.type || payload.profile || payload.tipo || payload.perfil;
+            if (typeof profile === "string") nextResults.perfil = profile;
           }
 
           // 3. Insight step
           if (paso === "generating_insight") {
             const parts: string[] = [];
-            if (typeof payload.tipo === "string") {
-              parts.push(`Type: ${payload.tipo}`);
-              if (!nextResults.contract_type) nextResults.contract_type = payload.tipo;
+            const type = payload.type || payload.tipo;
+            const recAction = payload.recommended_action || payload.accion_recomendada;
+            
+            if (typeof type === "string") {
+              parts.push(`Type: ${type}`);
+              if (!nextResults.contract_type) nextResults.contract_type = type;
             }
-            if (typeof payload.accion_recomendada === "string") {
-              parts.push(`Action: ${payload.accion_recomendada}`);
+            if (typeof recAction === "string") {
+              parts.push(`Action: ${recAction}`);
             }
             if (parts.length) nextResults.insight = parts.join(" · ");
             else if (detalle) nextResults.insight = detalle;
@@ -142,11 +145,14 @@ export function useAgentSSE() {
           }
 
           // Global overrides from payload
-          if (typeof payload.accion_recomendada === "string") {
-            nextResults.recommended_action = payload.accion_recomendada;
+          const finalRecAction = payload.recommended_action || payload.accion_recomendada;
+          const finalContractType = payload.contract_type || payload.tipo_contrato;
+
+          if (typeof finalRecAction === "string") {
+            nextResults.recommended_action = finalRecAction;
           }
-          if (typeof payload.tipo_contrato === "string") {
-            nextResults.contract_type = payload.tipo_contrato;
+          if (typeof finalContractType === "string") {
+            nextResults.contract_type = finalContractType;
           }
           if (typeof payload.risk === "number") nextResults.risk_score = payload.risk;
           if (typeof payload.activity === "number") nextResults.activity_score = payload.activity;

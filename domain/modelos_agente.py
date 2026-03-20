@@ -9,17 +9,17 @@ class DecisionAgente:
     """Documenta el razonamiento táctico detrás de una acción del agente."""
 
     contexto_analizado: str
-    estrategia_evaluada: str
-    acciones_elegidas: List[str] = field(default_factory=list)
-    motivo: str = ""
-    requiere_swap: bool = False
-    es_simulacion: bool = False
+    evaluated_strategy: str
+    chosen_actions: List[str] = field(default_factory=list)
+    reason: str = ""
+    requires_swap: bool = False
+    is_simulation: bool = False
 
 
 @dataclass
 class MetricasAgente:
     """Acumulador del impacto económico global del agente en la red."""
 
-    valor_protegido_eth: float = 0.0
-    transacciones_realizadas: int = 0
-    contratos_creados: int = 0
+    protected_value_eth: float = 0.0
+    transactions_performed: int = 0
+    contracts_created: int = 0

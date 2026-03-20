@@ -34,13 +34,13 @@ class AgenteAnalisis:
         accion = self._determinar_accion(risk, activity, perfil)
 
         insight = InsightContrato(
-            tipo=tipo,
-            wallet_analizada=getattr(perfil, "wallet", getattr(perfil, "address", "unknown")) if perfil is not None else "unknown",
-            score_riesgo=risk,
-            score_actividad=activity,
+            type=tipo,
+            analyzed_wallet=getattr(perfil, "wallet", getattr(perfil, "address", "unknown")) if perfil is not None else "unknown",
+            risk_score=risk,
+            activity_score=activity,
         )
 
-        insight.accion_recomendada = accion
+        insight.recommended_action = accion
 
         if self.modo_openclaw and self.openclaw_disponible:
             self._orquestar_con_openclaw(insight, metrics, perfil)

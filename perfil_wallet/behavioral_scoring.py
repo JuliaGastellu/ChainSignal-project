@@ -5,9 +5,9 @@ from generacion_features.extractor import FeaturesWallet
 
 class MetricaScoring:
     """Mandatory structure for each dashboard metric."""
-    def __init__(self, valor: int = 0, interpretacion: str = ""):
-        self.valor = valor
-        self.interpretacion = interpretacion
+    def __init__(self, value: int = 0, interpretation: str = ""):
+        self.value = value
+        self.interpretation = interpretation
 
 @dataclass
 class BehavioralScores:
@@ -58,7 +58,7 @@ class BehavioralScorer:
         elif valor >= 20: inter = "Regular network activity."
         else: inter = "Low or sporadic activity."
             
-        return MetricaScoring(valor=valor, interpretacion=inter)
+        return MetricaScoring(value=valor, interpretation=inter)
 
     def _score_riesgo(self, f: FeaturesWallet) -> MetricaScoring:
         """Risk estimation based on errors and anomalous patterns."""
@@ -76,7 +76,7 @@ class BehavioralScorer:
         elif valor >= 20: inter = "Low risk."
         else: inter = "Very low risk. Conservative profile."
             
-        return MetricaScoring(valor=valor, interpretacion=inter)
+        return MetricaScoring(value=valor, interpretation=inter)
 
     def _score_defi(self, f: FeaturesWallet) -> MetricaScoring:
         """Score for interaction with DeFi protocols and smart contracts."""
@@ -87,7 +87,7 @@ class BehavioralScorer:
         elif valor >= 20: inter = "Moderate use of decentralized applications."
         else: inter = "Low contract interaction, mainly used for transfers."
             
-        return MetricaScoring(valor=valor, interpretacion=inter)
+        return MetricaScoring(value=valor, interpretation=inter)
 
     def _score_diversidad(self, f: FeaturesWallet) -> MetricaScoring:
         """Score for diversity of tokens used on the network."""
@@ -98,41 +98,38 @@ class BehavioralScorer:
         valor = min(100, puntos)
         
         if valor >= 70: inter = "High diversity. Manages a broad portfolio."
-        elif valor >= 40: inter = "Medium token diversity."
-        elif valor >= 15: inter = "Low token diversity."
-        else: inter = "Wallet concentrated in 1 or 2 main assets."
-            
-        return MetricaScoring(valor=valor, interpretacion=inter)
+        elif valor >= 40: inter = "Moderate token diversity."
+        elif valor >= 10: inter = "Regular network interaction with tokens."
+        else: inter = "Low token variety; mostly uses ETH or a few tokens."
+        
+        return MetricaScoring(value=valor, interpretation=inter)
 
     def _score_exploracion(self, f: FeaturesWallet) -> MetricaScoring:
-        """Exploration score based on unique wallets and contracts."""
-        puntos = 0
-        if f.numero_wallets_interactuadas > 150: puntos += 100
-        else: puntos = int(f.numero_wallets_interactuadas * 0.6)
+        """Score for protocol exploration and discovery."""
+        valor = min(100, int(f.diversidad_protocolos * 100))
         
-        valor = min(100, puntos)
+        if valor >= 80: inter = "Early adopter. Actively interacts with multiple protocols."
+        elif valor >= 50: inter = "Protocol explorer; interacts with diverse DApps."
+        elif valor >= 20: inter = "Moderate protocol interaction."
+        else: inter = "Low protocol interaction; focused on basic transfers."
         
-        if valor >= 80: inter = "Extremely high exploration level."
-        elif valor >= 50: inter = "Active network explorer."
-        elif valor >= 20: inter = "Moderate exploration interacting with several counterparties."
-        else: inter = "Closed interaction circle (isolated activity or few destinations)."
-            
-        return MetricaScoring(valor=valor, interpretacion=inter)
+        return MetricaScoring(value=valor, interpretation=inter)
 
-    def _calcular_indice_web3(self, s: BehavioralScores) -> MetricaScoring:
-        """Composite index summarizing Web3 user level (0-100)."""
-        # Weighting: 30% Activity, 30% DeFi, 20% Diversity, 20% Exploration
-        indice = (
-            s.activity_score.valor * 0.3 +
-            s.defi_engagement.valor * 0.3 +
-            s.token_diversity.valor * 0.2 +
-            s.protocol_exploration.valor * 0.2
+    def _calcular_indice_web3(self, scores: BehavioralScores) -> MetricaScoring:
+        """Web3 Activity Index (normalized 0-100) based on multiple behavior metrics."""
+        # Weigh activity, defi, diversity and exploration for the global index
+        weighted_score = (
+            (scores.activity_score.value * 0.4) +
+            (scores.defi_engagement.value * 0.3) +
+            (scores.token_diversity.value * 0.15) +
+            (scores.protocol_exploration.value * 0.15)
         )
-        valor = min(100, int(indice))
         
-        if valor >= 80: inter = "Advanced Web3 Native or Institutional user."
-        elif valor >= 50: inter = "Experienced and involved Web3 user."
-        elif valor >= 20: inter = "Intermediate/moderate level Web3 user."
-        else: inter = "Beginner or occasional user."
-            
-        return MetricaScoring(valor=valor, interpretacion=inter)
+        valor = min(100, int(weighted_score))
+        
+        if valor >= 80: inter = "Expert Web3 user. High participation across all sectors."
+        elif valor >= 50: inter = "Advanced user with stable activity."
+        elif valor >= 25: inter = "Emerging user. Growing participation."
+        else: inter = "Sporadic user. Low impact in the ecosystem."
+        
+        return MetricaScoring(value=valor, interpretation=inter)

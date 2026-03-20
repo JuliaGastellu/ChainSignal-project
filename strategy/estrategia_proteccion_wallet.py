@@ -22,59 +22,59 @@ class EstrategiaProteccionWallet:
         Returns:
             DecisionEstrategia with required actions.
         """
-        acciones = []
-        requiere_contrato = False
-        requiere_fondos = False
-        requiere_ejecucion = False
-        requiere_swap = False
+        actions = []
+        requires_contract = False
+        requires_funds = False
+        requires_execution = False
+        requires_swap = False
         token_in = ""
         token_out = ""
-        detalle = "Sin acciones requeridas."
+        detail = "No actions required."
 
-        # Estrategia 1: Riesgo Alto -> Risk Guard Contract + SWAP USD₮
-        if insight.score_riesgo >= self.umbral_riesgo:
-            requiere_contrato = True
-            requiere_ejecucion = True
-            acciones.append("Deploy RiskGuard contract")
-            acciones.append("Execute actualizarPausa() to mitigate risk")
-            detalle = "High risk detected. Active on-chain protection required."
+        # Strategy 1: High Risk -> Risk Guard Contract + USDT SWAP
+        if insight.risk_score >= self.umbral_riesgo:
+            requires_contract = True
+            requires_execution = True
+            actions.append("Deploy RiskGuard contract")
+            actions.append("Execute actualizarPausa() to mitigate risk")
+            detail = "High risk detected. Active on-chain protection required."
             
-            # Preventive swap to USD₮ for high risk
-            if insight.score_riesgo >= 80:
-                requiere_swap = True
+            # Preventive swap to USDT for high risk
+            if insight.risk_score >= 80:
+                requires_swap = True
                 token_in = "ETH"
                 token_out = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
-                acciones.append("Execute preventive swap to USD₮ to protect capital")
+                actions.append("Execute preventive swap to USDT to protect capital")
 
             # Critical risk: suggest moving funds to safe wallet
-            if insight.score_riesgo >= 90:
-                requiere_fondos = True
-                acciones.append(f"Transfer {self.cantidad_transferencia_wei} wei for rescue test to secure wallet")
-                detalle = "Critical risk. Preparing preventive rescue, USD₮ swap, and on-chain lock."
+            if insight.risk_score >= 90:
+                requires_funds = True
+                actions.append(f"Transfer {self.cantidad_transferencia_wei} wei for rescue test to secure wallet")
+                detail = "Critical risk. Preparing preventive rescue, USDT swap, and on-chain lock."
 
         # Strategy 2: High activity -> Treasury Manager
-        elif insight.score_actividad >= self.umbral_actividad_alta:
-            requiere_contrato = True
-            requiere_fondos = False
-            requiere_ejecucion = False
-            acciones.append("Deploy TreasuryManager contract")
-            detalle = "Highly active wallet. On-chain treasury infrastructure required."
+        elif insight.activity_score >= self.umbral_actividad_alta:
+            requires_contract = True
+            requires_funds = False
+            requires_execution = False
+            actions.append("Deploy TreasuryManager contract")
+            detail = "Highly active wallet. On-chain treasury infrastructure required."
             
         # Strategy 3: Lower risk but suspicious -> Signal Lock
-        elif insight.score_riesgo >= 30:
-            requiere_contrato = True
-            requiere_fondos = False
-            requiere_ejecucion = False
-            acciones.append("Deploy SignalLock contract")
-            detalle = "Medium risk detected. Deploying temporary passive lock."
+        elif insight.risk_score >= 30:
+            requires_contract = True
+            requires_funds = False
+            requires_execution = False
+            actions.append("Deploy SignalLock contract")
+            detail = "Medium risk detected. Deploying temporary passive lock."
 
         return DecisionEstrategia(
-            requiere_contrato=requiere_contrato,
-            requiere_movimiento_fondos=requiere_fondos,
-            requiere_ejecucion=requiere_ejecucion,
-            requiere_swap=requiere_swap,
+            requires_contract=requires_contract,
+            requires_funds_movement=requires_funds,
+            requires_execution=requires_execution,
+            requires_swap=requires_swap,
             token_in=token_in,
             token_out=token_out,
-            acciones=acciones,
-            detalle=detalle,
+            actions=actions,
+            detail=detail,
         )

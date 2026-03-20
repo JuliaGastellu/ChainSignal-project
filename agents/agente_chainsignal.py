@@ -60,57 +60,57 @@ class AgenteChainSignal:
         """Ejecuta el ciclo completo del agente para un insight dado.
 
         Args:
-            datos_insight: Diccionario con claves 'tipo', 'wallet_analizada',
-                           'score_riesgo' y opcionalmente 'score_actividad'.
+            datos_insight: Diccionario con claves 'type', 'analyzed_wallet',
+                           'risk_score' y opcionalmente 'activity_score'.
 
         Returns:
             Diccionario con el resultado de cada fase del ciclo.
         """
         logger.info(
-            "Agente iniciando ciclo para wallet {} (riesgo={}, tipo='{}')",
-            datos_insight.get("wallet_analizada"),
-            datos_insight.get("score_riesgo"),
-            datos_insight.get("tipo"),
+            "Agent starting cycle for wallet {} (risk={}, type='{}')",
+            datos_insight.get("analyzed_wallet"),
+            datos_insight.get("risk_score"),
+            datos_insight.get("type"),
         )
 
         resultado: dict[str, Any] = {
-            "wallet_analizada": datos_insight.get("wallet_analizada"),
-            "tipo_contrato": datos_insight.get("tipo"),
-            "score_riesgo": datos_insight.get("score_riesgo"),
-            "requiere_accion": False,
-            "decision_agente": None,
-            "estrategia_evaluada": None,
-            "codigo_solidity": None,
-            "contrato_compilado": None,
-            "contrato_desplegado": None,
-            "funcion_ejecutada": None,
-            "estado_contrato": None,
-            "operacion_financiera": None,
-            "swap_realizado": None,
-            "skills_ejecutados": None,
+            "analyzed_wallet": datos_insight.get("analyzed_wallet"),
+            "contract_type": datos_insight.get("type"),
+            "risk_score": datos_insight.get("risk_score"),
+            "requires_action": False,
+            "agent_decision": None,
+            "evaluated_strategy": None,
+            "solidity_code": None,
+            "compiled_contract": None,
+            "deployed_contract": None,
+            "executed_function": None,
+            "contract_state": None,
+            "financial_operation": None,
+            "swap_performed": None,
+            "executed_skills": None,
             "timestamp": datetime.now().isoformat(),
         }
 
-        # Paso 1: Construir el modelo de insight del dominio.
+        # Step 1: Build the domain insight model.
         try:
             insight = InsightContrato(
-                tipo=datos_insight["tipo"],
-                wallet_analizada=datos_insight["wallet_analizada"],
-                score_riesgo=datos_insight.get("score_riesgo", 0),
-                score_actividad=datos_insight.get("score_actividad", 0),
+                type=datos_insight["type"],
+                analyzed_wallet=datos_insight["analyzed_wallet"],
+                risk_score=datos_insight.get("risk_score", 0),
+                activity_score=datos_insight.get("activity_score", 0),
             )
         except (KeyError, ValueError) as error:
-            logger.error("Insight inválido: {}", error)
+            logger.error("Invalid insight: {}", error)
             resultado["error"] = str(error)
             return resultado
 
-        # Guardia crítica: cuando no hay tipo, no se despliega.
-        if insight.tipo is None:
-            logger.info("Sin contrato a desplegar (tipo=None). Solo monitoreo.")
-            resultado["motivo_sin_accion"] = "Sin contrato a desplegar por falta de datos o criterio."
+        # Critical guard: if no type, do not deploy.
+        if insight.type is None:
+            logger.info("No contract to deploy (type=None). Monitoring only.")
+            resultado["no_action_reason"] = "No contract to deploy due to lack of data or criteria."
             return resultado
 
-        # Paso 2: Evaluación de Estrategia de Protección.
+        # Step 2: Protection Strategy Evaluation.
         from strategy.estrategia_proteccion_wallet import EstrategiaProteccionWallet
         estrategia = EstrategiaProteccionWallet()
         decision_estrategia = estrategia.evaluar(insight)
@@ -118,29 +118,29 @@ class AgenteChainSignal:
         es_simulacion = os.getenv("APP_ENV", "local") != "production"
 
         decision_agente = DecisionAgente(
-            contexto_analizado=f"Score Riesgo: {insight.score_riesgo}, Actividad: {insight.score_actividad}",
-            estrategia_evaluada=estrategia.__class__.__name__,
-            acciones_elegidas=decision_estrategia.acciones,
-            motivo=decision_estrategia.detalle,
-            requiere_swap=decision_estrategia.requiere_swap,
-            es_simulacion=es_simulacion,
+            contexto_analizado=f"Risk Score: {insight.risk_score}, Activity: {insight.activity_score}",
+            evaluated_strategy=estrategia.__class__.__name__,
+            chosen_actions=decision_estrategia.actions,
+            reason=decision_estrategia.detail,
+            requires_swap=decision_estrategia.requires_swap,
+            is_simulation=es_simulacion,
         )
 
-        resultado["decision_agente"] = decision_agente.__dict__
-        resultado["estrategia_evaluada"] = {
-            "requiere_contrato": decision_estrategia.requiere_contrato,
-            "requiere_movimiento_fondos": decision_estrategia.requiere_movimiento_fondos,
-            "requiere_swap": decision_estrategia.requiere_swap,
-            "acciones": decision_estrategia.acciones,
-            "detalle": decision_estrategia.detalle,
+        resultado["agent_decision"] = decision_agente.__dict__
+        resultado["evaluated_strategy"] = {
+            "requires_contract": decision_estrategia.requires_contract,
+            "requires_funds_movement": decision_estrategia.requires_funds_movement,
+            "requires_swap": decision_estrategia.requires_swap,
+            "actions": decision_estrategia.actions,
+            "detail": decision_estrategia.detail,
         }
 
-        if not decision_estrategia.requiere_contrato and not decision_estrategia.requiere_movimiento_fondos and not decision_estrategia.requiere_swap:
-            logger.info("Estrategia determinó que no hay acciones requeridas.")
-            resultado["motivo_sin_accion"] = decision_estrategia.detalle
+        if not decision_estrategia.requires_contract and not decision_estrategia.requires_funds_movement and not decision_estrategia.requires_swap:
+            logger.info("Strategy determined no actions required.")
+            resultado["no_action_reason"] = decision_estrategia.detail
             return resultado
 
-        resultado["requiere_accion"] = True
+        resultado["requires_action"] = True
 
         # Paso 3: Operaciones Económicas Preventivas
         # Se instancia ServicioWDK antes de los bloques condicionales para evitar
@@ -148,242 +148,242 @@ class AgenteChainSignal:
         from services.servicio_wdk import ServicioWDK
         wdk = ServicioWDK()
 
-        if decision_estrategia.requiere_movimiento_fondos:
-            logger.info("Estrategia requiere movimiento de fondos. Consultando balance propio...")
+        if decision_estrategia.requires_funds_movement:
+            logger.info("Strategy requires funds movement. Checking own balance...")
             balance = wdk.consultar_balance()
 
-            # Billetera segura de destino para tests de rescate
+            # Secure destination wallet for rescue tests
             wallet_segura = "0x000000000000000000000000000000000000dEaD"
 
             if balance and balance > 0:
-                # Usar AA si el riesgo es crítico para asegurar ejecución rápida/gasless
-                use_aa = insight.score_riesgo >= 90
+                # Use AA if risk is critical for fast/gasless execution
+                use_aa = insight.risk_score >= 90
                 tx_financiera = wdk.transferir_activo(wallet_segura, estrategia.cantidad_transferencia_wei, use_aa=use_aa)
-                resultado["operacion_financiera"] = {
-                    "tipo": "transferencia",
-                    "destino": wallet_segura,
-                    "exitoso": tx_financiera.exitoso,
+                resultado["financial_operation"] = {
+                    "type": "transfer",
+                    "destination": wallet_segura,
+                    "success": tx_financiera.exitoso,
                     "hash": tx_financiera.transaction_hash,
                 }
             else:
-                logger.warning("No hay balance suficiente para la operación preventiva.")
-                resultado["operacion_financiera"] = {"error": "Balance insuficiente."}
+                logger.warning("Insufficient balance for preventive operation.")
+                resultado["financial_operation"] = {"error": "Insufficient balance."}
 
-        # Paso 3.5: Swap Preventivo (Velora WDK)
-        if decision_estrategia.requiere_swap:
-            logger.info("Estrategia requiere SWAP preventivo. Consultando cotización...")
-            # Monto de prueba: 0.0005 ETH (en wei) para el swap
+        # Step 3.5: Preventive Swap (Velora WDK)
+        if decision_estrategia.requires_swap:
+            logger.info("Strategy requires preventive SWAP. Fetching quote...")
+            # Test amount: 0.0005 ETH (in wei) for the swap
             monto_swap_wei = 500000000000000
 
             quote = wdk.obtener_cotizacion_swap(decision_estrategia.token_in, decision_estrategia.token_out, monto_swap_wei)
 
             if quote or es_simulacion:
-                logger.info("Cotización recibida. Ejecutando swap on-chain...")
-                # Usar AA para swaps de emergencia
-                use_aa = insight.score_riesgo >= 80
+                logger.info("Quote received. Executing on-chain swap...")
+                # Use AA for emergency swaps
+                use_aa = insight.risk_score >= 80
                 tx_swap = wdk.ejecutar_swap(decision_estrategia.token_in, decision_estrategia.token_out, monto_swap_wei, use_aa=use_aa)
-                resultado["swap_realizado"] = {
+                resultado["swap_performed"] = {
                     "token_in": decision_estrategia.token_in,
                     "token_out": decision_estrategia.token_out,
-                    "exitoso": tx_swap.exitoso,
+                    "success": tx_swap.exitoso,
                     "hash": tx_swap.transaction_hash,
                 }
             else:
-                logger.warning("No se pudo obtener cotización para el swap.")
-                resultado["swap_realizado"] = {"error": "Fallo en cotización."}
+                logger.warning("Could not fetch swap quote.")
+                resultado["swap_performed"] = {"error": "Quote fetch failed."}
 
-        # Paso 4 a 8: Infraestructura On-Chain
-        if decision_estrategia.requiere_contrato:
-            # Paso 4: Generación del contrato.
+        # Steps 4 to 8: On-Chain Infrastructure
+        if decision_estrategia.requires_contract:
+            # Step 4: Contract generation.
             try:
                 codigo = generar_contrato(insight)
-                resultado["codigo_solidity"] = codigo
+                resultado["solidity_code"] = codigo
             except Exception as error:
-                logger.error("Fallo en generación de contrato: {}", error)
-                resultado["error"] = f"Generación: {error}"
+                logger.error("Contract generation failed: {}", error)
+                resultado["error"] = f"Generation: {error}"
                 return resultado
 
-            # Paso 5: Compilación.
+            # Step 5: Compilation.
             try:
                 compilado: ContratoCompilado = compilar_contrato_tool(codigo)
-                resultado["contrato_compilado"] = {
-                    "nombre": compilado.nombre,
-                    "abi_entradas": len(compilado.abi),
-                    "bytecode_longitud": len(compilado.bytecode),
+                resultado["compiled_contract"] = {
+                    "name": compilado.name,
+                    "abi_entries": len(compilado.abi),
+                    "bytecode_length": len(compilado.bytecode),
                 }
             except Exception as error:
-                logger.error("Fallo en compilación: {}", error)
-                resultado["error"] = f"Compilación: {error}"
+                logger.error("Compilation failed: {}", error)
+                resultado["error"] = f"Compilation: {error}"
                 return resultado
 
-            # Paso 6: Despliegue en blockchain.
-            args_constructor = _ARGS_CONSTRUCTOR.get(insight.tipo, [])
+            # Step 6: Blockchain deployment.
+            args_constructor = _ARGS_CONSTRUCTOR.get(insight.type, [])
             desplegado: ContratoDeplegado | None = desplegar_contrato(
                 compilado, args_constructor=args_constructor
             )
 
             if desplegado is None:
                 logger.warning(
-                    "Despliegue omitido (WDK no disponible). "
-                    "El contrato fue generado y compilado correctamente."
+                    "Deployment skipped (WDK not available). "
+                    "The contract was generated and compiled correctly."
                 )
-                resultado["aviso"] = "WDK no disponible. Despliegue pendiente."
+                resultado["notice"] = "WDK not available. Deployment pending."
                 return resultado
 
-            resultado["contrato_desplegado"] = {
-                "direccion": desplegado.direccion,
+            resultado["deployed_contract"] = {
+                "address": desplegado.address,
                 "transaction_hash": desplegado.transaction_hash,
             }
 
-            # Paso 7: Ejecución de función inicial según el tipo de contrato.
-            if decision_estrategia.requiere_ejecucion:
-                funcion_inicial, args_fn = self._funcion_inicial(insight.tipo, insight.score_riesgo)
+            # Step 7: Initial function execution based on contract type.
+            if decision_estrategia.requires_execution:
+                funcion_inicial, args_fn = self._funcion_inicial(insight.type, insight.risk_score)
                 if funcion_inicial:
                     tx: ResultadoTransaccion = ejecutar_funcion(
                         desplegado, funcion_inicial, args=args_fn
                     )
-                    resultado["funcion_ejecutada"] = {
-                        "funcion": funcion_inicial,
-                        "exitoso": tx.exitoso,
+                    resultado["executed_function"] = {
+                        "function": funcion_inicial,
+                        "success": tx.exitoso,
                         "transaction_hash": tx.transaction_hash,
                     }
 
-            # Paso 8: Lectura del estado resultante.
-            campo_estado = self._campo_estado(insight.tipo)
-            if campo_estado:
-                estado: EstadoContrato = leer_estado(desplegado, campo_estado)
-                resultado["estado_contrato"] = {
-                    "campo": estado.campo,
-                    "valor": estado.valor,
-                    "exitoso": estado.exitoso,
+            # Step 8: Reading resulting state.
+            state_field = self._state_field(insight.type)
+            if state_field:
+                state: EstadoContrato = leer_estado(desplegado, state_field)
+                resultado["contract_state"] = {
+                    "field": state.campo,
+                    "value": state.valor,
+                    "success": state.exitoso,
                 }
 
-        # Paso 9: Capa de Agent Skills (EXECUTE_ADVANCED)
-        # Los skills se invocan como capa adicional opcional — no reemplazan
-        # ninguna lógica existente; enriquecen el resultado con datos extra.
-        resultado["skills_ejecutados"] = self._invocar_skills(insight, wdk)
+        # Step 9: Agent Skills Layer (EXECUTE_ADVANCED)
+        # Skills are invoked as an optional additional layer — they do not replace
+        # any existing logic; they enrich the result with extra data.
+        resultado["executed_skills"] = self._invoke_skills(insight, wdk)
 
-        # Paso 10: Registro persistente de la operación.
-        self._registrar_operacion(resultado)
+        # Step 10: Persistent record of the operation.
+        self._record_operation(resultado)
 
-        logger.info("Ciclo del AgenteChainSignal completado exitosamente.")
+        logger.info("AgenteChainSignal cycle completed successfully.")
         return resultado
 
 
     def _funcion_inicial(
-        self, tipo: str, score_riesgo: int
+        self, type_val: str, risk_score: int
     ) -> tuple[str | None, list]:
-        """Retorna la función inicial y sus argumentos según el tipo de contrato."""
-        if tipo == "risk_guard":
-            return "actualizarPausa", [score_riesgo]
+        """Returns the initial function and its arguments based on the contract type."""
+        if type_val == "risk_guard":
+            return "actualizarPausa", [risk_score]
         return None, []
 
-    def _campo_estado(self, tipo: str) -> str | None:
-        """Retorna el campo de estado a leer según el tipo de contrato."""
-        campos = {
+    def _state_field(self, type_val: str) -> str | None:
+        """Returns the state field to read based on the contract type."""
+        fields = {
             "risk_guard": "pausado",
             "signal_lock": "desbloqueoTimestamp",
             "treasury_manager": "scoreActividadInicial",
         }
-        return campos.get(tipo)
+        return fields.get(type_val)
 
-    def _invocar_skills(
+    def _invoke_skills(
         self, insight: "InsightContrato", wdk: "ServicioWDK"
     ) -> dict[str, Any]:
-        """Invoca los WDK Agent Skills como capa adicional de inteligencia.
+        """Invokes WDK Agent Skills as an additional layer of intelligence.
 
-        Esta capa se activa cuando el score de riesgo supera el umbral y el
-        sistema ya evaluó su estrategia principal. Los skills enriquecen el
-        resultado con datos en tiempo real (balance, cotización) sin mutar
-        la lógica de clasificación ni el motor de decisiones.
+        This layer is activated when the risk score exceeds the threshold and the
+        system has already evaluated its main strategy. Skills enrich the
+        result with real-time data (balance, quote) without mutating
+        the classification logic or the decision engine.
 
-        Si el WDK no está disponible, retorna datos simulados vía ServicioWDK.
+        If the WDK is not available, it returns simulated data via ServicioWDK.
 
         Args:
-            insight: El contexto de análisis de la wallet.
-            wdk: Instancia ya inicializada de ServicioWDK.
+            insight: The analysis context of the wallet.
+            wdk: Already initialized instance of ServicioWDK.
 
         Returns:
-            Diccionario con los resultados de cada skill invocado.
+            Dictionary with the results of each invoked skill.
         """
-        resumen: dict[str, Any] = {}
-        logger.info("Invocando Agent Skills para wallet {}", insight.wallet_analizada)
+        summary: dict[str, Any] = {}
+        logger.info("Invoking Agent Skills for wallet {}", insight.analyzed_wallet)
 
-        # Skill 1: Balance de la wallet analizada
+        # Skill 1: Balance of the analyzed wallet
         try:
-            datos_balance = wdk.skill_obtener_balance(insight.wallet_analizada)
-            resumen["balance_wallet_analizada"] = datos_balance
+            balance_data = wdk.skill_obtener_balance(insight.analyzed_wallet)
+            summary["analyzed_wallet_balance"] = balance_data
         except Exception as error:
-            logger.warning("Skill obtener_balance falló: {}", error)
-            resumen["balance_wallet_analizada"] = {"error": str(error)}
+            logger.warning("Skill obtener_balance failed: {}", error)
+            summary["analyzed_wallet_balance"] = {"error": str(error)}
 
-        # Skill 2: Cotización de swap preventivo si hay riesgo alto
-        if insight.score_riesgo >= 80:
+        # Skill 2: Preventive swap quote if high risk
+        if insight.risk_score >= 80:
             token_out = "0xdAC17F958D2ee523a2206206994597C13D831ec7"  # USD₮
             monto_wei = 500_000_000_000_000  # 0.0005 ETH
             try:
-                cotizacion = wdk.skill_obtener_cotizacion("ETH", token_out, monto_wei)
-                resumen["cotizacion_swap_preventivo"] = cotizacion
+                quote = wdk.skill_obtener_cotizacion("ETH", token_out, monto_wei)
+                summary["preventive_swap_quote"] = quote
             except Exception as error:
-                logger.warning("Skill obtener_cotizacion falló: {}", error)
-                resumen["cotizacion_swap_preventivo"] = {"error": str(error)}
+                logger.warning("Skill obtener_cotizacion failed: {}", error)
+                summary["preventive_swap_quote"] = {"error": str(error)}
 
-        logger.info("Agent Skills completados: {} datos obtenidos", len(resumen))
-        return resumen
+        logger.info("Agent Skills completed: {} data points obtained", len(summary))
+        return summary
 
-    def _registrar_operacion(self, resultado: dict) -> None:
-        """Persiste el resultado del ciclo en el archivo de registro y actualiza métricas."""
-        # 1. Registro del contrato (append)
+    def _record_operation(self, result: dict) -> None:
+        """Persists the cycle result to the registry file and updates metrics."""
+        # 1. Contract Registry (append)
         try:
-            datos_existentes: dict = {"contratos": []}
+            existing_data: dict = {"contracts": []}
             if _REGISTRO_CONTRATOS.exists():
-                with _REGISTRO_CONTRATOS.open("r", encoding="utf-8") as archivo:
-                    datos_existentes = json.load(archivo)
+                with _REGISTRO_CONTRATOS.open("r", encoding="utf-8") as file:
+                    existing_data = json.load(file)
 
-            datos_existentes["contratos"].append({
-                "timestamp": resultado["timestamp"],
-                "wallet_analizada": resultado["wallet_analizada"],
-                "tipo": resultado["tipo_contrato"],
-                "direccion": resultado.get("contrato_desplegado", {}).get("direccion"),
-                "transaction_hash": resultado.get("contrato_desplegado", {}).get(
+            existing_data["contracts"].append({
+                "timestamp": result["timestamp"],
+                "analyzed_wallet": result["analyzed_wallet"],
+                "type": result["contract_type"],
+                "address": result.get("deployed_contract", {}).get("address"),
+                "transaction_hash": result.get("deployed_contract", {}).get(
                     "transaction_hash"
                 ),
             })
 
-            with _REGISTRO_CONTRATOS.open("w", encoding="utf-8") as archivo:
-                json.dump(datos_existentes, archivo, indent=2, ensure_ascii=False)
+            with _REGISTRO_CONTRATOS.open("w", encoding="utf-8") as file:
+                json.dump(existing_data, file, indent=2, ensure_ascii=False)
 
         except Exception as error:
-            logger.warning("No se pudo registrar la operación en disco: {}", error)
+            logger.warning("Could not record operation on disk: {}", error)
 
-        # 2. Actualización de las métricas económicas acumuladas
+        # 2. Update accumulated economic metrics
         try:
-            metricas_dict = {
-                "valor_protegido_eth": 0.0,
-                "transacciones_realizadas": 0,
-                "contratos_creados": 0
+            metrics_dict = {
+                "protected_value_eth": 0.0,
+                "transactions_performed": 0,
+                "contracts_created": 0
             }
             if _METRICAS_AGENTE.exists():
-                with _METRICAS_AGENTE.open("r", encoding="utf-8") as archivo:
-                    metricas_dict = json.load(archivo)
+                with _METRICAS_AGENTE.open("r", encoding="utf-8") as file:
+                    metrics_dict = json.load(file)
 
-            if resultado.get("contrato_desplegado"):
-                metricas_dict["contratos_creados"] += 1
-                metricas_dict["transacciones_realizadas"] += 1 # deploy tx
+            if result.get("deployed_contract"):
+                metrics_dict["contracts_created"] += 1
+                metrics_dict["transactions_performed"] += 1 # deploy tx
 
-            if resultado.get("funcion_ejecutada"):
-                metricas_dict["transacciones_realizadas"] += 1 # call tx
+            if result.get("executed_function"):
+                metrics_dict["transactions_performed"] += 1 # call tx
 
-            if resultado.get("operacion_financiera", {}).get("exitoso"):
-                metricas_dict["transacciones_realizadas"] += 1 # transfer tx
-                metricas_dict["valor_protegido_eth"] += 0.001
+            if result.get("financial_operation", {}).get("success"):
+                metrics_dict["transactions_performed"] += 1 # transfer tx
+                metrics_dict["protected_value_eth"] += 0.001
 
-            if resultado.get("swap_realizado", {}).get("exitoso"):
-                metricas_dict["transacciones_realizadas"] += 1 # swap tx
-                metricas_dict["valor_protegido_eth"] += 0.0005 # El monto del swap
+            if result.get("swap_performed", {}).get("success"):
+                metrics_dict["transactions_performed"] += 1 # swap tx
+                metrics_dict["protected_value_eth"] += 0.0005 # The swap amount
 
-            with _METRICAS_AGENTE.open("w", encoding="utf-8") as archivo:
-                json.dump(metricas_dict, archivo, indent=2, ensure_ascii=False)
+            with _METRICAS_AGENTE.open("w", encoding="utf-8") as file:
+                json.dump(metrics_dict, file, indent=2, ensure_ascii=False)
 
         except Exception as error:
-            logger.warning("No se pudieron registrar las métricas del agente: {}", error)
+            logger.warning("Could not record agent metrics: {}", error)

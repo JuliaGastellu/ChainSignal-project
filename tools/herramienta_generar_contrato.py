@@ -21,22 +21,22 @@ def generar_contrato(insight: InsightContrato) -> str:
         ValueError: Si el tipo de contrato no está soportado.
     """
     logger.info(
-        "Generando contrato tipo '{}' para wallet {}",
-        insight.tipo,
-        insight.wallet_analizada,
+        "Generating contract type '{}' for wallet {}",
+        insight.type,
+        insight.analyzed_wallet,
     )
 
     generador = GeneradorContratos()
     codigo = generador.generar({
-        "tipo": insight.tipo,
-        "wallet_analizada": insight.wallet_analizada,
-        "score_riesgo": insight.score_riesgo,
-        "score_actividad": insight.score_actividad,
+        "type": insight.type,
+        "analyzed_wallet": insight.analyzed_wallet,
+        "risk_score": insight.risk_score,
+        "activity_score": insight.activity_score,
     })
 
     logger.info(
-        "Código Solidity generado: {} caracteres, tipo '{}'",
+        "Solidity code generated: {} characters, type '{}'",
         len(codigo),
-        insight.tipo,
+        insight.type,
     )
     return codigo

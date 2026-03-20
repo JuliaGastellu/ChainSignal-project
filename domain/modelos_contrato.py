@@ -7,39 +7,39 @@ from typing import Optional
 
 @dataclass
 class InsightContrato:
-    """Contexto de análisis que dispara la generación de un contrato."""
+    """Analysis context that triggers the generation of a contract."""
 
-    tipo: Optional[str]
-    wallet_analizada: str
-    score_riesgo: int
-    score_actividad: int = 0
-    accion_recomendada: str = "monitorear"
+    type: Optional[str]
+    analyzed_wallet: str
+    risk_score: int
+    activity_score: int = 0
+    recommended_action: str = "monitor"
 
     def __post_init__(self):
-        tipos_validos = {None, "risk_guard", "signal_lock", "treasury_manager"}
-        if self.tipo not in tipos_validos:
+        valid_types = {None, "risk_guard", "signal_lock", "treasury_manager"}
+        if self.type not in valid_types:
             raise ValueError(
-                f"Tipo de contrato no soportado: '{self.tipo}'. "
-                f"Válidos: {tipos_validos - {None}} o null"
+                f"Unsupported contract type: '{self.type}'. "
+                f"Valid: {valid_types - {None}} or null"
             )
 
 
 @dataclass
 class ContratoCompilado:
-    """Resultado de la compilación de un contrato Solidity."""
+    """Result of a Solidity contract compilation."""
 
-    nombre: str
+    name: str
     abi: list[dict]
     bytecode: str
-    codigo_fuente: str = ""
+    source_code: str = ""
 
 
 @dataclass
 class ContratoDeplegado:
-    """Registro de un contrato desplegado en blockchain."""
+    """Record of a deployed contract on the blockchain."""
 
-    nombre: str
-    direccion: str
+    name: str
+    address: str
     transaction_hash: str
     abi: list[dict] = field(default_factory=list)
-    red: str = "sepolia"
+    network: str = "sepolia"

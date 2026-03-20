@@ -6,14 +6,14 @@ class DecisionEngine:
 
     def evaluate(self, scores: dict, metrics: dict = None):
         """
-        Evalúa si se debe ejecutar una acción financiera (transferencia o contrato).
-        La confianza es proporcional a la cantidad de datos y la calidad del perfil.
+        Evaluates whether a financial action (transfer or contract) should be executed.
+        Confidence is proportional to data volume and profile quality.
         """
         if not scores:
             return {
-                "decision": "DATOS_INSUFICIENTES",
+                "decision": "INSUFFICIENT_DATA",
                 "confidence": 0,
-                "reasoning": "el sistema no cuenta con informacion para realizar un analisis."
+                "reasoning": "system lacks information to perform an analysis."
             }
             
         activity = scores.get("activity", 0)
@@ -21,9 +21,9 @@ class DecisionEngine:
         defi = scores.get("defi_engagement", 0)
         tx_count = metrics.get("transaction_count", 0) if metrics else 0
         
-        logger.info(f"Evaluando decisión: Actividad={activity}, Riesgo={risk}, DeFi={defi}, Txs={tx_count}")
+        logger.info(f"Evaluating decision: Activity={activity}, Risk={risk}, DeFi={defi}, Txs={tx_count}")
         
-        # 1. Cálculo de Confianza Proporcional
+        # 1. Proportional Confidence Calculation
         if tx_count <= 10:
             confidence = 0.20 + (tx_count * 0.02)
         elif tx_count <= 50:
@@ -36,44 +36,44 @@ class DecisionEngine:
         gas_limit = 500000 if activity > 70 else 250000
 
         if tx_count < 5:
-            decision = "DATOS_INSUFICIENTES"
+            decision = "INSUFFICIENT_DATA"
             action_allowed = "NONE"
             reasoning = f"activity ({tx_count} txs) insufficient to build a profile."
-            tipo_contrato = None
-            accion_recomendada = "monitor"
-            ejecucion = False
+            contract_type = None
+            recommended_action = "monitor"
+            execution = False
         elif risk > 60:
             decision = "BLOCK"
             action_allowed = "NONE"
             reasoning = "high-risk behavior detected in wallet activity."
-            tipo_contrato = None
-            accion_recomendada = "protect"
-            ejecucion = False
+            contract_type = None
+            recommended_action = "protect"
+            execution = False
         elif confidence > 0.80 and activity > 70 and defi > 50:
             decision = "EXECUTE_ADVANCED"
             action_allowed = "ALL"
             reasoning = "high-confidence advanced profile; advanced operations allowed."
-            ejecucion = True
+            execution = True
 
             # Deterministic contract type selection
             if risk > 70:
-                tipo_contrato = "risk_guard"
-                accion_recomendada = "protect"
+                contract_type = "risk_guard"
+                recommended_action = "protect"
             elif activity > 80:
-                tipo_contrato = "treasury_manager"
-                accion_recomendada = "optimize"
+                contract_type = "treasury_manager"
+                recommended_action = "optimize"
             else:
-                tipo_contrato = "signal_lock"
-                accion_recomendada = "protect"
+                contract_type = "signal_lock"
+                recommended_action = "protect"
 
             return {
                 "decision": decision,
                 "action_allowed": action_allowed,
                 "confidence": round(confidence, 2),
                 "reasoning": reasoning,
-                "tipo_contrato": tipo_contrato,
-                "accion_recomendada": accion_recomendada,
-                "ejecucion": ejecucion,
+                "contract_type": contract_type,
+                "recommended_action": recommended_action,
+                "execution": execution,
                 "limits": {
                     "max_eth": max_amount_eth,
                     "gas_limit": gas_limit
@@ -84,25 +84,25 @@ class DecisionEngine:
             decision = "EXECUTE_BASIC"
             action_allowed = "TRANSFER_CALL"
             reasoning = "stable profile; standard transfers and interactions allowed."
-            tipo_contrato = None
-            accion_recomendada = "monitor"
-            ejecucion = True
+            contract_type = None
+            recommended_action = "monitor"
+            execution = True
         else:
             decision = "MONITOR"
             action_allowed = "NONE"
             reasoning = "insufficient confidence for auto-execution."
-            tipo_contrato = None
-            accion_recomendada = "monitor"
-            ejecucion = False
+            contract_type = None
+            recommended_action = "monitor"
+            execution = False
 
         return {
             "decision": decision,
             "action_allowed": action_allowed,
             "confidence": round(confidence, 2),
             "reasoning": reasoning,
-            "tipo_contrato": tipo_contrato,
-            "accion_recomendada": accion_recomendada,
-            "ejecucion": ejecucion,
+            "contract_type": contract_type,
+            "recommended_action": recommended_action,
+            "execution": execution,
             "limits": {
                 "max_eth": max_amount_eth,
                 "gas_limit": gas_limit

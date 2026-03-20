@@ -39,19 +39,19 @@ class ChallengeX402:
     descripcion: str    # Descripción del recurso que se está comprando
 
     def to_dict(self) -> dict:
-        """Serializa el challenge como dict JSON-serializable."""
+        """Serializes the challenge as a JSON-serializable dict."""
         return {
-            "error": "Pago requerido para acceder a este recurso.",
+            "error": "Payment required to access this resource.",
             "payment_required": True,
-            "monto_base": self.monto,
-            "monto_formateado": f"{self.monto / 1_000_000:.2f} USDT",
+            "base_amount": self.monto,
+            "formatted_amount": f"{self.monto / 1_000_000:.2f} USDT",
             "token": self.token,
-            "receptor": self.receptor,
-            "descripcion": self.descripcion,
-            "instrucciones": (
-                "Realizá el pago en USD₮ a la dirección 'receptor' usando el WDK "
-                "y volvé a llamar este endpoint con el header "
-                "X-Payment: <tx_hash_del_pago>"
+            "recipient": self.receptor,
+            "description": self.descripcion,
+            "instructions": (
+                "Make the payment in USDT to the 'recipient' address using the WDK "
+                "and call this endpoint again with the X-Payment header: "
+                "<tx_hash_of_the_payment>"
             ),
         }
 
@@ -71,51 +71,51 @@ class ValidadorX402:
         self._hashes_usados: set[str] = set()
 
     def esta_habilitado(self) -> bool:
-        """Retorna True si x402 está habilitado en el entorno."""
+        """Returns True if x402 is enabled in the environment."""
         valor = os.getenv("X402_ENABLED", "true").lower()
         return valor in ("true", "1", "yes")
 
     def extraer_hash_pago(self, headers: dict) -> str | None:
-        """Extrae el hash de pago del header X-Payment.
+        """Extracts the payment hash from the X-Payment header.
 
         Args:
-            headers: Dict de headers HTTP de la request.
+            headers: Dict of HTTP request headers.
 
         Returns:
-            El hash de transacción si existe, None si no está presente.
+            The transaction hash if it exists, None if not present.
         """
         return headers.get("x-payment") or headers.get("X-Payment")
 
     def validar(self, hash_pago: str) -> tuple[bool, str]:
-        """Valida que el hash de pago sea estructuralmente correcto y no usado.
+        """Validates that the payment hash is structurally correct and not used.
 
         Args:
-            hash_pago: Hash de transacción Ethereum (0x + 64 caracteres hex).
+            hash_pago: Ethereum transaction hash (0x + 64 hex characters).
 
         Returns:
-            Tupla (válido: bool, motivo: str).
+            Tuple (valid: bool, reason: str).
         """
         if not hash_pago:
-            return False, "Header X-Payment no presente."
+            return False, "X-Payment header not present."
 
-        # Validación estructural: 0x + 64 chars hexadecimales
+        # Structural validation: 0x + 64 hex characters
         if not hash_pago.startswith("0x") or len(hash_pago) != 66:
-            return False, f"Formato de hash inválido: '{hash_pago[:20]}...'"
+            return False, f"Invalid hash format: '{hash_pago[:20]}...'"
 
-        # Verificar caracteres hexadecimales
+        # Check hex characters
         try:
             int(hash_pago[2:], 16)
         except ValueError:
-            return False, "El hash contiene caracteres no hexadecimales."
+            return False, "The hash contains non-hexadecimal characters."
 
-        # Anti-replay: verificar que no haya sido usado
+        # Anti-replay: check it hasn't been used before
         if hash_pago.lower() in self._hashes_usados:
-            return False, "Este comprobante de pago ya fue utilizado."
+            return False, "This payment proof has already been used."
 
-        # Registrar como usado
+        # Register as used
         self._hashes_usados.add(hash_pago.lower())
-        logger.info("Pago x402 validado. Hash: {}", hash_pago)
-        return True, "Pago válido."
+        logger.info("x402 payment validated. Hash: {}", hash_pago)
+        return True, "Valid payment."
 
 
 class GatewayX402:
@@ -146,23 +146,23 @@ class GatewayX402:
         )
 
     def verificar_acceso(self, headers: dict) -> tuple[bool, str]:
-        """Verifica si la request tiene un comprobante de pago válido.
+        """Verifies if the request has a valid payment proof.
 
         Args:
-            headers: Dict de headers HTTP.
+            headers: Dict of HTTP headers.
 
         Returns:
-            Tupla (acceso_permitido: bool, motivo: str).
+            Tuple (access_allowed: bool, reason: str).
         """
         if not self._validador.esta_habilitado():
-            # x402 deshabilitado: requerir acceso igual pero con aviso
+            # x402 disabled: require access anyway but with notice
             return False, (
-                "x402 está deshabilitado en este entorno (X402_ENABLED=false). "
-                "Configure X402_ENABLED=true para habilitar el acceso protegido."
+                "x402 is disabled in this environment (X402_ENABLED=false). "
+                "Configure X402_ENABLED=true to enable protected access."
             )
 
         hash_pago = self._validador.extraer_hash_pago(headers)
         if not hash_pago:
-            return False, "Header X-Payment no presente."
+            return False, "X-Payment header not present."
 
         return self._validador.validar(hash_pago)

@@ -6,13 +6,13 @@ from typing import List
 
 @dataclass
 class DecisionEstrategia:
-    """Representa la decisión de alto nivel estructurada del agente."""
+    """Represents the structured high-level decision of the agent."""
 
-    requiere_contrato: bool
-    requiere_movimiento_fondos: bool
-    requiere_ejecucion: bool
-    requiere_swap: bool = False
+    requires_contract: bool
+    requires_funds_movement: bool
+    requires_execution: bool
+    requires_swap: bool = False
     token_in: str = ""
     token_out: str = ""
-    acciones: List[str] = field(default_factory=list)
-    detalle: str = ""
+    actions: List[str] = field(default_factory=list)
+    detail: str = ""
