@@ -47,15 +47,15 @@ def compilar_contrato_tool(
     resultado = compilar_contrato(codigo_solidity, nombre_contrato)
 
     compilado = ContratoCompilado(
-        nombre=resultado["nombre"],
+        name=resultado["nombre"],
         abi=resultado["abi"],
         bytecode=resultado["bytecode"],
-        codigo_fuente=codigo_solidity,
+        source_code=codigo_solidity,
     )
 
     logger.info(
         "Compilación exitosa: '{}', ABI={} entradas, bytecode={} bytes",
-        compilado.nombre,
+        compilado.name,
         len(compilado.abi),
         len(compilado.bytecode),
     )

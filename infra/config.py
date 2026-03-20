@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     
     # Web3 / Payment Config
     SEPOLIA_RPC_URL: str = os.getenv("SEPOLIA_RPC_URL", "")
-    X402_PAYMENT_RECIPIENT: str = os.getenv("X402_PAYMENT_RECIPIENT", "")
-    USDC_ADDRESS_SEPOLIA: str = os.getenv("USDC_ADDRESS_SEPOLIA", "0x1c7D4B196Cb0232491C26109653a6c6224a3383d")
+    USDC_ADDRESS_SEPOLIA: str = os.getenv("USDC_ADDRESS_SEPOLIA", "0x1c7d4B196Cb0232491C26109653a6c6224a3383d")
+    X402_PAYMENT_RECIPIENT: str = os.getenv("X402_PAYMENT_RECIPIENT", "0x516D97bC82a962627Fd52115F32ce80F2f5da52a")
     X402_REPORT_PRICE_USDC: int = int(os.getenv("X402_REPORT_PRICE_USDC", "1"))
     
     # Swap & Protection Config
