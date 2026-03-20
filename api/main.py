@@ -295,9 +295,11 @@ async def ejecutar_agente_stream(wallet: str):
 
             else:
                 detalle_final = decision.get("reasoning", "No action required.")
+                motivo = "low_confidence" if decision.get("decision") == "DATOS_INSUFICIENTES" else "decision_final"
+                ejecucion = bool(decision.get("ejecucion", decision.get("decision") in ["EXECUTE_ADVANCED", "EXECUTE_BASIC"]))
                 if decision.get("decision") == "DATOS_INSUFICIENTES":
                     detalle_final = "no_execution_due_to_low_confidence"
-                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": detalle_final, "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada")}})}\n\n'
+                yield f'data: {json.dumps({"paso": "decision_final", "estado": "completado", "detalle": detalle_final, "data": {"decision": decision.get("decision"), "tipo_contrato": decision.get("tipo_contrato"), "accion_recomendada": decision.get("accion_recomendada"), "ejecucion": ejecucion, "motivo": motivo}})}\n\n'
 
         except Exception as e:
             logger.error(f"Error en stream: {e}")

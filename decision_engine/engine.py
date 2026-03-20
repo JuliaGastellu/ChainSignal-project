@@ -41,16 +41,19 @@ class DecisionEngine:
             reasoning = f"actividad ({tx_count} txs) insuficiente para establecer perfil."
             tipo_contrato = None
             accion_recomendada = "monitorear"
+            ejecucion = False
         elif risk > 60:
             decision = "BLOCK"
             action_allowed = "NONE"
             reasoning = "riesgo elevado detectado en el comportamiento de la wallet."
             tipo_contrato = None
             accion_recomendada = "proteger"
+            ejecucion = False
         elif confidence > 0.80 and activity > 70 and defi > 50:
             decision = "EXECUTE_ADVANCED"
             action_allowed = "ALL"
             reasoning = "perfil experto con alta confianza; se permiten operaciones avanzadas."
+            ejecucion = True
 
             # Selección de tipo de contrato determinista
             if risk > 70:
@@ -70,6 +73,7 @@ class DecisionEngine:
                 "reasoning": reasoning,
                 "tipo_contrato": tipo_contrato,
                 "accion_recomendada": accion_recomendada,
+                "ejecucion": ejecucion,
                 "limits": {
                     "max_eth": max_amount_eth,
                     "gas_limit": gas_limit
@@ -82,12 +86,14 @@ class DecisionEngine:
             reasoning = "perfil estable; se permiten transferencias e interacciones estándar."
             tipo_contrato = None
             accion_recomendada = "monitorear"
+            ejecucion = True
         else:
             decision = "MONITOR"
             action_allowed = "NONE"
             reasoning = "confianza insuficiente para ejecutar operaciones automáticas."
             tipo_contrato = None
             accion_recomendada = "monitorear"
+            ejecucion = False
 
         return {
             "decision": decision,
@@ -96,6 +102,7 @@ class DecisionEngine:
             "reasoning": reasoning,
             "tipo_contrato": tipo_contrato,
             "accion_recomendada": accion_recomendada,
+            "ejecucion": ejecucion,
             "limits": {
                 "max_eth": max_amount_eth,
                 "gas_limit": gas_limit
