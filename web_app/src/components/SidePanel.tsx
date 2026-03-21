@@ -148,7 +148,7 @@ export function SidePanel({ events }: { events: AgentEvent[] }) {
   const metrics = health?.global_metrics;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:sticky lg:top-6 h-fit lg:border-l lg:border-border lg:pl-4">
       <div className="bg-card border border-border rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -198,4 +198,3 @@ export function SidePanel({ events }: { events: AgentEvent[] }) {
     </div>
   );
 }
-

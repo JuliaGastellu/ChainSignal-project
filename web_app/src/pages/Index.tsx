@@ -340,7 +340,7 @@ const Index = () => {
           <div className="lg:col-span-2">
             <AgentTimeline events={events} isStreaming={status === "streaming"} />
           </div>
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 h-fit">
             <SidePanel events={events} />
           </div>
         </div>
