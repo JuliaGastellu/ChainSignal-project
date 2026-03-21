@@ -64,6 +64,7 @@ export function PremiumReportPanel({ report }: PremiumReportProps) {
   const scores = report.scores || {};
   const metrics = report.metrics || {};
   const agentDecision = report.agent_decision || {};
+  const financialActions = safeArray<any>(report.financial_actions);
   const securityRating = asString(executiveSummary.security_rating);
   const profileTitle = asString(executiveSummary.profile_title) || "Wallet Analysis";
   const mainRecommendation = asString(executiveSummary.main_recommendation) || "N/A";
@@ -285,29 +286,34 @@ export function PremiumReportPanel({ report }: PremiumReportProps) {
         )}
 
         {/* Financial Actions Section */}
-        {report.financial_actions && report.financial_actions.length > 0 && (
+        {financialActions.length > 0 && (
           <div className="mb-8 space-y-4">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Zap className="h-4 w-4" />
               <span className="text-xs font-bold uppercase tracking-widest">Autonomous Financial Operations</span>
             </div>
             <div className="grid grid-cols-1 gap-3">
-              {report.financial_actions.map((action: any, i: number) => (
+              {financialActions.map((action: any, i: number) => {
+                const type = asString(action?.type) || "operation";
+                const status = asString(action?.status) || "unknown";
+                const detail = asString(action?.detail) || "N/A";
+                return (
                 <div key={i} className="flex items-center gap-4 p-4 bg-green-500/5 border border-green-500/20 rounded-xl">
                   <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
-                    {action.type === 'preventive_swap' ? <ArrowRightLeft className="h-5 w-5 text-green-500" /> : <Send className="h-5 w-5 text-green-500" />}
+                    {type === 'preventive_swap' ? <ArrowRightLeft className="h-5 w-5 text-green-500" /> : <Send className="h-5 w-5 text-green-500" />}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-foreground capitalize">{action.type.replace(/_/g, ' ')}</span>
+                      <span className="text-sm font-bold text-foreground capitalize">{type.replace(/_/g, ' ')}</span>
                       <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">
-                        {action.status}
+                        {status}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{action.detail}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
