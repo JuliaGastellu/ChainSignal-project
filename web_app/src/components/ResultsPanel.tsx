@@ -84,6 +84,11 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
           Analysis Results
         </h2>
         <div className="flex items-center gap-2">
+          {results.source && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-border bg-secondary/40 text-muted-foreground uppercase tracking-wider">
+              {results.source === "loop" ? "Triggered autonomously" : "Triggered by user"}
+            </span>
+          )}
           <button
             onClick={() => setShowJson((v) => !v)}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border"
@@ -140,6 +145,31 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
         />
       </div>
 
+      {(results.agent_intent || results.why_not_acting) && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.35 }}
+          className="mt-3 bg-card border border-border rounded-lg p-4"
+        >
+          <div className="flex items-center gap-2 text-muted-foreground mb-2">
+            <Brain className="h-4 w-4" />
+            <span className="text-xs font-medium uppercase tracking-wider">Agent Intent</span>
+          </div>
+          <p className="text-sm text-foreground">
+            {results.agent_intent || "No intent provided by the agent."}
+          </p>
+          {results.why_not_acting && (
+            <div className="mt-3 rounded-md border border-yellow-500/20 bg-yellow-500/5 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-yellow-700">
+                Why NOT acting
+              </div>
+              <div className="mt-1 text-sm text-yellow-800">{results.why_not_acting}</div>
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {results.agent_decision && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -164,6 +194,9 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
               </div>
             )}
           </div>
+          {results.reasoning && (
+            <p className="mt-2 text-sm text-muted-foreground">{results.reasoning}</p>
+          )}
         </motion.div>
       )}
 

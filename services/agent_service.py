@@ -64,6 +64,13 @@ class AgentService:
         self._semaphore = asyncio.Semaphore(3)
         self._agente_ia: Optional[AgenteAnalisis] = None
 
+    async def _acquire_semaphore(self, timeout_s: float = 3.0) -> bool:
+        try:
+            await asyncio.wait_for(self._semaphore.acquire(), timeout=timeout_s)
+            return True
+        except TimeoutError:
+            return False
+
     def _obtener_agente_ia(self) -> AgenteAnalisis:
         if self._agente_ia is None:
             self._agente_ia = AgenteAnalisis()
@@ -84,7 +91,18 @@ class AgentService:
         self.metrics.record_run()
 
         try:
-            async with self._semaphore:
+            sem_acquired = await self._acquire_semaphore(timeout_s=3.0)
+            if not sem_acquired:
+                yield {
+                    "paso": "decision_final",
+                    "estado": "completed",
+                    "detalle": "System busy, retrying...",
+                    "data": {"decision": "SYSTEM_BUSY", "recommended_action": "retry"},
+                    "source": source,
+                }
+                return
+
+            try:
                 if wallet_addr == "0x0000000000000000000000000000000000000000":
                     yield {
                         "paso": "evaluating_decision",
@@ -122,102 +140,103 @@ class AgentService:
                     "source": source,
                 }
 
-            yield {"paso": "calculating_scores", "estado": "starting", "detalle": "Running behavioral scoring...", "source": source}
-            yield {
-                "paso": "calculating_scores",
-                "estado": "completed",
-                "detalle": f"Risk: {scores_dict['risk']}, Activity: {scores_dict['activity']}, Confidence: {scores_dict['confidence']}",
-                "data": {
-                    "risk": scores_dict["risk"],
-                    "activity": scores_dict["activity"],
-                    "defi_engagement": scores_dict["defi_engagement"],
-                    "confidence": scores_dict["confidence"],
-                },
-                "source": source,
-            }
-
-            yield {"paso": "classifying_profile", "estado": "starting", "detalle": "Determining wallet profile...", "source": source}
-            yield {"paso": "classifying_profile", "estado": "completed", "detalle": f"Profile detected: {profile.type}", "source": source}
-
-            yield {"paso": "generating_insight", "estado": "starting", "detalle": "Running deterministic analysis agent...", "source": source}
-            yield {
-                "paso": "generating_insight",
-                "estado": "completed",
-                "detalle": "Structured insight generated.",
-                "data": {
-                    "type": insight_obj.type,
-                    "analyzed_wallet": insight_obj.analyzed_wallet,
-                    "risk_score": insight_obj.risk_score,
-                    "activity_score": insight_obj.activity_score,
-                    "recommended_action": insight_obj.recommended_action,
-                },
-                "source": source,
-            }
-
-            yield {"paso": "evaluating_decision", "estado": "starting", "detalle": "Executing decision engine...", "source": source}
-            decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
-
-            agent_intent = "No action required"
-            if decision.get("decision") == "EXECUTE_ADVANCED":
-                agent_intent = "Protect funds due to elevated on-chain risk indicators"
-
-            yield {
-                "paso": "evaluating_decision",
-                "estado": "completed",
-                "detalle": f"Decision: {decision.get('decision', 'MONITOR')}",
-                "data": {**decision, "agent_intent": agent_intent},
-                "source": source,
-            }
-
-            if decision.get("decision") != "EXECUTE_ADVANCED":
-                detalle_final = decision.get("reasoning", "No action required.")
-                motivo = "low_confidence" if decision.get("decision") == "INSUFFICIENT_DATA" else "decision_final"
-                execution = bool(decision.get("execution", decision.get("decision") in ["EXECUTE_ADVANCED", "EXECUTE_BASIC"]))
-                if decision.get("decision") == "INSUFFICIENT_DATA":
-                    detalle_final = "no_execution_due_to_low_confidence"
+                yield {"paso": "calculating_scores", "estado": "starting", "detalle": "Running behavioral scoring...", "source": source}
                 yield {
-                    "paso": "decision_final",
+                    "paso": "calculating_scores",
                     "estado": "completed",
-                    "detalle": detalle_final,
+                    "detalle": f"Risk: {scores_dict['risk']}, Activity: {scores_dict['activity']}, Confidence: {scores_dict['confidence']}",
                     "data": {
-                        "decision": decision.get("decision"),
-                        "contract_type": decision.get("contract_type"),
-                        "recommended_action": decision.get("recommended_action"),
-                        "execution": execution,
-                        "motivo": motivo,
-                        "simulation_mode": os.getenv("APP_ENV", "local") != "production",
+                        "risk": scores_dict["risk"],
+                        "activity": scores_dict["activity"],
+                        "defi_engagement": scores_dict["defi_engagement"],
+                        "confidence": scores_dict["confidence"],
                     },
                     "source": source,
                 }
-                return
 
-            yield {"paso": "x402_validation", "estado": "starting", "detalle": "Verifying advanced report license (WDK x402)...", "source": source}
-            yield {"paso": "x402_validation", "estado": "completed", "detalle": "x402 license validated via USDC. Accessing advanced mitigations.", "source": source}
+                yield {"paso": "classifying_profile", "estado": "starting", "detalle": "Determining wallet profile...", "source": source}
+                yield {"paso": "classifying_profile", "estado": "completed", "detalle": f"Profile detected: {profile.type}", "source": source}
 
-            yield {"paso": "strategy_execution", "estado": "starting", "detalle": "Calculating mitigations and tactical reasoning...", "source": source}
-            es_simulacion = os.getenv("APP_ENV", "local") != "production"
-            decision_agente = DecisionAgente(
-                contexto_analizado=f"Risk Score: {insight_obj.risk_score}, Activity: {insight_obj.activity_score}",
-                evaluated_strategy=EstrategiaProteccionWallet.__name__,
-                chosen_actions=decision_estrategia.actions,
-                reason=decision_estrategia.detail,
-                is_simulation=es_simulacion,
-            )
-            yield {"paso": "strategy_execution", "estado": "completed", "detalle": decision_estrategia.detail, "data": decision_agente.__dict__, "source": source}
+                yield {"paso": "generating_insight", "estado": "starting", "detalle": "Running deterministic analysis agent...", "source": source}
+                yield {
+                    "paso": "generating_insight",
+                    "estado": "completed",
+                    "detalle": "Structured insight generated.",
+                    "data": {
+                        "type": insight_obj.type,
+                        "analyzed_wallet": insight_obj.analyzed_wallet,
+                        "risk_score": insight_obj.risk_score,
+                        "activity_score": insight_obj.activity_score,
+                        "recommended_action": insight_obj.recommended_action,
+                    },
+                    "source": source,
+                }
 
-            acquired = await asyncio.to_thread(self.lock_manager.acquire, wallet_addr)
-            if not acquired:
-                self.metrics.record_execution_blocked()
-                yield {"paso": "execution_lock", "estado": "error", "detalle": "Wallet is currently being processed by another task.", "source": source}
-                return
+                yield {"paso": "evaluating_decision", "estado": "starting", "detalle": "Executing decision engine...", "source": source}
+                decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
 
-            try:
-                self.metrics.record_execution_triggered()
-                async for ev in self._execute_with_esl(wallet_addr, decision_estrategia, decision, insight_obj, source, stream_mode=True):
-                    yield ev
+                agent_intent = "No action required"
+                if decision.get("decision") == "EXECUTE_ADVANCED":
+                    agent_intent = "Protect funds due to elevated on-chain risk indicators"
+
+                yield {
+                    "paso": "evaluating_decision",
+                    "estado": "completed",
+                    "detalle": f"Decision: {decision.get('decision', 'MONITOR')}",
+                    "data": {**decision, "agent_intent": agent_intent},
+                    "source": source,
+                }
+
+                if decision.get("decision") != "EXECUTE_ADVANCED":
+                    detalle_final = decision.get("reasoning", "No action required.")
+                    motivo = "low_confidence" if decision.get("decision") == "INSUFFICIENT_DATA" else "decision_final"
+                    execution = bool(decision.get("execution", decision.get("decision") in ["EXECUTE_ADVANCED", "EXECUTE_BASIC"]))
+                    if decision.get("decision") == "INSUFFICIENT_DATA":
+                        detalle_final = "no_execution_due_to_low_confidence"
+                    yield {
+                        "paso": "decision_final",
+                        "estado": "completed",
+                        "detalle": detalle_final,
+                        "data": {
+                            "decision": decision.get("decision"),
+                            "contract_type": decision.get("contract_type"),
+                            "recommended_action": decision.get("recommended_action"),
+                            "execution": execution,
+                            "motivo": motivo,
+                            "simulation_mode": os.getenv("APP_ENV", "local") != "production",
+                        },
+                        "source": source,
+                    }
+                    return
+
+                yield {"paso": "x402_validation", "estado": "starting", "detalle": "Verifying advanced report license (WDK x402)...", "source": source}
+                yield {"paso": "x402_validation", "estado": "completed", "detalle": "x402 license validated via USDC. Accessing advanced mitigations.", "source": source}
+
+                yield {"paso": "strategy_execution", "estado": "starting", "detalle": "Calculating mitigations and tactical reasoning...", "source": source}
+                es_simulacion = os.getenv("APP_ENV", "local") != "production"
+                decision_agente = DecisionAgente(
+                    contexto_analizado=f"Risk Score: {insight_obj.risk_score}, Activity: {insight_obj.activity_score}",
+                    evaluated_strategy=EstrategiaProteccionWallet.__name__,
+                    chosen_actions=decision_estrategia.actions,
+                    reason=decision_estrategia.detail,
+                    is_simulation=es_simulacion,
+                )
+                yield {"paso": "strategy_execution", "estado": "completed", "detalle": decision_estrategia.detail, "data": decision_agente.__dict__, "source": source}
+
+                lock_acquired = await asyncio.to_thread(self.lock_manager.acquire, wallet_addr)
+                if not lock_acquired:
+                    self.metrics.record_execution_blocked()
+                    yield {"paso": "execution_lock", "estado": "error", "detalle": "Wallet is currently being processed by another task.", "source": source}
+                    return
+
+                try:
+                    self.metrics.record_execution_triggered()
+                    async for ev in self._execute_with_esl(wallet_addr, decision_estrategia, decision, insight_obj, source, stream_mode=True):
+                        yield ev
+                finally:
+                    await asyncio.to_thread(self.lock_manager.release, wallet_addr)
             finally:
-                await asyncio.to_thread(self.lock_manager.release, wallet_addr)
-
+                self._semaphore.release()
         except Exception as e:
             logger.error(f"Pipeline stream error: {e}")
             yield {"paso": "error", "estado": "error", "detalle": str(e), "source": source}
@@ -226,7 +245,10 @@ class AgentService:
         wallet_addr = wallet.lower()
         self.metrics.record_run()
 
-        async with self._semaphore:
+        acquired = await self._acquire_semaphore(timeout_s=3.0)
+        if not acquired:
+            raise RuntimeError("System busy, retrying...")
+        try:
             if wallet_addr == "0x0000000000000000000000000000000000000000":
                 now = datetime.now().isoformat()
                 return {
@@ -254,12 +276,17 @@ class AgentService:
             metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
             decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
             return self._build_report(wallet_addr, profile, scores_obj, scores_dict, risk_breakdown, metrics, decision, decision_estrategia)
+        finally:
+            self._semaphore.release()
 
     async def _run_loop(self, wallet: str) -> Dict[str, Any]:
         wallet_addr = wallet.lower()
         self.metrics.record_run()
 
-        async with self._semaphore:
+        acquired = await self._acquire_semaphore(timeout_s=3.0)
+        if not acquired:
+            return {"status": "skipped", "reason": "system_busy"}
+        try:
             locked = await asyncio.to_thread(self.lock_manager.is_locked, wallet_addr)
             if locked:
                 return {"status": "skipped", "reason": "locked"}
@@ -285,6 +312,8 @@ class AgentService:
                 return result
             finally:
                 await asyncio.to_thread(self.lock_manager.release, wallet_addr)
+        finally:
+            self._semaphore.release()
 
     async def _analyze(self, wallet_addr: str) -> Tuple[Any, Any, Any, Dict[str, Any], Dict[str, Any], Any]:
         datos_crudos = await asyncio.to_thread(self.cliente.obtener_datos_wallet, wallet_addr)

@@ -6,6 +6,7 @@ export interface AgentEvent {
   estado: string;
   detalle: string;
   timestamp: number;
+  source?: "api" | "loop";
   data?: Record<string, unknown>;
 }
 
@@ -15,6 +16,11 @@ export interface AgentResults {
   contract_type?: string;
   recommended_action?: string;
   agent_decision?: string;
+  agent_intent?: string;
+  why_not_acting?: string;
+  source?: "api" | "loop";
+  decision_code?: string;
+  reasoning?: string;
   perfil?: string;
   insight?: string;
   raw?: Record<string, unknown>;
@@ -76,6 +82,8 @@ export function useAgentSSE() {
         const detalle = String(
           data.detalle || data.detail || data.message || data.texto || ""
         );
+        const sourceRaw = String((data.source as string | undefined) || "api").toLowerCase();
+        const source: "api" | "loop" = sourceRaw === "loop" ? "loop" : "api";
 
         const agentEvent: AgentEvent = {
           id: `evt-${eventCountRef.current++}`,
@@ -83,6 +91,7 @@ export function useAgentSSE() {
           estado,
           detalle,
           timestamp: Date.now(),
+          source,
           data,
         };
 
@@ -131,14 +140,21 @@ export function useAgentSSE() {
 
           // 4. Decision step
           if (paso === "evaluating_decision") {
+            if (typeof payload.agent_intent === "string") nextResults.agent_intent = payload.agent_intent;
+            if (typeof payload.decision === "string") nextResults.decision_code = payload.decision;
+            if (typeof payload.reasoning === "string") nextResults.reasoning = payload.reasoning;
             if (typeof payload.decision === "string") nextResults.agent_decision = payload.decision;
-            if (typeof payload.reasoning === "string") nextResults.agent_decision = payload.reasoning;
           }
 
           // 5. Final/Result step
           if (["final_decision", "result_final"].includes(paso) || paso === "decision_final") {
             nextResults.agent_decision = detalle || nextResults.agent_decision;
             if (typeof payload.decision === "string") nextResults.agent_decision = payload.decision;
+            if (typeof payload.reasoning === "string") nextResults.reasoning = payload.reasoning;
+            if (typeof payload.decision === "string") nextResults.decision_code = payload.decision;
+            if (typeof detalle === "string" && detalle.toLowerCase().includes("agent decided not to act")) {
+              nextResults.why_not_acting = detalle;
+            }
           }
 
           // 6. Active Contract step
@@ -158,6 +174,7 @@ export function useAgentSSE() {
           }
           if (typeof payload.risk === "number") nextResults.risk_score = payload.risk;
           if (typeof payload.activity === "number") nextResults.activity_score = payload.activity;
+          nextResults.source = source;
 
           return nextResults;
         });
@@ -165,12 +182,26 @@ export function useAgentSSE() {
         const finalPuntos = [
           "decision_final", "final_decision", "result_final", "resultado_final", 
           "contract_active", "financial_operation",
+          "execution_final_status",
           "contract_generation", "contract_compilation", 
-          "contract_deployment"
+          "contract_deployment",
+          "execution_verification"
         ];
         
         const isCompleted = estado === "completed";
         const isError = estado === "error" || estado === "failed";
+
+        const systemBusy = paso === "decision_final" && typeof payload.decision === "string" && payload.decision === "SYSTEM_BUSY";
+
+        if (systemBusy) {
+          setStatus("error");
+          setError(detalle || "System busy, retrying...");
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+          }
+          return;
+        }
 
         if (finalPuntos.includes(paso) && isCompleted) {
           setStatus("completed");
@@ -208,7 +239,7 @@ export function useAgentSSE() {
       setStatus("error");
       setSimulationMode(true);
     }
-  }, [reset]);
+  }, [reset, status]);
 
   return { events, results, status, error, simulationMode, execute, reset };
 }

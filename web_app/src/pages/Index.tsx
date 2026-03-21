@@ -7,6 +7,7 @@ import { Bot, AlertCircle, RotateCcw, Shield, FileText, Monitor, Wallet, CheckCi
 import { useState, useEffect } from "react";
 import { BrowserProvider, Contract } from "ethers";
 import { PremiumReportPanel } from "@/components/PremiumReportPanel";
+import { SidePanel } from "@/components/SidePanel";
 import logo from "../../static/chainsignal_logo_v2.png";
 
 declare global {
@@ -324,7 +325,15 @@ const Index = () => {
           )}
         </div>
 
-        <AgentTimeline events={events} isStreaming={status === "streaming"} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <div className="lg:col-span-2">
+            <AgentTimeline events={events} isStreaming={status === "streaming"} />
+          </div>
+          <div className="lg:col-span-1">
+            <SidePanel events={events} />
+          </div>
+        </div>
+
         {results && <ResultsPanel results={results} />}
       </main>
 

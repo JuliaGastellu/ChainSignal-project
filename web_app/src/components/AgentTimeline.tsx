@@ -13,6 +13,13 @@ const STEP_ORDER = [
   "classifying_profile",
   "generating_insight",
   "evaluating_decision",
+  "x402_validation",
+  "strategy_execution",
+  "execution_safety",
+  "execution_step",
+  "execution_verification",
+  "execution_lock",
+  "execution_final_status",
   "decision_final",
   "contract_active",
   "financial_operation",
@@ -27,6 +34,13 @@ const STEP_LABELS: Record<string, string> = {
   classifying_profile: "Classifying Profile",
   generating_insight: "Generating Insight",
   evaluating_decision: "Evaluating Decision",
+  x402_validation: "License Validation (x402)",
+  strategy_execution: "Strategy Execution",
+  execution_safety: "Execution Safety (ESL)",
+  execution_step: "Execution Step",
+  execution_verification: "Execution Verification",
+  execution_lock: "Execution Lock",
+  execution_final_status: "Execution Final Status",
   decision_final: "Final Decision",
   contract_active: "Contract Active",
   financial_operation: "Financial Operation",
@@ -72,20 +86,45 @@ function getStatusBadge(estado: string) {
   }
 }
 
-function buildStepSummary(events: AgentEvent[]) {
-  const summary: Record<string, AgentEvent> = {};
-  for (const event of events) {
-    const key = event.paso.toLowerCase();
-    summary[key] = event; // keeps latest by same step
-  }
-  return summary;
+function getStepTone(paso: string) {
+  const p = paso.toLowerCase();
+  const analysis = new Set(["analyzing_wallet", "calculating_scores", "classifying_profile", "generating_insight"]);
+  const decision = new Set(["evaluating_decision", "x402_validation", "strategy_execution", "decision_final"]);
+  const execution = new Set([
+    "execution_safety",
+    "execution_step",
+    "execution_verification",
+    "contract_generation",
+    "contract_compilation",
+    "contract_deployment",
+    "contract_active",
+    "execution_final_status",
+  ]);
+  if (analysis.has(p)) return "analysis";
+  if (decision.has(p)) return "decision";
+  if (execution.has(p)) return "execution";
+  return "neutral";
+}
+
+function getToneClasses(tone: string, estado: string) {
+  const s = estado.toLowerCase();
+  const isError = s === "error" || s === "failed";
+  if (isError) return "border-destructive/30 bg-destructive/5";
+  if (tone === "analysis") return "border-sky-500/20 bg-sky-500/5";
+  if (tone === "decision") return "border-yellow-500/20 bg-yellow-500/5";
+  if (tone === "execution") return "border-green-500/20 bg-green-500/5";
+  return "border-border bg-secondary/50";
+}
+
+function getSourceBadge(source?: "api" | "loop") {
+  const s = source || "api";
+  const base = "text-[10px] font-semibold px-2 py-0.5 rounded-full";
+  if (s === "loop") return <span className={`${base} bg-primary/10 text-primary border border-primary/20`}>Autonomous Agent</span>;
+  return <span className={`${base} bg-muted text-muted-foreground border border-border`}>User Triggered</span>;
 }
 
 export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
   if (events.length === 0) return null;
-
-  const summary = buildStepSummary(events);
-  const orderedSteps = STEP_ORDER.filter((s) => summary[s]);
 
   return (
     <motion.div
@@ -103,24 +142,30 @@ export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
       </div>
 
       <div className="bg-card border border-border rounded-xl p-3 space-y-2">
-        {orderedSteps.map((stepKey, index) => {
-          const event = summary[stepKey];
+        {events.map((event, index) => {
+          const stepKey = event.paso.toLowerCase();
           const label = STEP_LABELS[stepKey] || stepKey;
-          const isActive = event.estado === "iniciando" || event.estado === "processing" || event.estado === "running";
+          const isActive =
+            event.estado === "iniciando" || event.estado === "processing" || event.estado === "running" || event.estado === "starting";
+          const tone = getStepTone(stepKey);
+          const toneClasses = getToneClasses(tone, event.estado);
           return (
             <motion.div
-              key={stepKey}
+              key={event.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, delay: index * 0.04 }}
-              className={`rounded-lg border px-3 py-2 ${event.estado === "completado" || event.estado === "completed" ? "border-risk-low/30 bg-risk-low/5" : "border-border bg-secondary/50"}`}
+              className={`rounded-lg border px-3 py-2 ${toneClasses}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   {getStepIcon(event.estado)}
                   <span>{label}</span>
                 </div>
-                <div>{getStatusBadge(event.estado)}</div>
+                <div className="flex items-center gap-2">
+                  {getSourceBadge(event.source)}
+                  {getStatusBadge(event.estado)}
+                </div>
               </div>
               <div className="mt-2 flex flex-col gap-1">
                 <p className={`text-sm ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
