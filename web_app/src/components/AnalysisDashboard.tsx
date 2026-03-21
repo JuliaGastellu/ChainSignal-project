@@ -1,16 +1,29 @@
-import { Brain, BarChart3, Shield, ListChecks } from "lucide-react";
+import { BarChart3, Shield, ListChecks } from "lucide-react";
 import type { AgentResults } from "@/hooks/useAgentSSE";
 
 function metricValue(v: unknown) {
-  if (v === null || v === undefined) return "N/A";
+  if (v === null || v === undefined) return "No data available yet";
   if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(3);
   return String(v);
 }
 
 function confidencePct(c?: number) {
-  if (c === undefined || Number.isNaN(c)) return "N/A";
+  if (c === undefined || Number.isNaN(c)) return "No data available yet";
   const value = c > 1 ? c : c * 100;
   return `${Math.round(value)}%`;
+}
+
+function renderRiskFactor(r: unknown) {
+  if (typeof r === "string") return { title: "Risk factor", severity: "info", detail: r };
+  if (r && typeof r === "object") {
+    const obj = r as Record<string, unknown>;
+    return {
+      title: typeof obj.factor === "string" ? obj.factor : "Risk factor",
+      severity: typeof obj.severity === "string" ? obj.severity : "info",
+      detail: typeof obj.detail === "string" ? obj.detail : "No data available yet",
+    };
+  }
+  return { title: "Risk factor", severity: "info", detail: "No data available yet" };
 }
 
 export function AnalysisDashboard({ results }: { results: AgentResults }) {
@@ -22,30 +35,6 @@ export function AnalysisDashboard({ results }: { results: AgentResults }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-card border border-border rounded-xl p-4">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Brain className="h-4 w-4" /> Agent Summary
-        </div>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="rounded-lg border border-border bg-secondary/30 p-3">
-            <div className="text-[10px] uppercase text-muted-foreground">Decision</div>
-            <div className="text-sm font-semibold">{results.agent_decision || "N/A"}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-secondary/30 p-3">
-            <div className="text-[10px] uppercase text-muted-foreground">Intent</div>
-            <div className="text-sm">{results.agent_intent || "N/A"}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-secondary/30 p-3">
-            <div className="text-[10px] uppercase text-muted-foreground">Confidence</div>
-            <div className="text-sm font-semibold">{confidencePct(results.confidence)}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-secondary/30 p-3">
-            <div className="text-[10px] uppercase text-muted-foreground">Risk</div>
-            <div className="text-sm font-semibold">{metricValue(results.risk_score)}</div>
-          </div>
-        </div>
-      </div>
-
       <div className="bg-card border border-border rounded-xl p-4">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <BarChart3 className="h-4 w-4" /> Metrics Panel
@@ -71,7 +60,11 @@ export function AnalysisDashboard({ results }: { results: AgentResults }) {
         {riskBreakdown.length > 0 && (
           <div className="mt-3 space-y-2">
             {riskBreakdown.slice(0, 6).map((r, i) => (
-              <div key={i} className="text-xs rounded border border-border bg-secondary/30 p-2">{typeof r === "string" ? r : JSON.stringify(r)}</div>
+              <div key={i} className="text-xs rounded border border-border bg-secondary/30 p-2">
+                <div className="font-semibold text-foreground">{renderRiskFactor(r).title}</div>
+                <div className="text-[10px] mt-1 uppercase text-muted-foreground">{renderRiskFactor(r).severity}</div>
+                <div className="mt-1 text-muted-foreground">{renderRiskFactor(r).detail}</div>
+              </div>
             ))}
           </div>
         )}
@@ -82,7 +75,7 @@ export function AnalysisDashboard({ results }: { results: AgentResults }) {
           <ListChecks className="h-4 w-4" /> Reasoning & Execution Decision
         </div>
         <div className="mt-2 text-sm text-muted-foreground">
-          {results.reasoning || results.why_not_acting || "No reasoning available yet."}
+          {results.reasoning || results.why_not_acting || "No data available yet"}
         </div>
         <div className="mt-3 text-xs">
           <span className="text-muted-foreground">Action:</span>{" "}
@@ -92,4 +85,3 @@ export function AnalysisDashboard({ results }: { results: AgentResults }) {
     </div>
   );
 }
-

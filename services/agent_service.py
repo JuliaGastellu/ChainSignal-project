@@ -81,7 +81,22 @@ class AgentService:
         return self._agente_ia
 
     async def run_pipeline_stream(self, wallet: str) -> AsyncGenerator[str, None]:
+        context_payload = {
+            "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
+            "action_scope": {"target_wallet": "read_only", "agent_wallet": "execution_enabled"},
+            "decision_context": {
+                "target_wallet": wallet.lower(),
+                "executor_wallet": settings.X402_PAYMENT_RECIPIENT,
+                "funds_source": "agent_budget",
+            },
+        }
         async for event in self._run_stream(wallet, source="api"):
+            event["agent_wallet"] = settings.X402_PAYMENT_RECIPIENT
+            event["action_scope"] = context_payload["action_scope"]
+            if isinstance(event.get("data"), dict):
+                event["data"] = {**context_payload, **event["data"]}
+            else:
+                event["data"] = context_payload
             yield f"data: {json.dumps(event)}\n\n"
 
     async def run_pipeline_core(self, wallet: str) -> Dict[str, Any]:
@@ -196,10 +211,19 @@ class AgentService:
                 yield {"paso": "evaluating_decision", "estado": "starting", "detalle": "Executing decision engine...", "source": source}
                 decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
                 report_snapshot = self._build_report(wallet_addr, profile, scores_obj, scores_dict, risk_breakdown, metrics, decision, decision_estrategia)
+                decision_code = str(decision.get("decision") or "MONITOR")
+                has_actionable_strategy = bool(
+                    decision_estrategia.requires_funds_movement
+                    or decision_estrategia.requires_swap
+                    or decision_estrategia.requires_contract
+                )
+                should_execute = decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy
 
                 agent_intent = "No action required"
-                if decision.get("decision") == "EXECUTE_ADVANCED":
+                if should_execute:
                     agent_intent = "Protect funds due to elevated on-chain risk indicators"
+                elif decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
+                    agent_intent = "Monitoring only: strategy found no actionable on-chain mitigation."
 
                 yield {
                     "paso": "evaluating_decision",
@@ -223,18 +247,21 @@ class AgentService:
                 }
                 yield {"paso": "analysis_snapshot", "estado": "completed", "detalle": "Full analysis snapshot ready.", "data": report_snapshot, "source": source}
 
-                if decision.get("decision") != "EXECUTE_ADVANCED":
+                if not should_execute:
                     detalle_final = decision.get("reasoning", "No action required.")
-                    motivo = "low_confidence" if decision.get("decision") == "INSUFFICIENT_DATA" else "decision_final"
-                    execution = bool(decision.get("execution", decision.get("decision") in ["EXECUTE_ADVANCED", "EXECUTE_BASIC"]))
-                    if decision.get("decision") == "INSUFFICIENT_DATA":
+                    motivo = "low_confidence" if decision_code == "INSUFFICIENT_DATA" else "decision_final"
+                    execution = False
+                    if decision_code == "INSUFFICIENT_DATA":
                         detalle_final = "no_execution_due_to_low_confidence"
+                    if decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
+                        detalle_final = "No autonomous execution: strategy did not require transfer/swap/deploy."
+                        motivo = "no_actionable_strategy"
                     yield {
                         "paso": "decision_final",
                         "estado": "completed",
                         "detalle": detalle_final,
                         "data": {
-                            "decision": decision.get("decision"),
+                            "decision": decision_code,
                             "contract_type": decision.get("contract_type"),
                             "recommended_action": decision.get("recommended_action"),
                             "execution": execution,
@@ -347,8 +374,17 @@ class AgentService:
 
             metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
             decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
-            if decision.get("decision") != "EXECUTE_ADVANCED":
-                return {"status": "no_action", "decision": decision.get("decision"), "why_not_acting": decision.get("reasoning")}
+            decision_code = str(decision.get("decision") or "MONITOR")
+            has_actionable_strategy = bool(
+                decision_estrategia.requires_funds_movement
+                or decision_estrategia.requires_swap
+                or decision_estrategia.requires_contract
+            )
+            should_execute = decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy
+            if not should_execute:
+                if decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
+                    return {"status": "no_action", "decision": decision_code, "why_not_acting": "No actionable strategy was generated for this wallet."}
+                return {"status": "no_action", "decision": decision_code, "why_not_acting": decision.get("reasoning")}
             current_budget = self.budget.get_budget(wallet_addr)
             if float(current_budget.get("balance_eth", 0.0)) <= 0:
                 return {"status": "simulation_only", "reason": "no_budget"}

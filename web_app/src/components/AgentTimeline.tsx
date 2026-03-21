@@ -82,6 +82,9 @@ function getStatusBadge(estado: string) {
     case "error":
     case "failed":
       return <span className={`${base} bg-destructive/15 text-destructive`}>Error</span>;
+    case "skipped":
+    case "aborted":
+      return <span className={`${base} bg-muted text-muted-foreground`}>Skipped</span>;
     default:
       return <span className={`${base} bg-muted text-muted-foreground`}>{estado}</span>;
   }
@@ -92,6 +95,7 @@ type UiEvent = AgentEvent & { uiEstado: string };
 function reconcileEvents(events: AgentEvent[]): UiEvent[] {
   const normalized: UiEvent[] = events.map((e) => ({ ...e, uiEstado: e.estado }));
   const lastByStep = new Map<string, number>();
+  const hiddenIndexes = new Set<number>();
   let closedAll = false;
 
   normalized.forEach((event, idx) => {
@@ -103,8 +107,8 @@ function reconcileEvents(events: AgentEvent[]): UiEvent[] {
       const prevStatus = String(prev.uiEstado).toLowerCase();
       const prevActive = ["starting", "running", "processing", "iniciando"].includes(prevStatus);
       if (prevActive) {
-        if (["completed", "success"].includes(status)) prev.uiEstado = "completed";
-        if (["error", "failed"].includes(status)) prev.uiEstado = "failed";
+        if (["completed", "success"].includes(status)) hiddenIndexes.add(prevIdx);
+        if (["error", "failed", "skipped", "aborted"].includes(status)) hiddenIndexes.add(prevIdx);
       }
     }
     lastByStep.set(step, idx);
@@ -120,8 +124,7 @@ function reconcileEvents(events: AgentEvent[]): UiEvent[] {
     }
   });
 
-  if (!closedAll) return normalized;
-  return normalized;
+  return normalized.filter((_, i) => !hiddenIndexes.has(i));
 }
 
 function getStepTone(paso: string) {
@@ -148,6 +151,7 @@ function getToneClasses(tone: string, estado: string) {
   const s = estado.toLowerCase();
   const isError = s === "error" || s === "failed";
   if (isError) return "border-destructive/30 bg-destructive/5";
+  if (s === "skipped" || s === "aborted") return "border-border bg-muted/30";
   if (tone === "analysis") return "border-sky-500/20 bg-sky-500/5";
   if (tone === "decision") return "border-yellow-500/20 bg-yellow-500/5";
   if (tone === "execution") return "border-green-500/20 bg-green-500/5";

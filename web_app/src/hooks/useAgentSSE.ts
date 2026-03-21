@@ -28,6 +28,9 @@ export interface AgentResults {
   features?: Record<string, unknown>;
   risk_factors?: unknown[];
   full_analysis?: Record<string, unknown>;
+  agent_wallet?: string;
+  action_scope?: Record<string, unknown>;
+  decision_context?: Record<string, unknown>;
   raw?: Record<string, unknown>;
 }
 
@@ -121,6 +124,7 @@ export function useAgentSSE() {
         const sourceRaw = String((data.source as string | undefined) || "api").toLowerCase();
         const source: "api" | "loop" = sourceRaw === "loop" ? "loop" : "api";
 
+        const agentWallet = typeof data.agent_wallet === "string" ? data.agent_wallet : undefined;
         const agentEvent: AgentEvent = {
           id: `evt-${eventCountRef.current++}`,
           paso,
@@ -142,6 +146,9 @@ export function useAgentSSE() {
           const payload = (typeof data.data === "object" && data.data !== null) 
             ? (data.data as Record<string, unknown>) 
             : data;
+          if (agentWallet) nextResults.agent_wallet = agentWallet;
+          if (payload.action_scope && typeof payload.action_scope === "object") nextResults.action_scope = payload.action_scope as Record<string, unknown>;
+          if (payload.decision_context && typeof payload.decision_context === "object") nextResults.decision_context = payload.decision_context as Record<string, unknown>;
 
           // 1. Scoring step
           if (paso === "calculating_scores") {
@@ -212,7 +219,11 @@ export function useAgentSSE() {
             if (typeof payload.decision === "string") nextResults.agent_decision = payload.decision;
             if (typeof payload.reasoning === "string") nextResults.reasoning = payload.reasoning;
             if (typeof payload.decision === "string") nextResults.decision_code = payload.decision;
-            if (typeof detalle === "string" && detalle.toLowerCase().includes("agent decided not to act")) {
+            const executionFlag = payload.execution;
+            if (
+              typeof detalle === "string" &&
+              (detalle.toLowerCase().includes("agent decided not to act") || executionFlag === false)
+            ) {
               nextResults.why_not_acting = detalle;
             }
           }

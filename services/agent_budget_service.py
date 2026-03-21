@@ -95,3 +95,22 @@ class AgentBudgetService:
         except Exception as e:
             return {"ok": False, "message": f"Funding verification error: {e}"}
 
+    def get_global_state(self) -> Dict[str, Any]:
+        data = self._load()
+        budgets = data.get("budgets", {})
+        total_balance = 0.0
+        total_spent = 0.0
+        funded_wallets = 0
+        for _, item in budgets.items():
+            bal = float(item.get("balance_eth", 0.0))
+            spent = float(item.get("spent_eth", 0.0))
+            total_balance += bal
+            total_spent += spent
+            if bal > 0:
+                funded_wallets += 1
+        return {
+            "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
+            "funded_wallets": funded_wallets,
+            "total_balance_eth": round(total_balance, 8),
+            "total_spent_eth": round(total_spent, 8),
+        }

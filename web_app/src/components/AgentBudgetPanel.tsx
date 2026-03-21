@@ -18,7 +18,7 @@ export function AgentBudgetPanel({ wallet }: { wallet: string }) {
   const refreshBudget = async () => {
     if (!wallet) return;
     try {
-      const res = await fetch(`${API_BASE}/agent-budget/${wallet}`);
+      const res = await fetch(`${API_BASE}/agent/budget/${wallet}`);
       const data = await res.json();
       setBudget(data);
     } catch {
@@ -46,7 +46,7 @@ export function AgentBudgetPanel({ wallet }: { wallet: string }) {
         value: parseEther(amount || "0"),
       });
       await tx.wait();
-      const res = await fetch(`${API_BASE}/fund-agent`, {
+      const res = await fetch(`${API_BASE}/agent/budget`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ wallet, tx_hash: tx.hash }),
@@ -88,9 +88,8 @@ export function AgentBudgetPanel({ wallet }: { wallet: string }) {
           Fund Agent
         </button>
       </div>
-      <div className="text-[11px] text-muted-foreground break-all">Agent wallet: {budget?.agent_wallet || "N/A"}</div>
+      <div className="text-[11px] text-muted-foreground break-all">Agent wallet: {budget?.agent_wallet || "No data available yet"}</div>
       {msg && <div className="text-[11px] text-muted-foreground">{msg}</div>}
     </div>
   );
 }
-

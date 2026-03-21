@@ -1,4 +1,4 @@
-# ChainSignal Autonomous On-Chain Agent
+﻿# ChainSignal Autonomous On-Chain Agent
 
 ChainSignal is an autonomous deterministic agent that analyzes on-chain wallet behavior, generates structured mitigation insights, and executes protective operations through the Tether Wallet Development Kit (WDK).
 
@@ -56,41 +56,49 @@ python -m uvicorn api.main:app --host 0.0.0.0 --port 8001
 
 - https://chainsignal-project.onrender.com/docs
 
-## x402 Payment System (Protected Reports)
+## Product Model: Target Wallet vs Agent Wallet
 
-The endpoint `GET /report/{wallet_address}` is protected by the x402 protocol. To access a report:
+- **Target Wallet**: wallet under analysis (read-only).
+- **Agent Wallet**: execution wallet controlled by the autonomous agent.
+- **Funds source**: agent actions use the agent budget, not the target wallet funds.
 
-1. Call the endpoint. It will return `402 Payment Required` with a challenge.
-2. Pay the required amount (1.00 USDC) on **Sepolia Testnet**.
-3. Re-call the endpoint with the transaction hash in the `X-Payment` header.
-
-**Sepolia Testnet Info:**
-- **USDC Contract**: `0x1C7D4b196cB0232491C26109653A6c6224a3383D`
-- **Network**: Sepolia (Chain ID: 11155111)
-
-**How to pay with MetaMask:**
-- The UI provides a "Pay with MetaMask" button when a 402 is received.
-- It executes a standard ERC20 `transfer` to the agent's recipient address.
-
-**Manual usage (curl):**
-```bash
-curl -H "X-Payment: <tx_hash>" https://chainsignal-project.onrender.com/report/0x...
-```
+The UI exposes this context explicitly through Wallet Context, Agent Summary, and Action Scope blocks.
 
 ## API and UI
 
 The FastAPI backend provides:
 
-- `GET /` for landing page
-- `GET /ejecutar-agente/{wallet}` as SSE for agent execution updates
-- API docs at `https://chainsignal-project.onrender.com/docs`
+- `GET /run-agent/{wallet}` / `GET /ejecutar-agente/{wallet}` SSE analysis+decision+execution stream
+- `GET /events/sse/{wallet}` / `GET /events/sse?wallet=...` SSE aliases
+- `GET /report/{wallet}` full free analysis snapshot
+- `GET /analyze/wallet/{wallet}` wallet-level strategic analysis
+- `GET /analyze/block/{block_number}` block-level strategic analysis
+- `POST /agent/execute` trigger autonomous execution evaluation
+- `POST /agent/budget` assign budget from verified MetaMask tx hash
+- `GET /agent/budget/{wallet}` current budget for target wallet
+- `GET /agent/actions` recent autonomous actions
+- `GET /agent/state` global agent state and latest action
+- `POST /track-wallet` add/update autonomous loop tracking
+- `GET /health` service and loop health
 
 The UI is served via FastAPI from `web_app/app.py` and uses SSE to display real-time progress.
 
+## SSE Event Payload Model
+
+All SSE events include contextual fields to avoid ambiguity:
+
+- `source`: `api` | `loop`
+- `agent_wallet`
+- `action_scope`: `{ target_wallet: "read_only", agent_wallet: "execution_enabled" }`
+- `decision_context`: `{ target_wallet, executor_wallet, funds_source }`
+
+Final event is always guaranteed as `decision_final` or `execution_final_status`.
+
 ## Operational Modes
 
-- Production mode (`APP_ENV=production`) executes real blockchain operations and **verifies x402 payments on-chain**.
-- Simulation mode runs deterministic flows without real on-chain transactions and accepts any valid-looking hash for x402.
+- Production mode (`APP_ENV=production`) executes real blockchain operations through ESL/WDK.
+- Simulation mode runs deterministic flows without real on-chain transactions.
+- If budget is empty, the agent returns `SIMULATION_ONLY` (no funds at risk).
 
 ## Production Mode Requirements
 
@@ -111,10 +119,20 @@ The deterministic decision engine returns explicit outputs:
 ## Safety Guarantees
 
 - Invalid wallet inputs are rejected.
-- Execution only occurs when risk and confidence thresholds are met.
+- Execution only occurs when decision is actionable and budget is available.
 - Simulation mode is explicitly indicated.
+- ESL remains mandatory: idempotency, cooldown, nonce and exposure validation before execution.
+
+## Dashboard Flow
+
+Analyze & Monitor → Decision → ESL Validation → Autonomous Execution (if applicable) → Activity Feed
+
+- Timeline: append-only and phase-colored.
+- ResultsPanel + AnalysisDashboard: full analysis, free, no premium gate.
+- SidePanel: autonomous status, safety semantics, treasury state.
 
 ## References
 
 - ARCHITECTURE.md
 - AGENT_DESIGN.md
+- docs/AUTONOMOUS_DASHBOARD.md

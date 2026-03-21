@@ -1,10 +1,13 @@
 import { WalletInput } from "@/components/WalletInput";
 import { AgentTimeline } from "@/components/AgentTimeline";
 import { AnalysisDashboard } from "@/components/AnalysisDashboard";
+import { ResultsPanel } from "@/components/ResultsPanel";
 import { AgentActivityFeed } from "@/components/AgentActivityFeed";
 import { HealthStatusCards } from "@/components/HealthStatusCards";
 import { AgentSummaryCard } from "@/components/AgentSummaryCard";
 import { AgentTreasuryCard } from "@/components/AgentTreasuryCard";
+import { WalletContextPanel } from "@/components/WalletContextPanel";
+import { BlockAnalysisPanel } from "@/components/BlockAnalysisPanel";
 import { useAgentSSE, API_BASE } from "@/hooks/useAgentSSE";
 import { motion } from "framer-motion";
 import { Bot, AlertCircle, RotateCcw, Monitor, Activity } from "lucide-react";
@@ -14,7 +17,6 @@ import { SidePanel } from "@/components/SidePanel";
 const Index = () => {
   const { events, results, status, error, execute, reset } = useAgentSSE();
   const [wallet, setWallet] = useState("");
-  const [healthRaw, setHealthRaw] = useState<string | null>(null);
   const [healthObj, setHealthObj] = useState<Record<string, any> | null>(null);
   const isLoading = status === "connecting" || status === "streaming";
 
@@ -23,10 +25,8 @@ const Index = () => {
       const res = await fetch(`${API_BASE}/health`);
       const data = await res.json();
       setHealthObj(data);
-      setHealthRaw(JSON.stringify(data, null, 2));
     } catch {
       setHealthObj(null);
-      setHealthRaw("Could not connect to API.");
     }
   };
 
@@ -107,13 +107,17 @@ const Index = () => {
           )}
         </div>
 
+        <BlockAnalysisPanel />
+
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
           <div className="lg:col-span-7">
             <AgentTimeline events={events} isStreaming={status === "streaming"} />
             {results && <AnalysisDashboard results={results} />}
+            {results && <ResultsPanel results={results} targetWallet={wallet} agentWallet={results.agent_wallet} />}
           </div>
           <div className="lg:col-span-3">
             <div className="space-y-4 lg:sticky lg:top-4 h-fit">
+              {wallet && <WalletContextPanel targetWallet={wallet} />}
               <AgentSummaryCard results={results} />
               {wallet && <AgentTreasuryCard wallet={wallet} />}
               <SidePanel events={events} />
