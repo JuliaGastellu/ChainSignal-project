@@ -12,6 +12,9 @@ type BlockAnalysis = {
   };
   recommended_action?: string;
   reasoning?: string;
+  message?: string;
+  hint?: string;
+  network_latest_block?: number;
 };
 
 export function BlockAnalysisPanel() {
@@ -29,7 +32,9 @@ export function BlockAnalysisPanel() {
       const res = await fetch(`${API_BASE}/analyze/block/${block.trim()}`);
       const data = await res.json();
       if (!res.ok) {
-        setError(data.message || "Block analysis failed");
+        const latest = typeof data.network_latest_block === "number" ? ` Latest: ${data.network_latest_block}.` : "";
+        const hint = typeof data.hint === "string" ? ` ${data.hint}` : "";
+        setError(`${data.message || "Block analysis failed"}${latest}${hint}`);
       } else {
         setResult(data as BlockAnalysis);
       }
@@ -76,4 +81,3 @@ export function BlockAnalysisPanel() {
     </div>
   );
 }
-

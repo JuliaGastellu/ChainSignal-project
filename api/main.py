@@ -1,5 +1,6 @@
 """ChainSignal REST API using FastAPI."""
 
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -131,7 +132,19 @@ async def analyze_block(block_number: int):
     if not _budget_service.w3 or not _budget_service.w3.is_connected():
         return JSONResponse(status_code=503, content={"error": "rpc_unavailable", "message": "RPC unavailable for block analysis."})
     try:
-        block = _budget_service.w3.eth.get_block(block_number, full_transactions=True)
+        latest_block = await asyncio.to_thread(lambda: _budget_service.w3.eth.block_number)
+        if block_number < 0 or block_number > latest_block:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "invalid_block_number",
+                    "message": f"Block {block_number} is out of range for current network.",
+                    "network_latest_block": latest_block,
+                    "hint": "Use a valid Sepolia block number less than or equal to network_latest_block.",
+                },
+            )
+
+        block = await asyncio.to_thread(lambda: _budget_service.w3.eth.get_block(block_number, full_transactions=True))
         txs = block.get("transactions", []) or []
         tx_count = len(txs)
         total_value_wei = sum(int((tx.get("value") or 0)) for tx in txs)
@@ -163,7 +176,20 @@ async def analyze_block(block_number: int):
             "action_scope": {"target_wallet": "read_only", "agent_wallet": "execution_enabled"},
         }
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": "block_analysis_failed", "message": str(e)})
+        logger.error("Block analysis error: {}", e)
+        try:
+            latest_block = await asyncio.to_thread(lambda: _budget_service.w3.eth.block_number)
+        except Exception:
+            latest_block = None
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "block_analysis_failed",
+                "message": str(e),
+                "network_latest_block": latest_block,
+                "hint": "Try a recent Sepolia block and ensure RPC is healthy.",
+            },
+        )
 
 
 @app.post("/agent/budget", summary="Assign budget to agent wallet from verified MetaMask tx")
