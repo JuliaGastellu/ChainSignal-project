@@ -24,6 +24,10 @@ export interface AgentResults {
   reasoning?: string;
   perfil?: string;
   insight?: string;
+  metrics?: Record<string, unknown>;
+  features?: Record<string, unknown>;
+  risk_factors?: unknown[];
+  full_analysis?: Record<string, unknown>;
   raw?: Record<string, unknown>;
 }
 
@@ -178,6 +182,28 @@ export function useAgentSSE() {
             if (typeof payload.decision === "string") nextResults.decision_code = payload.decision;
             if (typeof payload.reasoning === "string") nextResults.reasoning = payload.reasoning;
             if (typeof payload.decision === "string") nextResults.agent_decision = payload.decision;
+            if (payload.metrics && typeof payload.metrics === "object") nextResults.metrics = payload.metrics as Record<string, unknown>;
+            if (payload.features && typeof payload.features === "object") nextResults.features = payload.features as Record<string, unknown>;
+            if (Array.isArray(payload.risk_factors)) nextResults.risk_factors = payload.risk_factors;
+          }
+
+          if (paso === "analysis_snapshot" && payload && typeof payload === "object") {
+            nextResults.full_analysis = payload;
+            const snapMetrics = (payload as Record<string, unknown>).metrics;
+            if (snapMetrics && typeof snapMetrics === "object") nextResults.metrics = snapMetrics as Record<string, unknown>;
+            const snapProfile = (payload as Record<string, unknown>).profile;
+            if (snapProfile && typeof snapProfile === "object") {
+              const p = snapProfile as Record<string, unknown>;
+              if (typeof p.type === "string") nextResults.perfil = p.type;
+              if (Array.isArray(p.signals)) nextResults.risk_factors = p.signals;
+            }
+            const snapDecision = (payload as Record<string, unknown>).agent_decision;
+            if (snapDecision && typeof snapDecision === "object") {
+              const d = snapDecision as Record<string, unknown>;
+              if (typeof d.decision === "string") nextResults.agent_decision = d.decision;
+              if (typeof d.reasoning === "string") nextResults.reasoning = d.reasoning;
+              if (typeof d.recommended_action === "string") nextResults.recommended_action = d.recommended_action;
+            }
           }
 
           // 5. Final/Result step

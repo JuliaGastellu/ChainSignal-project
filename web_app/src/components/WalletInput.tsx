@@ -60,7 +60,7 @@ export function WalletInput({ onSubmit, isLoading }: WalletInputProps) {
                 <span>Processing</span>
               </>
             ) : (
-              <span>Analyze</span>
+              <span>Analyze & Monitor</span>
             )}
           </button>
         </div>

@@ -15,6 +15,7 @@ from ingestion_onchain.cliente_etherscan import ClienteEtherscan
 from perfil_wallet.behavioral_scoring import BehavioralScorer
 from perfil_wallet.clasificador import ClasificadorWallet
 from services.servicio_wdk import ServicioWDK
+from services.agent_budget_service import AgentBudgetService
 from strategy.estrategia_proteccion_wallet import EstrategiaProteccionWallet
 from tools.herramienta_compilar_contrato import compilar_contrato_tool
 from tools.herramienta_generar_contrato import generar_contrato
@@ -60,6 +61,7 @@ class AgentService:
         self.guard = ExecutionGuard()
         self.lock_manager = WalletLockManager()
         self.wdk = ServicioWDK()
+        self.budget = AgentBudgetService()
         self.metrics = AgentMetrics()
         self._semaphore = asyncio.Semaphore(3)
         self._active_stream_wallets: set[str] = set()
@@ -193,6 +195,7 @@ class AgentService:
 
                 yield {"paso": "evaluating_decision", "estado": "starting", "detalle": "Executing decision engine...", "source": source}
                 decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
+                report_snapshot = self._build_report(wallet_addr, profile, scores_obj, scores_dict, risk_breakdown, metrics, decision, decision_estrategia)
 
                 agent_intent = "No action required"
                 if decision.get("decision") == "EXECUTE_ADVANCED":
@@ -202,9 +205,23 @@ class AgentService:
                     "paso": "evaluating_decision",
                     "estado": "completed",
                     "detalle": f"Decision: {decision.get('decision', 'MONITOR')}",
-                    "data": {**decision, "agent_intent": agent_intent},
+                    "data": {
+                        **decision,
+                        "agent_intent": agent_intent,
+                        "confidence": scores_dict.get("confidence"),
+                        "reasoning": decision.get("reasoning") or decision_estrategia.detail,
+                        "metrics": report_snapshot.get("metrics"),
+                        "features": {
+                            "profile_type": profile.type,
+                            "profile_signals": profile.signals,
+                            "days_active": metrics.dias_activo,
+                            "contract_interactions_pct": metrics.porcentaje_interacciones_contratos,
+                        },
+                        "risk_factors": risk_breakdown if isinstance(risk_breakdown, list) else [risk_breakdown],
+                    },
                     "source": source,
                 }
+                yield {"paso": "analysis_snapshot", "estado": "completed", "detalle": "Full analysis snapshot ready.", "data": report_snapshot, "source": source}
 
                 if decision.get("decision") != "EXECUTE_ADVANCED":
                     detalle_final = decision.get("reasoning", "No action required.")
@@ -223,6 +240,22 @@ class AgentService:
                             "execution": execution,
                             "motivo": motivo,
                             "simulation_mode": os.getenv("APP_ENV", "local") != "production",
+                        },
+                        "source": source,
+                    }
+                    return
+
+                current_budget = self.budget.get_budget(wallet_addr)
+                if float(current_budget.get("balance_eth", 0.0)) <= 0:
+                    yield {
+                        "paso": "decision_final",
+                        "estado": "completed",
+                        "detalle": "Simulation mode — no funds at risk",
+                        "data": {
+                            "decision": "SIMULATION_ONLY",
+                            "recommended_action": "fund_agent_budget",
+                            "execution": False,
+                            "simulation_mode": True,
                         },
                         "source": source,
                     }
@@ -316,6 +349,9 @@ class AgentService:
             decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
             if decision.get("decision") != "EXECUTE_ADVANCED":
                 return {"status": "no_action", "decision": decision.get("decision"), "why_not_acting": decision.get("reasoning")}
+            current_budget = self.budget.get_budget(wallet_addr)
+            if float(current_budget.get("balance_eth", 0.0)) <= 0:
+                return {"status": "simulation_only", "reason": "no_budget"}
 
             acquired = await asyncio.to_thread(self.lock_manager.acquire, wallet_addr)
             if not acquired:
@@ -480,6 +516,10 @@ class AgentService:
         else:
             yield {"paso": "contract_active", "estado": "completed", "detalle": "Strategy executed without requiring contracts.", "source": source}
 
+        moved_eth = self._estimate_value_moved_eth(plan)
+        if moved_eth > 0:
+            self.budget.consume(wallet_addr, moved_eth)
+
         if source == "loop":
             yield {"paso": "execution_final_status", "data": {"status": "success", "last_fingerprint": plan.fingerprint}}
 
@@ -556,3 +596,15 @@ class AgentService:
         if include_deploy and decision_estrategia.requires_contract:
             intended_actions.append({"type": "DEPLOY", "params": {"type": decision.get("contract_type", "unknown")}})
         return intended_actions
+
+    def _estimate_value_moved_eth(self, plan: Any) -> float:
+        moved_wei = 0
+        for action in getattr(plan, "actions", []):
+            params = getattr(action, "params", {}) or {}
+            if action.type == "TRANSFER":
+                moved_wei += int(params.get("value_wei") or 0)
+            elif action.type == "SWAP":
+                moved_wei += int(params.get("amount_wei") or 0)
+        if moved_wei <= 0:
+            return 0.0
+        return float(moved_wei / 1e18)
