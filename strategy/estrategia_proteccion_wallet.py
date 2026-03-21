@@ -68,6 +68,12 @@ class EstrategiaProteccionWallet:
             requires_execution = False
             actions.append("Deploy SignalLock contract")
             detail = "Medium risk detected. Deploying temporary passive lock."
+        
+        # Strategy 4: Default Monitoring (Ensure insight.type is set)
+        else:
+            requires_contract = True # Always provide a contract in the report for value
+            actions.append("Deploy GeneralMonitor contract")
+            detail = "Safe wallet behavior. Standard monitoring infrastructure suggested."
 
         return DecisionEstrategia(
             requires_contract=requires_contract,

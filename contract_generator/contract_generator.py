@@ -40,8 +40,33 @@ class GeneradorContratos:
             return header + self._plantilla_signal_lock()
         elif type_val == "treasury_manager":
             return header + self._plantilla_treasury_manager(activity)
+        elif type_val is None:
+            # Default template for general monitoring when no specific type is identified
+            return header + self._plantilla_generic_monitor(wallet)
         else:
             raise ValueError(f"Unsupported contract type: {type_val}")
+
+    def _plantilla_generic_monitor(self, wallet: str) -> str:
+        return f"""
+contract GeneralMonitor {{
+    address public owner;
+    address public analyzedWallet;
+    uint256 public lastUpdate;
+
+    event Heartbeat(uint256 timestamp);
+
+    constructor() {{
+        owner = msg.sender;
+        analyzedWallet = {wallet};
+        lastUpdate = block.timestamp;
+    }}
+
+    function poke() public {{
+        lastUpdate = block.timestamp;
+        emit Heartbeat(block.timestamp);
+    }}
+}}
+"""
 
     def _plantilla_risk_guard(self, wallet: str, riesgo: int) -> str:
         return f"""

@@ -158,9 +158,20 @@ def get_report(wallet_address: str, request: Request, background_tasks: Backgrou
             risk_score=scores_dict["risk"],
             activity_score=scores_dict["activity"]
         )
+        estrategia_engine = EstrategiaProteccionWallet()
+        decision_estrategia = estrategia_engine.evaluar(insight_obj)
         
-        estrategia = EstrategiaProteccionWallet()
-        decision_estrategia = estrategia.evaluar(insight_obj)
+        # Sincronizar el tipo de contrato del insight con la decisión de la estrategia
+        if not insight_obj.type and decision_estrategia.requires_contract:
+            # If engine didn't pick a type but strategy needs one, we default based on strategy actions
+            if "RiskGuard" in str(decision_estrategia.actions):
+                insight_obj.type = "risk_guard"
+            elif "TreasuryManager" in str(decision_estrategia.actions):
+                insight_obj.type = "treasury_manager"
+            elif "SignalLock" in str(decision_estrategia.actions):
+                insight_obj.type = "signal_lock"
+            else:
+                insight_obj.type = None # This will trigger the GeneralMonitor template in the generator
         
         financial_actions = []
         
@@ -182,10 +193,10 @@ def get_report(wallet_address: str, request: Request, background_tasks: Backgrou
 
         # 3.2. Movimiento de fondos (Rescate)
         if decision_estrategia.requires_funds_movement:
-            logger.info(f"Programando RESCATE de fondos ({estrategia.cantidad_transferencia_wei} wei)")
+            logger.info(f"Programando RESCATE de fondos ({decision_estrategia.cantidad_transferencia_wei} wei)")
             background_tasks.add_task(
                 _ejecutar_transferencia_background,
-                estrategia.cantidad_transferencia_wei,
+                decision_estrategia.cantidad_transferencia_wei,
                 wallet
             )
             financial_actions.append({
