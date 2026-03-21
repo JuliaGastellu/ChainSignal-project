@@ -136,7 +136,9 @@ const Index = () => {
       <header className="border-b border-border">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src={logo} alt="ChainSignal" className="h-8 w-auto" />
+            <div className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-sm">
+              <Bot className="h-5 w-5 text-primary" />
+            </div>
             <div>
               <h1 className="text-sm font-semibold text-foreground leading-none">ChainSignal</h1>
               <p className="text-xs text-muted-foreground mt-0.5">On-Chain Risk Analysis</p>
