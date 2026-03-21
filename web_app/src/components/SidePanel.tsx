@@ -13,6 +13,14 @@ type HealthPayload = {
   };
 };
 
+type SafetyStateValue = "ok" | "blocked" | "failed" | "aborted" | "safe" | "unsafe" | "unknown" | "na";
+type SafetyState = {
+  idempotency: SafetyStateValue;
+  simulation: SafetyStateValue;
+  exposure: SafetyStateValue;
+  note?: string;
+};
+
 function formatWhen(iso?: string | null) {
   if (!iso) return "N/A";
   const d = new Date(iso);
@@ -20,25 +28,54 @@ function formatWhen(iso?: string | null) {
   return d.toLocaleString();
 }
 
-function deriveSafety(events: AgentEvent[]) {
+function deriveSafety(events: AgentEvent[]): SafetyState {
+  const hasExecution = events.some((e) => {
+    const p = e.paso.toLowerCase();
+    return p === "execution_safety" || p === "execution_step" || p === "execution_verification";
+  });
+
+  if (!hasExecution) {
+    return { idempotency: "na", simulation: "na", exposure: "na", note: "No execution performed → safety checks not required" };
+  }
+
   const safetyEvents = events.filter((e) => e.paso.toLowerCase() === "execution_safety");
   const lastSafety = safetyEvents[safetyEvents.length - 1];
   const lastSafetyText = (lastSafety?.detalle || "").toLowerCase();
+  const lastSafetyStatus = (lastSafety?.estado || "").toLowerCase();
+
+  const isAborted = lastSafetyStatus === "error" || lastSafetyStatus === "failed";
+  const hasSuccessSignal =
+    lastSafetyStatus === "completed" &&
+    (lastSafetyText.includes("safety checks passed") ||
+      lastSafetyText.includes("validation successful") ||
+      lastSafetyText.includes("fingerprint"));
 
   const idempotency =
-    lastSafetyText.includes("fingerprint") || lastSafetyText.includes("validation successful")
-      ? "ok"
-      : lastSafetyText.includes("already executed") || lastSafetyText.includes("already executing")
-        ? "blocked"
-        : "unknown";
+    lastSafetyText.includes("already executed") || lastSafetyText.includes("already executing")
+      ? "blocked"
+      : hasSuccessSignal
+        ? "ok"
+        : isAborted
+          ? "aborted"
+          : "unknown";
 
   const simulation =
-    lastSafetyText.includes("strict simulation") && lastSafety?.estado.toLowerCase() === "error"
+    lastSafetyText.includes("strict simulation") && isAborted
       ? "failed"
-      : "ok";
+      : hasSuccessSignal
+        ? "ok"
+        : isAborted
+          ? "aborted"
+          : "unknown";
 
   const exposure =
-    lastSafetyText.includes("exposure") && lastSafety?.estado.toLowerCase() === "error" ? "unsafe" : "safe";
+    lastSafetyText.includes("exposure") && isAborted
+      ? "unsafe"
+      : lastSafetyText.includes("exposure") && hasSuccessSignal
+        ? "safe"
+        : isAborted
+          ? "unknown"
+          : "unknown";
 
   return { idempotency, simulation, exposure };
 }
@@ -63,7 +100,21 @@ function StatusRow({
   );
 }
 
-function CheckItem({ label, state }: { label: string; state: "ok" | "blocked" | "failed" | "safe" | "unsafe" | "unknown" }) {
+function CheckItem({
+  label,
+  state,
+}: {
+  label: string;
+  state: SafetyStateValue;
+}) {
+  if (state === "na") {
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="text-xs font-semibold text-muted-foreground">N/A</span>
+      </div>
+    );
+  }
   if (state === "ok" || state === "safe") {
     return (
       <div className="flex items-center justify-between rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2">
@@ -84,6 +135,16 @@ function CheckItem({ label, state }: { label: string; state: "ok" | "blocked" | 
       </div>
     );
   }
+  if (state === "aborted") {
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-3 py-2">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-yellow-600">
+          <AlertCircle className="h-3.5 w-3.5" /> ABORTED
+        </span>
+      </div>
+    );
+  }
   if (state === "failed" || state === "unsafe") {
     return (
       <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
@@ -97,7 +158,7 @@ function CheckItem({ label, state }: { label: string; state: "ok" | "blocked" | 
   return (
     <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="text-xs font-semibold text-muted-foreground">N/A</span>
+      <span className="text-xs font-semibold text-muted-foreground">UNKNOWN</span>
     </div>
   );
 }
@@ -193,6 +254,7 @@ export function SidePanel({ events }: { events: AgentEvent[] }) {
           <CheckItem label="Idempotency" state={safety.idempotency} />
           <CheckItem label="Simulation" state={safety.simulation} />
           <CheckItem label="Exposure" state={safety.exposure} />
+          {safety.note && <div className="mt-2 text-[11px] text-muted-foreground">{safety.note}</div>}
         </div>
       </div>
     </div>
