@@ -45,8 +45,24 @@ const Index = () => {
     }
   };
 
+  const challengeObj = challenge && typeof challenge === "object" ? challenge : null;
+  const challengeChainName =
+    typeof challengeObj?.chain === "string" ? challengeObj.chain.toUpperCase() : "SEPOLIA";
+  const challengeChainId =
+    typeof challengeObj?.chain_id === "number"
+      ? challengeObj.chain_id
+      : Number.isFinite(Number(challengeObj?.chain_id))
+        ? Number(challengeObj?.chain_id)
+        : null;
+  const challengeFormattedAmount =
+    typeof challengeObj?.formatted_amount === "string" ? challengeObj.formatted_amount : "1.00 USDC";
+  const challengeToken =
+    typeof challengeObj?.token === "string" ? challengeObj.token : "USDC";
+  const challengeRecipient =
+    typeof challengeObj?.recipient === "string" ? challengeObj.recipient : "";
+
   const payWithMetaMask = async () => {
-    if (!challenge) return;
+    if (!challengeObj) return;
     setIsPaying(true);
     setReportError(null);
 
@@ -55,26 +71,33 @@ const Index = () => {
         throw new Error("MetaMask is not installed.");
       }
 
+      if (!challengeChainId) {
+        throw new Error("Invalid payment challenge: missing chain id.");
+      }
+      if (!challengeObj.token_address || !challengeRecipient || challengeObj.amount === undefined || challengeObj.amount === null) {
+        throw new Error("Invalid payment challenge: missing payment fields.");
+      }
+
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       
       // Verify network
       const network = await provider.getNetwork();
-      if (Number(network.chainId) !== challenge.chain_id) {
+      if (Number(network.chainId) !== challengeChainId) {
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
-            params: [{ chainId: `0x${challenge.chain_id.toString(16)}` }],
+            params: [{ chainId: `0x${challengeChainId.toString(16)}` }],
           });
         } catch (switchError: any) {
-          throw new Error(`Please switch to ${challenge.chain} (Chain ID: ${challenge.chain_id})`);
+          throw new Error(`Please switch to ${challengeChainName} (Chain ID: ${challengeChainId})`);
         }
       }
 
-      const usdcContract = new Contract(challenge.token_address, ERC20_ABI, signer);
+      const usdcContract = new Contract(String(challengeObj.token_address), ERC20_ABI, signer);
       
       // Amount is already in base units (string from API)
-      const tx = await usdcContract.transfer(challenge.recipient, challenge.amount);
+      const tx = await usdcContract.transfer(challengeRecipient, challengeObj.amount);
       
       console.log("Transaction sent:", tx.hash);
       setPaymentHash(tx.hash);
@@ -115,8 +138,16 @@ const Index = () => {
       const data = await res.json();
       
       if (res.status === 402) {
-        setChallenge(data.challenge);
-        setReportError(data.message || "Payment Required");
+        const challengePayload =
+          data && typeof data === "object" && "challenge" in data && data.challenge && typeof data.challenge === "object"
+            ? (data.challenge as any)
+            : data;
+        setChallenge(challengePayload);
+        const msg =
+          (data && typeof data === "object" ? (data.message as string | undefined) : undefined) ||
+          (challengePayload && typeof challengePayload === "object" ? (challengePayload.message as string | undefined) : undefined) ||
+          "Payment Required";
+        setReportError(msg);
       } else if (!res.ok) {
         setReportError(`Error ${res.status}: ${data.message || data.error || "403"}`);
       } else {
@@ -166,13 +197,13 @@ const Index = () => {
       </header>
 
       <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-10 space-y-6">
-        {challenge && (
+        {challengeObj && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
-            {challenge.simulation_mode && (
+            {Boolean(challengeObj.simulation_mode) && (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
@@ -200,20 +231,20 @@ const Index = () => {
                 <div className="flex-1">
                   <h3 className="text-sm font-bold text-foreground">Payment Required (x402)</h3>
                   <p className="text-xs text-muted-foreground mt-1">
-                    This report is protected. Please pay <strong>{challenge.formatted_amount}</strong> to access it.
+                    This report is protected. Please pay <strong>{challengeFormattedAmount}</strong> to access it.
                   </p>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px]">
                   <div className="space-y-1">
                     <p className="text-muted-foreground uppercase tracking-wider">Network</p>
-                    <p className="font-mono text-foreground">{challenge.chain.toUpperCase()} (ID: {challenge.chain_id})</p>
+                    <p className="font-mono text-foreground">{challengeChainName} (ID: {challengeChainId ?? "N/A"})</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-muted-foreground uppercase tracking-wider">Token</p>
-                    <p className="font-mono text-foreground">{challenge.token} (USDC)</p>
+                    <p className="font-mono text-foreground">{challengeToken} (USDC)</p>
                   </div>
                   <div className="md:col-span-2 space-y-1">
                     <p className="text-muted-foreground uppercase tracking-wider">Recipient</p>
-                    <p className="font-mono text-foreground break-all">{challenge.recipient}</p>
+                    <p className="font-mono text-foreground break-all">{challengeRecipient || "N/A"}</p>
                   </div>
                 </div>
                 <div className="mt-6 flex items-center gap-3">
