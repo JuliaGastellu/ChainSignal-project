@@ -40,11 +40,19 @@ export function useAgentSSE() {
   const [simulationMode, setSimulationMode] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const eventCountRef = useRef(0);
+  const receivedFinalEventRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
+  const currentUrlRef = useRef<string | null>(null);
 
   const reset = useCallback(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
+    }
+    if (retryTimerRef.current) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
     }
     setEvents([]);
     setResults(null);
@@ -52,20 +60,43 @@ export function useAgentSSE() {
     setError(null);
     setSimulationMode(false);
     eventCountRef.current = 0;
+    receivedFinalEventRef.current = false;
+    retryCountRef.current = 0;
+    currentUrlRef.current = null;
   }, []);
 
   const execute = useCallback((wallet: string) => {
+    if (status === "connecting" || status === "streaming") {
+      return;
+    }
     reset();
     setStatus("connecting");
 
     const url = `${API_BASE}/run-agent/${wallet}`;
+    currentUrlRef.current = url;
+    receivedFinalEventRef.current = false;
+    retryCountRef.current = 0;
 
-    try {
-      const es = new EventSource(url);
+    const closeCurrent = (reason: string) => {
+      if (eventSourceRef.current) {
+        console.debug("[SSE] closing:", reason);
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+
+    const openEventSource = (openUrl: string, attempt: number) => {
+      closeCurrent("reopen");
+
+      const es = new EventSource(openUrl);
       eventSourceRef.current = es;
 
+      console.debug("[SSE] opening:", openUrl, "attempt", attempt);
+
       es.onopen = () => {
+        console.debug("[SSE] open");
         setStatus("streaming");
+        setError(null);
       };
 
       es.onmessage = (event) => {
@@ -179,61 +210,71 @@ export function useAgentSSE() {
           return nextResults;
         });
 
+        const payload = (typeof data.data === "object" && data.data !== null) 
+          ? (data.data as Record<string, unknown>) 
+          : data;
+
         const finalPuntos = [
-          "decision_final", "final_decision", "result_final", "resultado_final", 
-          "contract_active", "financial_operation",
+          "decision_final",
           "execution_final_status",
-          "contract_generation", "contract_compilation", 
-          "contract_deployment",
-          "execution_verification"
         ];
-        
+
         const isCompleted = estado === "completed";
         const isError = estado === "error" || estado === "failed";
 
-        const systemBusy = paso === "decision_final" && typeof payload.decision === "string" && payload.decision === "SYSTEM_BUSY";
+        const systemBusy =
+          paso === "decision_final" && typeof payload.decision === "string" && payload.decision === "SYSTEM_BUSY";
 
-        if (systemBusy) {
-          setStatus("error");
-          setError(detalle || "System busy, retrying...");
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
+        if ((finalPuntos.includes(paso) && (isCompleted || isError)) || systemBusy) {
+          receivedFinalEventRef.current = true;
+          console.debug("[SSE] final event:", paso, estado, payload.decision);
+          closeCurrent("final");
+          if (systemBusy) {
+            setStatus("completed");
+            setError(detalle || "System busy, retry shortly");
+            return;
           }
-          return;
-        }
-
-        if (finalPuntos.includes(paso) && isCompleted) {
+          if (isError) {
+            setStatus("error");
+            setError(detalle || "Error during execution.");
+            return;
+          }
           setStatus("completed");
           setError(null);
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
-        } else if (isError) {
-          setStatus("error");
-          setError(detalle || "Error during execution.");
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
         }
       };
 
       es.onerror = () => {
         if (eventSourceRef.current !== es) return;
-        if (es.readyState === EventSource.CLOSED) {
-          // El stream se cerró al terminar.
-          if (status !== "completed") setStatus("completed");
-          setError(null);
+        if (receivedFinalEventRef.current) {
+          console.debug("[SSE] onerror after final; ignoring");
           return;
         }
-        if (status !== "completed") {
-          setError("Connection lost. The API may be unavailable.");
-          setStatus("error");
-          setSimulationMode(true);
+
+        console.debug("[SSE] onerror; readyState=", es.readyState);
+        closeCurrent("error");
+
+        if (retryCountRef.current < 2 && currentUrlRef.current) {
+          retryCountRef.current += 1;
+          const delayMs = retryCountRef.current === 1 ? 1000 : 2000;
+          setStatus("connecting");
+          setError("Connection interrupted. Retrying...");
+          console.debug("[SSE] retry scheduled in", delayMs, "ms (attempt", retryCountRef.current, ")");
+
+          retryTimerRef.current = window.setTimeout(() => {
+            if (!currentUrlRef.current) return;
+            openEventSource(currentUrlRef.current, retryCountRef.current);
+          }, delayMs);
+          return;
         }
+
+        setError("Connection interrupted. Please retry.");
+        setStatus("error");
       };
+    };
+
+    try {
+      openEventSource(url, 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect");
       setStatus("error");

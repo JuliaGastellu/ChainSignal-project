@@ -3,6 +3,7 @@
 import json
 import os
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -93,9 +94,61 @@ async def run_agent_stream(wallet: str):
     """
     Runs the full agent pipeline with real-time SSE event streaming via AgentService.
     """
+    def _format_sse(payload: dict) -> str:
+        return f"data: {json.dumps(payload)}\n\n"
+
+    async def event_generator() -> AsyncGenerator[str, Any]:
+        sent_final = False
+        last_paso = None
+
+        try:
+            async for chunk in _agent_service.run_pipeline_stream(wallet):
+                if isinstance(chunk, str) and chunk.startswith("data: "):
+                    try:
+                        data_raw = chunk[6:].strip()
+                        if data_raw:
+                            payload = json.loads(data_raw)
+                            paso = str(payload.get("paso", "")).lower()
+                            last_paso = paso or last_paso
+                            if paso in {"decision_final", "execution_final_status"}:
+                                sent_final = True
+                    except Exception:
+                        pass
+
+                yield chunk
+
+        except Exception as e:
+            logger.error(f"SSE error: {e}")
+            sent_final = True
+            yield _format_sse(
+                {
+                    "paso": "decision_final",
+                    "estado": "error",
+                    "detalle": f"Execution failed: {str(e)}",
+                    "data": {"decision": "ERROR"},
+                    "source": "api",
+                }
+            )
+        finally:
+            if not sent_final:
+                yield _format_sse(
+                    {
+                        "paso": "decision_final",
+                        "estado": "completed",
+                        "detalle": "Stream completed.",
+                        "data": {"decision": "COMPLETED"},
+                        "source": "api",
+                    }
+                )
+
     return StreamingResponse(
-        _agent_service.run_pipeline_stream(wallet), 
-        media_type="text/event-stream"
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

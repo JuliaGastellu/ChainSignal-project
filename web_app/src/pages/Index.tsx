@@ -128,6 +128,7 @@ const Index = () => {
   };
 
   const handleWalletSubmit = (value: string) => {
+    if (isLoading) return;
     setWallet(value);
     execute(value);
   };
@@ -247,7 +248,17 @@ const Index = () => {
               </div>
               <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-secondary/40">
                 <div><span className="font-semibold text-foreground">GET /run-agent/{'{wallet}'}</span><br/>Stream agent analysis</div>
-                <button onClick={() => handleWalletSubmit(wallet || "0x0000000000000000000000000000000000000000")} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">Run Stream</button>
+                <button
+                  onClick={() => handleWalletSubmit(wallet || "0x0000000000000000000000000000000000000000")}
+                  disabled={isLoading}
+                  className={`text-xs px-2 py-1 rounded ${
+                    isLoading
+                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                      : "bg-primary/10 text-primary hover:bg-primary/15"
+                  }`}
+                >
+                  {isLoading ? "Running..." : "Run Stream"}
+                </button>
               </div>
               <div className="flex items-center justify-between gap-2 p-2 rounded-md bg-secondary/40">
                 <div><span className="font-semibold text-foreground">GET /report/{'{wallet_address}'}</span><br/>Protected x402 report</div>

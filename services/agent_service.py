@@ -62,6 +62,8 @@ class AgentService:
         self.wdk = ServicioWDK()
         self.metrics = AgentMetrics()
         self._semaphore = asyncio.Semaphore(3)
+        self._active_stream_wallets: set[str] = set()
+        self._active_stream_wallets_lock = asyncio.Lock()
         self._agente_ia: Optional[AgenteAnalisis] = None
 
     async def _acquire_semaphore(self, timeout_s: float = 3.0) -> bool:
@@ -96,8 +98,25 @@ class AgentService:
                 yield {
                     "paso": "decision_final",
                     "estado": "completed",
-                    "detalle": "System busy, retrying...",
+                    "detalle": "System busy, retry shortly",
                     "data": {"decision": "SYSTEM_BUSY", "recommended_action": "retry"},
+                    "source": source,
+                }
+                return
+
+            already_running = False
+            async with self._active_stream_wallets_lock:
+                if wallet_addr in self._active_stream_wallets:
+                    already_running = True
+                else:
+                    self._active_stream_wallets.add(wallet_addr)
+
+            if already_running:
+                yield {
+                    "paso": "decision_final",
+                    "estado": "completed",
+                    "detalle": "Pipeline already running for this wallet.",
+                    "data": {"decision": "ALREADY_RUNNING"},
                     "source": source,
                 }
                 return
@@ -236,6 +255,8 @@ class AgentService:
                 finally:
                     await asyncio.to_thread(self.lock_manager.release, wallet_addr)
             finally:
+                async with self._active_stream_wallets_lock:
+                    self._active_stream_wallets.discard(wallet_addr)
                 self._semaphore.release()
         except Exception as e:
             logger.error(f"Pipeline stream error: {e}")
