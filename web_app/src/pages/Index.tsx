@@ -92,28 +92,40 @@ const Index = () => {
           <HealthStatusCards health={healthObj} />
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4">
-          <div className="text-sm font-semibold text-foreground mb-2"><Activity className="h-4 w-4 inline-block mr-1" /> Analyze & Monitor</div>
-          <WalletInput onSubmit={handleWalletSubmit} isLoading={isLoading} />
-          {status === "error" && error && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2 mt-4 p-3 rounded-lg bg-destructive/5 border border-destructive/20"
-            >
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <p className="text-sm text-destructive">{error}</p>
-            </motion.div>
-          )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          <div className="bg-card border border-border rounded-xl p-4 min-h-[220px] h-full">
+            <div className="text-sm font-semibold text-foreground mb-2"><Activity className="h-4 w-4 inline-block mr-1" /> Analyze & Monitor</div>
+            <WalletInput onSubmit={handleWalletSubmit} isLoading={isLoading} />
+            {status === "error" && error && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 mt-4 p-3 rounded-lg bg-destructive/5 border border-destructive/20"
+              >
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                <p className="text-sm text-destructive">{error}</p>
+              </motion.div>
+            )}
+          </div>
+          <BlockAnalysisPanel />
         </div>
-
-        <BlockAnalysisPanel />
 
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
           <div className="lg:col-span-7">
-            <AgentTimeline events={events} isStreaming={status === "streaming"} />
-            {results && <AnalysisDashboard results={results} />}
-            {results && <ResultsPanel results={results} targetWallet={wallet} agentWallet={results.agent_wallet} />}
+            {events.length === 0 && !results ? (
+              <div className="bg-card border border-border rounded-xl p-6 min-h-[420px] flex flex-col justify-center">
+                <h3 className="text-lg font-semibold text-foreground">Ready to analyze</h3>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Ingresá una wallet para análisis estratégico o corré Block-Level Analysis. El stream en tiempo real aparecerá acá cuando inicies el flujo.
+                </p>
+              </div>
+            ) : (
+              <>
+                <AgentTimeline events={events} isStreaming={status === "streaming"} />
+                {results && <AnalysisDashboard results={results} />}
+                {results && <ResultsPanel results={results} targetWallet={wallet} agentWallet={results.agent_wallet} />}
+              </>
+            )}
           </div>
           <div className="lg:col-span-3">
             <div className="space-y-4 lg:sticky lg:top-4 h-fit">

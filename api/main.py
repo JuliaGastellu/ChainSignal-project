@@ -133,6 +133,7 @@ async def analyze_block(block_number: int):
         return JSONResponse(status_code=503, content={"error": "rpc_unavailable", "message": "RPC unavailable for block analysis."})
     try:
         latest_block = await asyncio.to_thread(lambda: _budget_service.w3.eth.block_number)
+        chain_id = await asyncio.to_thread(lambda: _budget_service.w3.eth.chain_id)
         if block_number < 0 or block_number > latest_block:
             return JSONResponse(
                 status_code=400,
@@ -140,6 +141,7 @@ async def analyze_block(block_number: int):
                     "error": "invalid_block_number",
                     "message": f"Block {block_number} is out of range for current network.",
                     "network_latest_block": latest_block,
+                    "chain_id": chain_id,
                     "hint": "Use a valid Sepolia block number less than or equal to network_latest_block.",
                 },
             )
@@ -174,19 +176,35 @@ async def analyze_block(block_number: int):
             "recommended_action": suggested_action,
             "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
             "action_scope": {"target_wallet": "read_only", "agent_wallet": "execution_enabled"},
+            "chain_id": chain_id,
         }
     except Exception as e:
         logger.error("Block analysis error: {}", e)
         try:
             latest_block = await asyncio.to_thread(lambda: _budget_service.w3.eth.block_number)
+            chain_id = await asyncio.to_thread(lambda: _budget_service.w3.eth.chain_id)
         except Exception:
             latest_block = None
+            chain_id = None
+        msg = str(e)
+        if "not found" in msg.lower():
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": "block_not_found",
+                    "message": msg,
+                    "network_latest_block": latest_block,
+                    "chain_id": chain_id,
+                    "hint": "Block may not exist on this network or your RPC provider may not serve this historical block.",
+                },
+            )
         return JSONResponse(
             status_code=500,
             content={
                 "error": "block_analysis_failed",
-                "message": str(e),
+                "message": msg,
                 "network_latest_block": latest_block,
+                "chain_id": chain_id,
                 "hint": "Try a recent Sepolia block and ensure RPC is healthy.",
             },
         )
