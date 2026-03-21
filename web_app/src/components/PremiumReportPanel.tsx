@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Shield, Activity, Zap, Brain, 
-  CheckCircle2, AlertCircle, Info, ChevronDown, 
+  CheckCircle2, Info, ChevronDown, 
   ChevronUp, Code, FileCode, Beaker,
   TrendingUp, Clock, Wallet, BarChart3,
   ArrowRightLeft, Send
@@ -239,7 +239,7 @@ export function PremiumReportPanel({ report }: PremiumReportProps) {
         {scores?.risk?.breakdown && (
           <div className="mb-8 space-y-4">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <AlertCircle className="h-4 w-4" />
+              <Info className="h-4 w-4" />
               <span className="text-xs font-bold uppercase tracking-widest">Detailed Risk Assessment</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
