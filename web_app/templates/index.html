@@ -19,9 +19,12 @@
             <p
                 style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
                 On-Chain Intelligence System</p>
-            <h1 style="font-size: 1.5rem; opacity: 0.8;">ChainSignal <span
-                    style="font-size: 0.7rem; vertical-align: middle; background: var(--border); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; margin-left: 10px; font-weight: 500;">SEPOLIA
-                    LIVE</span></h1>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                <img src="/static/chainsignal_logo_v2.png" alt="ChainSignal" style="height: 32px; width: auto;">
+                <h1 style="font-size: 1.5rem; opacity: 0.8; margin: 0;">ChainSignal <span
+                        style="font-size: 0.7rem; vertical-align: middle; background: var(--border); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; margin-left: 10px; font-weight: 500;">SEPOLIA
+                        LIVE</span></h1>
+            </div>
             {% if simulation_mode %}
             <div style="margin-top: 8px; border: 1px solid #f59e0b; background: rgba(245,162,0,0.12); color: #f59e0b; padding: 8px 12px; border-radius: 10px; font-weight: 700; letter-spacing: 0.2px;">
                 Demo Mode — No real transactions executed. (APP_ENV != production)
