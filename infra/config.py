@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     SWAP_AMOUNT_WEI: int = 500000000000000  # 0.0005 ETH in wei
     SAFE_WALLET_ADDRESS: str = "0x000000000000000000000000000000000000dEaD"  # Rescue wallet
     
+    # Execution Safety Layer (ESL)
+    MAX_EXPOSURE_ETH: float = 0.5
+    COOLDOWN_SECONDS: int = 300  # 5 minutes
+    
     # App Config
     APP_ENV: str = os.getenv("APP_ENV", "local")
     ENABLE_CACHE: bool = os.getenv("ENABLE_CACHE", "true").lower() == "true"
