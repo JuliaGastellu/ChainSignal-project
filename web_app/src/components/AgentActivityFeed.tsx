@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/hooks/useAgentSSE";
-import { History } from "lucide-react";
+import { History, ArrowRightLeft, Send, ShieldAlert, Eye } from "lucide-react";
 
 type ActivityItem = {
   wallet?: string;
@@ -45,14 +45,17 @@ export function AgentActivityFeed() {
         </div>
       </div>
       <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
-        {items.length === 0 && <div className="text-xs text-muted-foreground">No autonomous actions yet.</div>}
+        {items.length === 0 && <div className="text-xs text-muted-foreground">No data available yet.</div>}
         {items.map((a, i) => (
           <div key={`${a.tx_hash || "action"}-${i}`} className="rounded border border-border bg-secondary/30 p-2">
             <div className="flex items-center justify-between text-xs">
-              <div className="font-semibold">{a.type || "ACTION"} · {a.status || "UNKNOWN"}</div>
-              <div className="text-muted-foreground">{a.timestamp ? new Date(a.timestamp * 1000).toLocaleString() : "N/A"}</div>
+              <div className="font-semibold flex items-center gap-1.5">
+                {a.type === "SWAP" ? <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" /> : a.type === "TRANSFER" ? <Send className="h-3.5 w-3.5 text-green-500" /> : a.status === "FAILED" ? <ShieldAlert className="h-3.5 w-3.5 text-yellow-600" /> : <Eye className="h-3.5 w-3.5 text-primary" />}
+                {a.type || "MONITORING"} · {a.status || "SKIPPED"}
+              </div>
+              <div className="text-muted-foreground">{a.timestamp ? new Date(a.timestamp * 1000).toLocaleString() : "Not triggered"}</div>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-1">{a.reason || "No reason provided."}</div>
+            <div className="text-[11px] text-muted-foreground mt-1">{a.reason || "No data available yet"}</div>
             <div className="text-[11px] mt-1">Moved: {a.value_moved_eth || 0} ETH</div>
             {a.explorer && (
               <a href={a.explorer} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">
@@ -65,4 +68,3 @@ export function AgentActivityFeed() {
     </div>
   );
 }
-

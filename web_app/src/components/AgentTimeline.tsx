@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, Circle, AlertCircle, Loader2, ArrowRight, Sparkles } from "lucide-react";
 import type { AgentEvent } from "@/hooks/useAgentSSE";
+import { useMemo } from "react";
 
 interface AgentTimelineProps {
   events: AgentEvent[];
@@ -84,6 +85,43 @@ function getStatusBadge(estado: string) {
     default:
       return <span className={`${base} bg-muted text-muted-foreground`}>{estado}</span>;
   }
+}
+
+type UiEvent = AgentEvent & { uiEstado: string };
+
+function reconcileEvents(events: AgentEvent[]): UiEvent[] {
+  const normalized: UiEvent[] = events.map((e) => ({ ...e, uiEstado: e.estado }));
+  const lastByStep = new Map<string, number>();
+  let closedAll = false;
+
+  normalized.forEach((event, idx) => {
+    const step = event.paso.toLowerCase();
+    const status = String(event.uiEstado).toLowerCase();
+    const prevIdx = lastByStep.get(step);
+    if (prevIdx !== undefined) {
+      const prev = normalized[prevIdx];
+      const prevStatus = String(prev.uiEstado).toLowerCase();
+      const prevActive = ["starting", "running", "processing", "iniciando"].includes(prevStatus);
+      if (prevActive) {
+        if (["completed", "success"].includes(status)) prev.uiEstado = "completed";
+        if (["error", "failed"].includes(status)) prev.uiEstado = "failed";
+      }
+    }
+    lastByStep.set(step, idx);
+
+    if (step === "decision_final" || step === "execution_final_status") {
+      closedAll = true;
+      for (let i = 0; i < idx; i += 1) {
+        const s = String(normalized[i].uiEstado).toLowerCase();
+        if (["starting", "running", "processing", "iniciando"].includes(s)) {
+          normalized[i].uiEstado = "completed";
+        }
+      }
+    }
+  });
+
+  if (!closedAll) return normalized;
+  return normalized;
 }
 
 function getStepTone(paso: string) {
@@ -179,13 +217,14 @@ function PhaseHeader({ phase }: { phase: string }) {
 
 export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
   if (events.length === 0) return null;
+  const reconciled = useMemo(() => reconcileEvents(events), [events]);
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="w-full max-w-2xl mx-auto mt-8"
+      className="w-full mt-4"
     >
       <div className="mb-3 flex items-center justify-between">
         <div>
@@ -195,16 +234,16 @@ export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
         <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary"><Sparkles className="h-3.5 w-3.5" /> Live</span>
       </div>
 
-      <div className="bg-card border border-border rounded-xl p-3 space-y-2">
-        {events.map((event, index) => {
+      <div className="bg-card border border-border rounded-xl p-3 space-y-2 max-h-[560px] overflow-y-auto">
+        {reconciled.map((event, index) => {
           const stepKey = event.paso.toLowerCase();
           const label = STEP_LABELS[stepKey] || stepKey;
           const isActive =
-            event.estado === "iniciando" || event.estado === "processing" || event.estado === "running" || event.estado === "starting";
+            event.uiEstado === "iniciando" || event.uiEstado === "processing" || event.uiEstado === "running" || event.uiEstado === "starting";
           const tone = getStepTone(stepKey);
-          const toneClasses = getToneClasses(tone, event.estado);
+          const toneClasses = getToneClasses(tone, event.uiEstado);
           const phase = getPhase(stepKey);
-          const prevPhase = index > 0 ? getPhase(events[index - 1].paso) : null;
+          const prevPhase = index > 0 ? getPhase(reconciled[index - 1].paso) : null;
           return (
             <div key={event.id}>
               {phase !== prevPhase && <PhaseHeader phase={phase} />}
@@ -216,12 +255,12 @@ export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    {getStepIcon(event.estado)}
+                    {getStepIcon(event.uiEstado)}
                     <span>{label}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     {getSourceBadge(event.source)}
-                    {getStatusBadge(event.estado)}
+                    {getStatusBadge(event.uiEstado)}
                   </div>
                 </div>
                 <div className="mt-2 flex flex-col gap-1">

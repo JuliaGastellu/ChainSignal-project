@@ -13,7 +13,7 @@ type HealthPayload = {
   };
 };
 
-type SafetyStateValue = "ok" | "blocked" | "failed" | "aborted" | "safe" | "unsafe" | "unknown" | "na";
+type SafetyStateValue = "passed" | "blocked" | "failed" | "aborted" | "safe" | "unsafe" | "skipped" | "not_required";
 type SafetyState = {
   idempotency: SafetyStateValue;
   simulation: SafetyStateValue;
@@ -22,9 +22,9 @@ type SafetyState = {
 };
 
 function formatWhen(iso?: string | null) {
-  if (!iso) return "N/A";
+  if (!iso) return "Not triggered";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "N/A";
+  if (Number.isNaN(d.getTime())) return "Not available yet";
   return d.toLocaleString();
 }
 
@@ -35,7 +35,7 @@ function deriveSafety(events: AgentEvent[]): SafetyState {
   });
 
   if (!hasExecution) {
-    return { idempotency: "na", simulation: "na", exposure: "na", note: "No execution performed → safety checks not required" };
+    return { idempotency: "not_required", simulation: "not_required", exposure: "not_required", note: "No execution performed → safety checks not required" };
   }
 
   const safetyEvents = events.filter((e) => e.paso.toLowerCase() === "execution_safety");
@@ -54,19 +54,19 @@ function deriveSafety(events: AgentEvent[]): SafetyState {
     lastSafetyText.includes("already executed") || lastSafetyText.includes("already executing")
       ? "blocked"
       : hasSuccessSignal
-        ? "ok"
+        ? "passed"
         : isAborted
           ? "aborted"
-          : "unknown";
+          : "skipped";
 
   const simulation =
     lastSafetyText.includes("strict simulation") && isAborted
       ? "failed"
       : hasSuccessSignal
-        ? "ok"
+        ? "passed"
         : isAborted
           ? "aborted"
-          : "unknown";
+          : "skipped";
 
   const exposure =
     lastSafetyText.includes("exposure") && isAborted
@@ -74,8 +74,8 @@ function deriveSafety(events: AgentEvent[]): SafetyState {
       : lastSafetyText.includes("exposure") && hasSuccessSignal
         ? "safe"
         : isAborted
-          ? "unknown"
-          : "unknown";
+          ? "skipped"
+          : "skipped";
 
   return { idempotency, simulation, exposure };
 }
@@ -107,20 +107,20 @@ function CheckItem({
   label: string;
   state: SafetyStateValue;
 }) {
-  if (state === "na") {
+  if (state === "not_required") {
     return (
       <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="text-xs font-semibold text-muted-foreground">N/A</span>
+        <span className="text-xs font-semibold text-muted-foreground">NOT_REQUIRED</span>
       </div>
     );
   }
-  if (state === "ok" || state === "safe") {
+  if (state === "passed" || state === "safe") {
     return (
       <div className="flex items-center justify-between rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
         <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-500">
-          <CheckCircle2 className="h-3.5 w-3.5" /> OK
+          <CheckCircle2 className="h-3.5 w-3.5" /> PASSED
         </span>
       </div>
     );
@@ -145,6 +145,16 @@ function CheckItem({
       </div>
     );
   }
+  if (state === "skipped") {
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+          <AlertCircle className="h-3.5 w-3.5" /> SKIPPED
+        </span>
+      </div>
+    );
+  }
   if (state === "failed" || state === "unsafe") {
     return (
       <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
@@ -158,7 +168,7 @@ function CheckItem({
   return (
     <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="text-xs font-semibold text-muted-foreground">UNKNOWN</span>
+      <span className="text-xs font-semibold text-muted-foreground">Not available yet</span>
     </div>
   );
 }

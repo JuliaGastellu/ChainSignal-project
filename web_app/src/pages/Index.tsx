@@ -1,8 +1,10 @@
 import { WalletInput } from "@/components/WalletInput";
 import { AgentTimeline } from "@/components/AgentTimeline";
 import { AnalysisDashboard } from "@/components/AnalysisDashboard";
-import { AgentBudgetPanel } from "@/components/AgentBudgetPanel";
 import { AgentActivityFeed } from "@/components/AgentActivityFeed";
+import { HealthStatusCards } from "@/components/HealthStatusCards";
+import { AgentSummaryCard } from "@/components/AgentSummaryCard";
+import { AgentTreasuryCard } from "@/components/AgentTreasuryCard";
 import { useAgentSSE, API_BASE } from "@/hooks/useAgentSSE";
 import { motion } from "framer-motion";
 import { Bot, AlertCircle, RotateCcw, Monitor, Activity } from "lucide-react";
@@ -82,47 +84,44 @@ const Index = () => {
       </header>
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground"><Monitor className="h-4 w-4" /> Service Status</div>
-              <button onClick={checkHealth} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">Refresh</button>
-            </div>
-            <pre className="p-2 bg-secondary/40 border border-border rounded text-[11px] whitespace-pre-wrap break-all">{healthRaw || "Loading..."}</pre>
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground"><Monitor className="h-4 w-4" /> Agent Status</div>
+            <button onClick={checkHealth} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary">Refresh</button>
           </div>
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="text-sm font-semibold text-foreground mb-2"><Activity className="h-4 w-4 inline-block mr-1" /> Analyze & Monitor</div>
-            <WalletInput onSubmit={handleWalletSubmit} isLoading={isLoading} />
-            {status === "error" && error && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 mt-4 p-3 rounded-lg bg-destructive/5 border border-destructive/20"
-              >
-                <AlertCircle className="h-4 w-4 text-destructive" />
-                <p className="text-sm text-destructive">{error}</p>
-              </motion.div>
-            )}
-          </div>
+          <HealthStatusCards health={healthObj} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-2">
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="text-sm font-semibold text-foreground mb-2"><Activity className="h-4 w-4 inline-block mr-1" /> Analyze & Monitor</div>
+          <WalletInput onSubmit={handleWalletSubmit} isLoading={isLoading} />
+          {status === "error" && error && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 mt-4 p-3 rounded-lg bg-destructive/5 border border-destructive/20"
+            >
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <p className="text-sm text-destructive">{error}</p>
+            </motion.div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
+          <div className="lg:col-span-7">
             <AgentTimeline events={events} isStreaming={status === "streaming"} />
+            {results && <AnalysisDashboard results={results} />}
           </div>
-          <div className="lg:col-span-1 h-fit">
-            <SidePanel events={events} />
+          <div className="lg:col-span-3">
+            <div className="space-y-4 lg:sticky lg:top-4 h-fit">
+              <AgentSummaryCard results={results} />
+              {wallet && <AgentTreasuryCard wallet={wallet} />}
+              <SidePanel events={events} />
+            </div>
           </div>
         </div>
 
-        {results && <AnalysisDashboard results={results} />}
-
-        {wallet && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AgentBudgetPanel wallet={wallet} />
-            <AgentActivityFeed />
-          </div>
-        )}
+        <AgentActivityFeed />
       </main>
 
       <footer className="border-t border-border py-4">
