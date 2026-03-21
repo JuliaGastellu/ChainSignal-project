@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Shield, Activity, Zap, Brain, 
-  CheckCircle2, Info, ChevronDown, 
+  CheckCircle2, AlertCircle, Info, ChevronDown, 
   ChevronUp, Code, FileCode, Beaker,
   TrendingUp, Clock, Wallet, BarChart3,
   ArrowRightLeft, Send
