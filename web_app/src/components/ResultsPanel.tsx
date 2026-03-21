@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Shield, Activity, FileText, Zap, Brain, Copy, Check } from "lucide-react";
+import { Shield, Activity, FileText, Zap, Brain, Copy, Check, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import type { AgentResults } from "@/hooks/useAgentSSE";
 
@@ -62,6 +62,104 @@ function ScoreCard({
   );
 }
 
+function normalizeConfidence(confidence: number | undefined) {
+  if (confidence === undefined) return undefined;
+  if (Number.isNaN(confidence)) return undefined;
+  if (confidence > 1) return Math.max(0, Math.min(1, confidence / 100));
+  return Math.max(0, Math.min(1, confidence));
+}
+
+function ConfidenceBar({ confidence }: { confidence: number | undefined }) {
+  const c = normalizeConfidence(confidence);
+  if (c === undefined) return null;
+  const pct = Math.round(c * 100);
+  const filled = Math.round((c * 10));
+
+  return (
+    <div className="mt-2 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-1.5">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div
+            key={i}
+            className={`h-2 w-2 rounded-sm ${i < filled ? "bg-primary" : "bg-muted"}`}
+          />
+        ))}
+      </div>
+      <div className="text-xs font-mono text-muted-foreground">Confidence: {pct}%</div>
+    </div>
+  );
+}
+
+function getDecisionPresentation(results: AgentResults) {
+  const code = results.decision_code || results.agent_decision || "";
+  const normalized = String(code).toUpperCase();
+
+  const decisionType: Record<string, "system" | "error"> = {
+    SYSTEM_BUSY: "system",
+    ALREADY_RUNNING: "system",
+    ERROR: "error",
+  };
+
+  const kind = decisionType[normalized] || "normal";
+
+  if (kind === "system") {
+    return {
+      title: normalized === "ALREADY_RUNNING" ? "Already Running" : "System Busy",
+      subtitle:
+        normalized === "ALREADY_RUNNING"
+          ? "An execution is already in progress for this wallet."
+          : "Agent is currently processing other requests. Retry in a few seconds.",
+      tone: "border-yellow-500/20 bg-yellow-500/5",
+      icon: <AlertCircle className="h-4 w-4 text-yellow-600" />,
+      badge: "SYSTEM",
+    };
+  }
+
+  if (kind === "error") {
+    return {
+      title: "Execution Failed",
+      subtitle: results.reasoning || results.agent_decision || "An error occurred during execution.",
+      tone: "border-destructive/30 bg-destructive/5",
+      icon: <AlertCircle className="h-4 w-4 text-destructive" />,
+      badge: "ERROR",
+    };
+  }
+
+  return {
+    title: "Agent Decision",
+    subtitle: results.reasoning || results.why_not_acting || "Decision computed from on-chain behavioral signals.",
+    tone: "border-risk-low/20 bg-risk-low/5",
+    icon: <CheckCircle2 className="h-4 w-4 text-risk-low" />,
+    badge: "DECISION",
+  };
+}
+
+function buildAgentConclusion(results: AgentResults) {
+  const code = String(results.decision_code || results.agent_decision || "").toUpperCase();
+  const c = normalizeConfidence(results.confidence);
+
+  if (code === "SYSTEM_BUSY") {
+    return "The agent is currently saturated and cannot start a new run. Please retry shortly.";
+  }
+  if (code === "ALREADY_RUNNING") {
+    return "An agent run is already in progress for this wallet. Wait for completion to avoid duplicated execution.";
+  }
+  if (code === "ERROR") {
+    return "The agent attempted to execute but encountered an error. No unsafe execution should proceed without ESL validation.";
+  }
+  if (code === "INSUFFICIENT_DATA") {
+    return "This wallet does not present sufficient behavioral signals to justify intervention. Monitoring is recommended.";
+  }
+
+  if (typeof c === "number" && c < 0.2) {
+    return "Confidence is low due to limited observable activity. The agent will prioritize monitoring until stronger signals emerge.";
+  }
+  if (code === "EXECUTE_ADVANCED") {
+    return "Elevated risk indicators detected. The agent will apply mitigations using the Execution Safety Layer before any on-chain action.";
+  }
+  return "The agent evaluated this wallet and produced a decision based on on-chain behavioral signals and safety constraints.";
+}
+
 export function ResultsPanel({ results }: ResultsPanelProps) {
   const [copied, setCopied] = useState(false);
   const [showJson, setShowJson] = useState(false);
@@ -79,16 +177,32 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
       transition={{ duration: 0.5 }}
       className="w-full max-w-2xl mx-auto mt-8"
     >
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-          Analysis Results
-        </h2>
-        <div className="flex items-center gap-2">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mb-4 bg-card border border-border rounded-xl p-4"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-foreground font-semibold">
+            <Brain className="h-4 w-4" />
+            <span>Agent Conclusion</span>
+          </div>
           {results.source && (
             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-border bg-secondary/40 text-muted-foreground uppercase tracking-wider">
               {results.source === "loop" ? "Triggered autonomously" : "Triggered by user"}
             </span>
           )}
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">{buildAgentConclusion(results)}</p>
+        <ConfidenceBar confidence={results.confidence} />
+      </motion.div>
+
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          Analysis Results
+        </h2>
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowJson((v) => !v)}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border"
@@ -104,6 +218,26 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
           </button>
         </div>
       </div>
+
+      {(() => {
+        const p = getDecisionPresentation(results);
+        return (
+          <div className={`mb-3 rounded-xl border p-4 ${p.tone}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {p.icon}
+                <div>
+                  <div className="text-sm font-semibold text-foreground">{p.title}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{p.subtitle}</div>
+                </div>
+              </div>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-border bg-background/40 text-muted-foreground uppercase tracking-wider">
+                {p.badge}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-2 gap-3">
         <ScoreCard

@@ -13,6 +13,7 @@ export interface AgentEvent {
 export interface AgentResults {
   risk_score?: number;
   activity_score?: number;
+  confidence?: number;
   contract_type?: string;
   recommended_action?: string;
   agent_decision?: string;
@@ -142,8 +143,10 @@ export function useAgentSSE() {
           if (paso === "calculating_scores") {
             const risk = Number(payload.risk ?? payload.risk_score);
             const activity = Number(payload.activity ?? payload.activity_score);
+            const conf = Number(payload.confidence);
             if (!Number.isNaN(risk)) nextResults.risk_score = risk;
             if (!Number.isNaN(activity)) nextResults.activity_score = activity;
+            if (!Number.isNaN(conf)) nextResults.confidence = conf;
           }
 
           // 2. Profile step

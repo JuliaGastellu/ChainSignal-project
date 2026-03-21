@@ -123,6 +123,60 @@ function getSourceBadge(source?: "api" | "loop") {
   return <span className={`${base} bg-muted text-muted-foreground border border-border`}>User Triggered</span>;
 }
 
+function getPhase(paso: string) {
+  const p = paso.toLowerCase();
+  const analysis = new Set(["analyzing_wallet", "calculating_scores", "classifying_profile", "generating_insight"]);
+  const decision = new Set(["evaluating_decision", "x402_validation", "strategy_execution"]);
+  const execution = new Set([
+    "execution_safety",
+    "execution_step",
+    "execution_verification",
+    "contract_generation",
+    "contract_compilation",
+    "contract_deployment",
+    "contract_active",
+    "execution_final_status",
+    "execution_lock",
+  ]);
+  const final = new Set(["decision_final"]);
+
+  if (analysis.has(p)) return "analysis";
+  if (decision.has(p)) return "decision";
+  if (execution.has(p)) return "execution";
+  if (final.has(p)) return "final";
+  return "other";
+}
+
+function PhaseHeader({ phase }: { phase: string }) {
+  const label =
+    phase === "analysis"
+      ? "Analysis Phase"
+      : phase === "decision"
+        ? "Decision Phase"
+        : phase === "execution"
+          ? "Execution Phase"
+          : phase === "final"
+            ? "Final Outcome"
+            : "Updates";
+
+  const tone =
+    phase === "analysis"
+      ? "text-sky-600 bg-sky-500/5 border-sky-500/15"
+      : phase === "decision"
+        ? "text-yellow-700 bg-yellow-500/5 border-yellow-500/15"
+        : phase === "execution"
+          ? "text-green-700 bg-green-500/5 border-green-500/15"
+          : phase === "final"
+            ? "text-foreground bg-secondary/40 border-border"
+            : "text-muted-foreground bg-secondary/40 border-border";
+
+  return (
+    <div className={`mt-2 rounded-lg border px-3 py-2 ${tone}`}>
+      <div className="text-xs font-semibold uppercase tracking-wider">{label}</div>
+    </div>
+  );
+}
+
 export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
   if (events.length === 0) return null;
 
@@ -149,34 +203,38 @@ export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
             event.estado === "iniciando" || event.estado === "processing" || event.estado === "running" || event.estado === "starting";
           const tone = getStepTone(stepKey);
           const toneClasses = getToneClasses(tone, event.estado);
+          const phase = getPhase(stepKey);
+          const prevPhase = index > 0 ? getPhase(events[index - 1].paso) : null;
           return (
-            <motion.div
-              key={event.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.22, delay: index * 0.04 }}
-              className={`rounded-lg border px-3 py-2 ${toneClasses}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  {getStepIcon(event.estado)}
-                  <span>{label}</span>
+            <div key={event.id}>
+              {phase !== prevPhase && <PhaseHeader phase={phase} />}
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, delay: index * 0.04 }}
+                className={`rounded-lg border px-3 py-2 ${toneClasses}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    {getStepIcon(event.estado)}
+                    <span>{label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getSourceBadge(event.source)}
+                    {getStatusBadge(event.estado)}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {getSourceBadge(event.source)}
-                  {getStatusBadge(event.estado)}
+                <div className="mt-2 flex flex-col gap-1">
+                  <p className={`text-sm ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
+                    {event.detalle || "Waiting for new update..."}
+                  </p>
+                  {event.data && (event.data as Record<string, unknown>).decision && (
+                    <p className="text-[11px] text-primary font-medium">Decision: {((event.data as Record<string, unknown>).decision as string)}</p>
+                  )}
                 </div>
-              </div>
-              <div className="mt-2 flex flex-col gap-1">
-                <p className={`text-sm ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
-                  {event.detalle || "Waiting for new update..."}
-                </p>
-                {event.data && (event.data as Record<string, unknown>).decision && (
-                  <p className="text-[11px] text-primary font-medium">Decision: {((event.data as Record<string, unknown>).decision as string)}</p>
-                )}
-              </div>
-              <div className="text-[11px] text-muted-foreground font-mono mt-1">{new Date(event.timestamp).toLocaleTimeString()}</div>
-            </motion.div>
+                <div className="text-[11px] text-muted-foreground font-mono mt-1">{new Date(event.timestamp).toLocaleTimeString()}</div>
+              </motion.div>
+            </div>
           );
         })}
         {isStreaming && (
