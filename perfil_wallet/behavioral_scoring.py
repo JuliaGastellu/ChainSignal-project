@@ -37,6 +37,46 @@ class BehavioralScorer:
         
         return scores
 
+    def get_risk_breakdown(self, f: FeaturesWallet) -> list[dict]:
+        """Provides a detailed list of risk factors found."""
+        breakdown = []
+        if f.transacciones_con_error > 10:
+            breakdown.append({
+                "factor": "High Error Rate",
+                "severity": "high" if f.transacciones_con_error > 20 else "medium",
+                "detail": f"Detected {f.transacciones_con_error} failed transactions, which may indicate interaction with malicious or broken contracts."
+            })
+        
+        if f.ratio_envios_vs_recepciones > 10:
+            breakdown.append({
+                "factor": "Aggressive Outflow",
+                "severity": "medium",
+                "detail": "High frequency of outgoing transfers compared to receipts. Common in automated trading or fund drainage."
+            })
+            
+        if f.dias_activo < 30:
+            breakdown.append({
+                "factor": "Young Wallet",
+                "severity": "medium",
+                "detail": f"Wallet is only {f.dias_activo} days old. Young wallets have less established behavioral history."
+            })
+            
+        if f.porcentaje_interacciones_contratos < 5:
+            breakdown.append({
+                "factor": "Low Contract Interaction",
+                "severity": "low",
+                "detail": "Mostly simple transfers. Limited interaction with verified DeFi protocols."
+            })
+
+        if not breakdown:
+            breakdown.append({
+                "factor": "Clean History",
+                "severity": "none",
+                "detail": "No significant risk factors detected in the analyzed period."
+            })
+            
+        return breakdown
+
     def _score_actividad(self, f: FeaturesWallet) -> MetricaScoring:
         """Activity score based on volume and transaction frequency."""
         puntos = 0

@@ -44,25 +44,51 @@ export function PremiumReportPanel({ report }: PremiumReportProps) {
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-4xl mx-auto space-y-6 mt-8 p-1 rounded-2xl bg-gradient-to-b from-primary/10 to-transparent border border-primary/20 backdrop-blur-sm"
     >
-      <div className="bg-card/80 rounded-2xl p-6 shadow-xl border border-white/5">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-primary" />
+      <div className="p-8">
+        {/* Executive Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 pb-8 border-b border-white/10">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Executive Intelligence Report</span>
+              <span className="h-1 w-1 rounded-full bg-white/20"></span>
+              <span className="text-[10px] text-muted-foreground">{new Date(report.timestamp).toLocaleString()}</span>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">Premium On-Chain Report</h2>
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                <CheckCircle2 className="h-3 w-3 text-green-500" /> Verified via Sepolia Middleware
-              </p>
+            <h1 className="text-3xl font-bold text-foreground mb-1">
+              {report.executive_summary?.profile_title || "Wallet Analysis"}
+            </h1>
+            <p className="text-sm text-muted-foreground font-mono">
+              {report.wallet}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-3 text-center">
+              <div className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Security Rating</div>
+              <div className={`text-3xl font-black ${
+                report.executive_summary?.security_rating === 'A' ? 'text-green-500' :
+                report.executive_summary?.security_rating === 'B' ? 'text-blue-500' :
+                report.executive_summary?.security_rating === 'C' ? 'text-orange-500' : 'text-red-500'
+              }`}>
+                {report.executive_summary?.security_rating || "N/A"}
+              </div>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-3 text-center">
+              <div className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Activity</div>
+              <div className="text-xl font-bold text-foreground">
+                {report.executive_summary?.activity_level || "Medium"}
+              </div>
             </div>
           </div>
-          <div className="text-right">
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-primary/10 text-primary rounded border border-primary/20">
-              License Activated
-            </span>
+        </div>
+
+        {/* Main Recommendation Banner */}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-8 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <Shield className="h-5 w-5 text-primary" />
           </div>
+          <p className="text-sm text-foreground/90 font-medium">
+            <span className="text-primary font-bold">Summary:</span> {report.executive_summary?.main_recommendation}
+          </p>
         </div>
 
         {/* Profile Section */}
@@ -163,6 +189,35 @@ export function PremiumReportPanel({ report }: PremiumReportProps) {
             </div>
           </div>
         </div>
+
+        {/* Risk Breakdown Section */}
+        {report.scores.risk.breakdown && (
+          <div className="mb-8 space-y-4">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-xs font-bold uppercase tracking-widest">Detailed Risk Assessment</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {report.scores.risk.breakdown.map((item: any, i: number) => (
+                <div key={i} className="bg-white/5 rounded-xl p-4 border border-white/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-foreground">{item.factor}</span>
+                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                      item.severity === 'high' ? 'bg-red-500/20 text-red-400' : 
+                      item.severity === 'medium' ? 'bg-orange-500/20 text-orange-400' : 
+                      'bg-blue-500/20 text-blue-400'
+                    }`}>
+                      {item.severity}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {item.detail}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Financial Actions Section */}
         {report.financial_actions && report.financial_actions.length > 0 && (

@@ -2,6 +2,7 @@
 
 import json
 import os
+from datetime import datetime
 from contextlib import asynccontextmanager
 
 from typing import AsyncGenerator
@@ -138,6 +139,17 @@ def get_report(wallet_address: str, request: Request, background_tasks: Backgrou
         profile = _clasificador.clasificar(metrics)
         scorer = BehavioralScorer()
         scores_obj = scorer.calcular_scores(metrics)
+        risk_breakdown = scorer.get_risk_breakdown(metrics)
+        
+        scores_dict = {
+            "risk": scores_obj.risk_score.value,
+            "activity": scores_obj.activity_score.value,
+            "defi_engagement": scores_obj.defi_engagement.value
+        }
+        
+        # 2.1. Decision Engine para determinar el tipo de contrato y nivel de ejecución
+        engine = DecisionEngine()
+        decision = engine.evaluate(scores_dict, metrics={"transaction_count": metrics.total_transacciones})
         
         # 3. Evaluación de Estrategia de Protección
         insight_obj = InsightContrato(
@@ -204,6 +216,14 @@ def get_report(wallet_address: str, request: Request, background_tasks: Backgrou
         # 5. Construcción de Respuesta Premium Enriquecida
         return {
             "wallet": wallet,
+            "timestamp": datetime.now().isoformat(),
+            "executive_summary": {
+                "profile_title": profile.type.replace("_", " ").title(),
+                "security_rating": "A" if scores_dict["risk"] < 20 else "B" if scores_dict["risk"] < 40 else "C" if scores_dict["risk"] < 60 else "D",
+                "activity_level": "High" if scores_dict["activity"] > 70 else "Medium" if scores_dict["activity"] > 30 else "Low",
+                "main_recommendation": f"Wallet identified as {profile.type.replace('_', ' ')}. " + 
+                                     ("Urgent protection suggested." if scores_dict["risk"] > 60 else "Routine monitoring recommended.")
+            },
             "profile": {
                 "type": profile.type,
                 "confidence": profile.confidence,
@@ -213,7 +233,8 @@ def get_report(wallet_address: str, request: Request, background_tasks: Backgrou
             "scores": {
                 "risk": {
                     "value": scores_obj.risk_score.value,
-                    "interpretation": scores_obj.risk_score.interpretation
+                    "interpretation": scores_obj.risk_score.interpretation,
+                    "breakdown": risk_breakdown
                 },
                 "activity": {
                     "value": scores_obj.activity_score.value,
