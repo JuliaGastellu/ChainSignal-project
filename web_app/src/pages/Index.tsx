@@ -935,7 +935,6 @@ const ReasoningColumn: React.FC<{
   nextCycleIn: number;
   isRunning: boolean;
 }> = ({ wallet, nextCycleIn, isRunning }) => {
-  const selectedWallet = wallet?.address || null;
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -1009,7 +1008,7 @@ const ReasoningColumn: React.FC<{
               Agent stopped. Start the agent to begin monitoring.
             </div>
           </div>
-        ) : selectedWallet ? (
+        ) : wallet ? (
           <div>
             <div style={{ marginBottom: '16px' }}>
               <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>
@@ -1020,7 +1019,7 @@ const ReasoningColumn: React.FC<{
                 fontSize: '14px', 
                 color: '#e2e8f0' 
               }}>
-                {selectedWallet}
+                {wallet.address}
               </div>
             </div>
 
@@ -1032,6 +1031,7 @@ const ReasoningColumn: React.FC<{
               <ScoreBar label="Exploration" score={scores.exploration} color="#3b82f6" />
             </div>
 
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <div style={{ 
                 fontSize: '32px', 
                 fontWeight: '600',
@@ -1057,6 +1057,7 @@ const ReasoningColumn: React.FC<{
                   {wallet.last_signal}
                 </div>
               )}
+            </div>
 
             <div style={{ 
               backgroundColor: '#3b82f605',
