@@ -8,6 +8,14 @@ interface WalletData {
   last_signal?: string;
   risk_score?: number;
   times_flagged?: number;
+  reasoning?: string;
+  scores?: {
+    activity: number;
+    risk: number;
+    defi_engagement: number;
+    diversity: number;
+    exploration: number;
+  };
 }
 
 interface ExecutionData {
@@ -26,6 +34,15 @@ interface ActivityEntry {
   type: string;
   description: string;
 }
+
+const getSignalColor = (signal?: string) => {
+  switch (signal) {
+    case 'MONITOR': return '#f59e0b';
+    case 'ALERT': return '#3b82f6';
+    case 'INTERVENE': return '#ef4444';
+    default: return '#64748b';
+  }
+};
 
 const Index: React.FC = () => {
   const [showFundingPanel, setShowFundingPanel] = useState(false);
@@ -47,22 +64,13 @@ const Index: React.FC = () => {
         const healthRes = await fetch(`${API_BASE}/health`);
         const healthData = await healthRes.json();
         
-        // Try to get agent address from dedicated endpoint
-        let agentAddress = '';
-        try {
-          const addrRes = await fetch(`${API_BASE}/agent/address`);
-          if (addrRes.ok) {
-            const addrData = await addrRes.json();
-            agentAddress = addrData.agent_wallet || addrData.address || '';
-          }
-        } catch (addrError) {
-          console.warn('Agent address endpoint failed');
-        }
+        // Use CANONICAL agent_wallet from health endpoint
+        const canonicalAddress = healthData.agent_budget?.agent_wallet || '';
         
         // Extract agent status from health data
         setAgentStatus({
           running: healthData.agent_loop === 'active',
-          agent_wallet: agentAddress,
+          agent_wallet: canonicalAddress,
           agent_balance_eth: healthData.agent_budget?.total_balance_eth || 0,
           cycles_completed: healthData.global_metrics?.total_runs || 0
         });
@@ -107,31 +115,57 @@ const Index: React.FC = () => {
       case 'agent_idle':
         setNextCycleIn(latestEvent.next_cycle_in || 0);
         break;
-      case 'reasoning_complete':
+      case 'analysis_completed':
         setWatchedWallets(prev => prev.map(wallet => 
-          wallet.address === latestEvent.wallet 
-            ? { ...wallet, last_signal: latestEvent.decision, risk_score: latestEvent.threat_score }
+          wallet.address.toLowerCase() === latestEvent.wallet.toLowerCase()
+            ? { ...wallet, scores: latestEvent.scores }
             : wallet
         ));
         break;
-      case 'execution_confirmed':
+      case 'reasoning':
+        setWatchedWallets(prev => prev.map(wallet => 
+          wallet.address.toLowerCase() === latestEvent.wallet.toLowerCase()
+            ? { ...wallet, reasoning: latestEvent.decision.reasoning, last_signal: latestEvent.decision.decision, risk_score: latestEvent.decision.threat_score }
+            : wallet
+        ));
+        break;
+      case 'reasoning_token':
+        setWatchedWallets(prev => prev.map(wallet => 
+          wallet.address.toLowerCase() === selectedWallet?.toLowerCase()
+            ? { ...wallet, reasoning: (wallet.reasoning || '') + latestEvent.token }
+            : wallet
+        ));
+        break;
+      case 'execution_start':
         setExecutions(prev => [{
-          id: latestEvent.tx_hash || Date.now().toString(),
+          id: latestEvent.id || `exec-${Date.now()}`,
           timestamp: new Date().toISOString(),
           wallet: latestEvent.wallet,
-          decision: 'ALERT',
-          action: `transfer ${latestEvent.amount_eth || 0} ETH`,
-          status: 'confirmed',
-          tx_hash: latestEvent.tx_hash,
-          contract_address: latestEvent.contract_address
+          decision: latestEvent.decision || 'ALERT',
+          action: `${latestEvent.action_type || 'transfer'} ${latestEvent.amount_eth || 0.001} ETH`,
+          status: 'pending',
         }, ...prev.slice(0, 99)]);
         break;
+      case 'execution_confirmed':
+        setExecutions(prev => prev.map(ex => 
+          (ex.wallet.toLowerCase() === latestEvent.wallet.toLowerCase() && ex.status === 'pending')
+            ? { ...ex, status: 'confirmed', tx_hash: latestEvent.tx_hash }
+            : ex
+        ));
+        break;
+      case 'execution_failed':
+        setExecutions(prev => prev.map(ex => 
+          (ex.wallet.toLowerCase() === latestEvent.wallet.toLowerCase() && ex.status === 'pending')
+            ? { ...ex, status: 'failed', action: `${ex.action} (Error: ${latestEvent.error})` }
+            : ex
+        ));
+        break;
       case 'balance_update':
-        if (agentStatus) {
-          setAgentStatus(prev => ({
+        if (setAgentStatus) {
+          setAgentStatus((prev: any) => prev ? {
             ...prev,
             agent_balance_eth: latestEvent.balance_eth
-          }));
+          } : prev);
         }
         break;
     }
@@ -386,7 +420,7 @@ const Index: React.FC = () => {
           flexDirection: 'column'
         }}>
           <ReasoningColumn
-            selectedWallet={selectedWallet}
+            wallet={watchedWallets.find(w => w.address === selectedWallet) || null}
             nextCycleIn={nextCycleIn}
             isRunning={agentStatus?.running}
           />
@@ -524,19 +558,46 @@ const FundingPanelContent: React.FC<{
       setStatus("success");
 
       // Register with API
-      await fetch(`${API_BASE}/agent/budget`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          wallet: agentAddress,
-          tx_hash: txHash
-        }),
-      });
+      try {
+        await fetch(`${API_BASE}/agent/budget`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            wallet: agentAddress,
+            tx_hash: txHash
+          }),
+        });
+      } catch (err) {
+        console.warn("Budget registration failed:", err);
+      }
 
-      // Refresh balance
-      const statusRes = await fetch(`${API_BASE}/health`);
-      const statusData = await statusRes.json();
-      onSuccess(statusData.agent_budget?.total_balance_eth || currentBalance);
+      // 60s aggressive polling
+      const startBalance = currentBalance;
+      const startTime = Date.now();
+      
+      const pollInterval = window.setInterval(async () => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed > 60000) {
+          window.clearInterval(pollInterval);
+          setStatus("idle");
+          return;
+        }
+
+        try {
+          const res = await fetch(`${API_BASE}/health`);
+          const data = await res.json();
+          const newBalance = data.agent_budget?.total_balance_eth || currentBalance;
+          
+          if (newBalance > startBalance) {
+            onSuccess(newBalance);
+            window.clearInterval(pollInterval);
+            setStatus("success");
+            setErrorMessage("Funds received and confirmed!");
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
+        }
+      }, 3000);
 
     } catch (error: any) {
       if (error?.code === 4001) {
@@ -696,14 +757,7 @@ const WatchedWalletsColumn: React.FC<{
     setNewLabel('');
   };
 
-  const getSignalColor = (signal?: string) => {
-    switch (signal) {
-      case 'MONITOR': return '#f59e0b';
-      case 'ALERT': return '#3b82f6';
-      case 'INTERVENE': return '#ef4444';
-      default: return '#64748b';
-    }
-  };
+/* utils removed from here */
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -877,23 +931,23 @@ const WatchedWalletsColumn: React.FC<{
 
 // Reasoning Column
 const ReasoningColumn: React.FC<{
-  selectedWallet: string | null;
+  wallet: WalletData | null;
   nextCycleIn: number;
   isRunning: boolean;
-}> = ({ selectedWallet, nextCycleIn, isRunning }) => {
+}> = ({ wallet, nextCycleIn, isRunning }) => {
+  const selectedWallet = wallet?.address || null;
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Mock data for demonstration
-  const mockScores = {
-    activity: 75,
-    risk: 45,
-    defi_engagement: 60,
-    diversity: 30,
-    exploration: 85
+  const scores = wallet?.scores || {
+    activity: 0,
+    risk: 0,
+    defi_engagement: 0,
+    diversity: 0,
+    exploration: 0
   };
 
   const ScoreBar = ({ label, score, color }: { label: string; score: number; color: string }) => (
@@ -971,14 +1025,13 @@ const ReasoningColumn: React.FC<{
             </div>
 
             <div style={{ marginBottom: '20px' }}>
-              <ScoreBar label="Activity" score={mockScores.activity} color="#3b82f6" />
-              <ScoreBar label="Risk" score={mockScores.risk} color="#ef4444" />
-              <ScoreBar label="DeFi Engagement" score={mockScores.defi_engagement} color="#3b82f6" />
-              <ScoreBar label="Diversity" score={mockScores.diversity} color="#3b82f6" />
-              <ScoreBar label="Exploration" score={mockScores.exploration} color="#3b82f6" />
+              <ScoreBar label="Activity" score={scores.activity} color="#3b82f6" />
+              <ScoreBar label="Risk" score={scores.risk} color="#ef4444" />
+              <ScoreBar label="DeFi Engagement" score={scores.defi_engagement} color="#3b82f6" />
+              <ScoreBar label="Diversity" score={scores.diversity} color="#3b82f6" />
+              <ScoreBar label="Exploration" score={scores.exploration} color="#3b82f6" />
             </div>
 
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <div style={{ 
                 fontSize: '32px', 
                 fontWeight: '600',
@@ -986,33 +1039,39 @@ const ReasoningColumn: React.FC<{
                 color: '#e2e8f0',
                 marginBottom: '12px'
               }}>
-                0.71
+                {wallet.risk_score !== undefined ? (wallet.risk_score / 100).toFixed(2) : '0.00'}
               </div>
               
-              <div style={{
-                display: 'inline-block',
-                padding: '6px 12px',
-                fontSize: '12px',
-                fontWeight: '600',
-                backgroundColor: '#3b82f620',
-                color: '#3b82f6',
-                border: '1px solid #3b82f640',
-                borderRadius: '4px'
-              }}>
-                ALERT
-              </div>
-            </div>
+              {wallet.last_signal && (
+                <div style={{
+                  display: 'inline-block',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  backgroundColor: `${getSignalColor(wallet.last_signal)}20`,
+                  color: getSignalColor(wallet.last_signal),
+                  border: `1px solid ${getSignalColor(wallet.last_signal)}40`,
+                  borderRadius: '4px',
+                  textTransform: 'uppercase'
+                }}>
+                  {wallet.last_signal}
+                </div>
+              )}
 
-            <div style={{
-              padding: '12px',
-              backgroundColor: '#080a10',
-              border: '1px solid #1a1f2e',
+            <div style={{ 
+              backgroundColor: '#3b82f605',
+              border: '1px solid #3b82f615',
               borderRadius: '4px',
+              padding: '12px',
+              color: '#94a3b8',
               fontSize: '12px',
-              color: '#e2e8f0',
-              lineHeight: '1.4'
+              lineHeight: '1.5',
+              fontStyle: wallet.reasoning ? 'normal' : 'italic',
+              fontFamily: "'Courier New', monospace",
+              minHeight: '80px',
+              whiteSpace: 'pre-wrap'
             }}>
-              Wallet shows moderate risk patterns with high DeFi engagement but limited diversity. Recent activity suggests automated behavior warranting monitoring.
+              {wallet.reasoning || "Analyzing wallet patterns and detecting risk signals..."}
             </div>
           </div>
         ) : (

@@ -212,7 +212,7 @@ class GuardianAgentLoop:
         self.event_bus = event_bus
         self.queue = QueueManager()
         self.reasoning = ReasoningEngine()
-        self.executor = AgentExecutor()
+        self.executor = AgentExecutor(event_bus=self.event_bus)
         self.extractor = ExtractorFeatures()
         self.client = ClienteEtherscan()
         self.scorer = BehavioralScorer()
@@ -257,19 +257,20 @@ class GuardianAgentLoop:
                 try:
                     payload = await self._analyze_wallet(wallet)
                     agent_balance = self.service.budget.get_effective_balance_eth(wallet)
-                    decision = self.reasoning.decide(
+                    decision = await self.reasoning.decide(
                         {
                             "cycle": cycle,
                             "address": wallet,
                             "scores": payload["scores"],
                             "agent_balance_eth": f"{agent_balance:.8f}",
-                        }
+                        },
+                        event_bus=self.event_bus
                     )
                     flagged = decision["decision"] in {"ALERT", "INTERVENE"}
                     self.queue.update_wallet_state(wallet, last_signal=decision["decision"], increment_flagged=flagged)
                     await self.event_bus.publish({"type": "reasoning", "cycle": cycle, "wallet": wallet, "decision": decision})
                     if decision["decision"] in {"ALERT", "INTERVENE"}:
-                        result = await asyncio.to_thread(self.executor.execute, decision)
+                        result = await self.executor.execute(decision)
                         await self.event_bus.publish({"type": "execution", "cycle": cycle, "wallet": wallet, "result": result})
                     else:
                         await self.event_bus.publish({"type": "monitor", "cycle": cycle, "wallet": wallet, "decision": decision["decision"]})

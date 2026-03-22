@@ -19,12 +19,13 @@ else:
 
 
 class AgentExecutor:
-    def __init__(self, history_path: str = "executions.json"):
+    def __init__(self, history_path: str = "executions.json", event_bus: Optional[Any] = None):
         self.history_path = Path(history_path)
         self.history_path.parent.mkdir(parents=True, exist_ok=True)
         if not self.history_path.exists():
             self.history_path.write_text("[]", encoding="utf-8")
         self.wallet_agent = WalletAgent()
+        self.event_bus = event_bus
 
     @contextmanager
     def _file_lock(self, mode: str):
@@ -92,12 +93,13 @@ class AgentExecutor:
     def _post_balance_ok(self, cost_eth: float) -> bool:
         return (self._get_agent_balance() - cost_eth) >= 0.001
 
-    def execute(self, decision: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, decision: Dict[str, Any]) -> Dict[str, Any]:
         wallet = str(decision.get("wallet", "")).lower()
         cycle = int(decision.get("cycle", 0) or 0)
         action = decision.get("action", {}) or {}
         action_type = action.get("type")
         threat_score = float(decision.get("threat_score", 0.0) or 0.0)
+        decision_str = str(decision.get("decision", ""))
 
         history = self._load_history()
         if self._is_duplicate(history, wallet, cycle):
@@ -108,12 +110,26 @@ class AgentExecutor:
         if action_type not in {"transfer", "deploy_contract"}:
             return {"status": "no_action"}
 
+        # Emit execution_start
+        amount_eth = float(action.get("amount_eth", 0.0) or 0.0)
+        if action_type == "transfer" and amount_eth == 0:
+            amount_eth = 0.001
+            
+        if self.event_bus:
+            await self.event_bus.publish({
+                "type": "execution_start",
+                "wallet": wallet,
+                "action_type": action_type,
+                "amount_eth": amount_eth,
+                "decision": decision_str
+            })
+
         base = {
             "id": str(uuid.uuid4()),
             "timestamp": self._now_iso(),
             "cycle": cycle,
             "wallet": wallet,
-            "decision": str(decision.get("decision", "")),
+            "decision": decision_str,
             "threat_score": threat_score,
             "action_type": action_type,
             "tx_hash": None,
@@ -123,43 +139,82 @@ class AgentExecutor:
         }
 
         try:
+            logger.info(f"STARTING execution attempt for {wallet} (Action: {action_type}, Cycle: {cycle})")
+            
             if action_type == "transfer":
-                amount_eth = float(action.get("amount_eth", 0.001) or 0.001)
                 if not self._post_balance_ok(amount_eth):
                     base["status"] = "failed"
                     base["error"] = "insufficient_post_action_balance"
-                    return self._append(base)
-                tx_hash = self.wallet_agent.ejecutar_transaccion(wallet, int(amount_eth * (10**18)))
-                if tx_hash:
-                    base["tx_hash"] = tx_hash
-                    base["status"] = "confirmed"
                 else:
-                    base["status"] = "simulated"
+                    tx_hash = await asyncio.to_thread(self.wallet_agent.ejecutar_transaccion, wallet, int(amount_eth * (10**18)))
+                    if tx_hash:
+                        base["tx_hash"] = tx_hash
+                        base["status"] = "confirmed"
+                    else:
+                        base["status"] = "simulated"
             else:
-                if not self._post_balance_ok(0.001):
+                # deploy_contract
+                cost_estimate = 0.001
+                if not self._post_balance_ok(cost_estimate):
                     base["status"] = "failed"
                     base["error"] = "insufficient_post_action_balance"
-                    return self._append(base)
-                insight = InsightContrato(type="risk_guard", analyzed_wallet=wallet, risk_score=max(1, int(threat_score * 100)))
-                source = generar_contrato(insight)
-                compiled = compilar_contrato_tool(source)
-                deploy_result = self.wallet_agent.deploy_contract(compiled.abi, compiled.bytecode, args=None)
-                if deploy_result and isinstance(deploy_result, dict):
-                    base["tx_hash"] = deploy_result.get("transaction_hash")
-                    base["contract_address"] = deploy_result.get("address")
-                    method_name = "poke"
-                    if compiled.abi:
-                        method_candidates = [x.get("name") for x in compiled.abi if x.get("type") == "function" and x.get("stateMutability") != "view"]
-                        if method_candidates:
-                            method_name = str(method_candidates[0])
-                    call_hash = self.wallet_agent.call_contract(base["contract_address"], compiled.abi, method_name, args=[])
-                    if call_hash and not base["tx_hash"]:
-                        base["tx_hash"] = call_hash
-                    base["status"] = "confirmed"
                 else:
-                    base["status"] = "simulated"
+                    insight = InsightContrato(type="risk_guard", analyzed_wallet=wallet, risk_score=max(1, int(threat_score * 100)))
+                    source = await asyncio.to_thread(generar_contrato, insight)
+                    compiled = await asyncio.to_thread(compilar_contrato_tool, source)
+                    deploy_result = await asyncio.to_thread(self.wallet_agent.deploy_contract, compiled.abi, compiled.bytecode, args=None)
+                    if deploy_result and isinstance(deploy_result, dict):
+                        base["tx_hash"] = deploy_result.get("transaction_hash")
+                        base["contract_address"] = deploy_result.get("address")
+                        method_name = "poke"
+                        if compiled.abi:
+                            method_candidates = [x.get("name") for x in compiled.abi if x.get("type") == "function" and x.get("stateMutability") != "view"]
+                            if method_candidates:
+                                method_name = str(method_candidates[0])
+                        call_hash = await asyncio.to_thread(self.wallet_agent.call_contract, base["contract_address"], compiled.abi, method_name, args=[])
+                        if call_hash and not base["tx_hash"]:
+                            base["tx_hash"] = call_hash
+                        base["status"] = "confirmed"
+                    else:
+                        base["status"] = "simulated"
+            
+            logger.info(f"FINISHED execution attempt for {wallet}. Status: {base['status']}")
+            
+            # Emit execution events
+            if self.event_bus:
+                if base["status"] in {"confirmed", "simulated"}:
+                    await self.event_bus.publish({
+                        "type": "execution_confirmed",
+                        "wallet": wallet,
+                        "tx_hash": base["tx_hash"],
+                        "amount_eth": amount_eth,
+                        "contract_address": base["contract_address"]
+                    })
+                else:
+                    await self.event_bus.publish({
+                        "type": "execution_failed",
+                        "wallet": wallet,
+                        "error": base["error"] or "Unknown error"
+                    })
+                
+                # Emit balance update
+                new_balance = self._get_agent_balance()
+                await self.event_bus.publish({
+                    "type": "balance_update",
+                    "balance_eth": new_balance
+                })
+
             return self._append(base)
         except Exception as exc:
+            logger.error(f"EXCEPTION in execution for {wallet}: {exc}")
             base["status"] = "failed"
             base["error"] = str(exc)
+            
+            if self.event_bus:
+                await self.event_bus.publish({
+                    "type": "execution_failed",
+                    "wallet": wallet,
+                    "error": str(exc)
+                })
+            
             return self._append(base)

@@ -5,7 +5,7 @@ import { Wallet, Loader2, Copy, CheckCircle2, AlertCircle } from "lucide-react";
 
 declare global {
   interface Window {
-    ethereum?: unknown;
+    ethereum?: any;
   }
 }
 
@@ -28,12 +28,13 @@ export function AgentFundingPanel({
   const [amount, setAmount] = useState(DEFAULT_FUND_AMOUNT);
   const [status, setStatus] = useState<FundingStatus>("idle");
   const [message, setMessage] = useState<string>("Ready to fund autonomous agent.");
+  const [txHash, setTxHash] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const loadState = async () => {
     try {
-      const res = await fetch(`${API_BASE}/agent/state`);
+      const res = await fetch(`${API_BASE}/health`);
       const data = await res.json();
       setAgentState(data as AgentState);
     } catch {
@@ -43,9 +44,9 @@ export function AgentFundingPanel({
 
   const loadAddress = async () => {
     try {
-      const res = await fetch(`${API_BASE}/agent/address`);
+      const res = await fetch(`${API_BASE}/health`);
       const data = await res.json();
-      setAgentWallet(data.agent_wallet || data.address || "");
+      setAgentWallet(data.agent_budget?.agent_wallet || "");
     } catch (err) {
       console.error("Failed to load agent address:", err);
     }
@@ -138,8 +139,54 @@ export function AgentFundingPanel({
         }],
       });
 
+      setTxHash(txHash);
       setMessage(`Transaction submitted: ${txHash}`);
-      setStatus("confirmed");
+      setStatus("awaiting_balance");
+
+      // Register with API
+      try {
+        await fetch(`${API_BASE}/agent/budget`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            wallet: agentWallet,
+            tx_hash: txHash
+          }),
+        });
+      } catch (err) {
+        console.warn("Budget registration failed:", err);
+      }
+
+      // 60s aggressive polling
+      const startBalance = balance;
+      const startTime = Date.now();
+      setPolling(true);
+
+      const pollInterval = window.setInterval(async () => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed > 60000) {
+          window.clearInterval(pollInterval);
+          setPolling(false);
+          setStatus("idle");
+          return;
+        }
+
+        try {
+          const res = await fetch(`${API_BASE}/health`);
+          const data = await res.json();
+          const newBalance = Number(data.agent_budget?.total_balance_eth ?? 0);
+          
+          if (newBalance > startBalance) {
+            setAgentState(data as AgentState);
+            window.clearInterval(pollInterval);
+            setPolling(false);
+            setStatus("confirmed");
+            setMessage("Funds received and confirmed!");
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
+        }
+      }, 3000);
 
     } catch (error: any) {
       if (error?.code === 4001) {

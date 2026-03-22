@@ -1,0 +1,42 @@
+{
+  "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+  "actions": [
+    {
+      "action_id": 0,
+      "type": "TRANSFER",
+      "params": {
+        "to": "0x000000000000000000000000000000000000dEaD",
+        "value_wei": 500000000000000,
+        "strategy_used": "EXPLORE"
+      },
+      "status": "SUCCESS",
+      "tx_hash": "0xSimulatedTransferHash00000000000000000000000000000000000000000",
+      "error_code": null
+    }
+  ],
+  "risk_score": 30,
+  "block_number": 10500673,
+  "context": {
+    "pre_state": {
+      "nonce": 0,
+      "balance": 0,
+      "block_number": 10500673
+    },
+    "post_state": {
+      "final_balance": 10.5,
+      "verification_time": 1774218632.756667
+    },
+    "max_exposure_per_execution": 0.5,
+    "execution_mode": "ATOMIC",
+    "simulation_policy": "STRICT"
+  },
+  "lifecycle": "COMPLETED",
+  "recovery": {
+    "retry_count": 0,
+    "interrupted_at_step": null,
+    "last_tx_check": 0.0
+  },
+  "created_at": 1774218632.7256804,
+  "expires_at": 1774219232.7256804,
+  "fingerprint": "c193eb1ece12f125139b931a7f50155a6103ca26a4ac465db98109449ffae19e"
+}

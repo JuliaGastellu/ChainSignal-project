@@ -4,9 +4,9 @@
       "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
       "agent_wallet": "0x516D97bC82a962627Fd52115F32ce80F2f5da52a",
       "balance_eth": 0.0,
-      "spent_eth": 0.0015,
+      "spent_eth": 0.002,
       "created_at": null,
-      "updated_at": 1774217245.1439974,
+      "updated_at": 1774218632.8711157,
       "last_funding_tx": null,
       "last_funding_amount_eth": 0.0
     }
