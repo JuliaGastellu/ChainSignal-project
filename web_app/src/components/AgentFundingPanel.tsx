@@ -131,13 +131,11 @@ export function AgentFundingPanel({
             const fundedDelta = Math.max(0, nextBalance - baselineBalance);
             setStatus("confirmed");
             setMessage(`Funds received: +${fundedDelta.toFixed(6)} ETH · Autonomous execution activated.`);
-            if (targetWallet) {
-              await fetch(`${API_BASE}/agent/execute`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ wallet: targetWallet }),
-              });
-            }
+            await fetch(`${API_BASE}/agent/execute`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ wallet: targetWallet || fromAddress }),
+            });
             onFundingActivated?.();
           }
           if (attempts >= 20) {

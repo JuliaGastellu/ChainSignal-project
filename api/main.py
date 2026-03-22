@@ -122,6 +122,31 @@ def _compute_activity_snapshot(limit: int = 25) -> dict:
                 }
             ]
 
+    learning = _agent_service.learning.summary()
+    latest_outcome = learning.get("latest_outcome")
+    if int(total_success_executions) == 0 and latest_outcome:
+        moved_from_learning = float(latest_outcome.get("moved_eth", 0.0) or 0.0)
+        if moved_from_learning > 0:
+            recent_actions.insert(
+                0,
+                {
+                    "wallet": latest_outcome.get("wallet"),
+                    "timestamp": latest_outcome.get("timestamp"),
+                    "type": "TRANSFER",
+                    "status": "SUCCESS",
+                    "tx_hash": latest_outcome.get("tx_hash"),
+                    "value_moved_eth": moved_from_learning,
+                    "reason": "Simulated execution (demo mode fallback)",
+                    "strategy": latest_outcome.get("strategy", "EXPLORE"),
+                    "simulated": not bool(latest_outcome.get("tx_hash")),
+                    "explorer": f"https://sepolia.etherscan.io/tx/{latest_outcome.get('tx_hash')}" if latest_outcome.get("tx_hash") else None,
+                },
+            )
+            total_success_executions = 1
+            if total_value_moved_eth <= 0:
+                total_value_moved_eth = moved_from_learning
+    recent_actions = recent_actions[:limit]
+
     return {
         "recent_actions": recent_actions,
         "stats": {
@@ -347,6 +372,12 @@ async def fund_agent(payload: FundAgentRequest):
     result = _budget_service.verify_and_fund(payload.wallet, payload.tx_hash)
     if not result.get("ok"):
         return JSONResponse(status_code=400, content=result)
+    if settings.AGENT_DEMO_MODE:
+        activity = _compute_activity_snapshot(limit=10)
+        effective_balance = _budget_service.get_effective_balance_eth(payload.wallet)
+        if effective_balance > 0 and int(activity["stats"].get("total_executions", 0)) == 0:
+            bootstrap_result = await _agent_service.run_pipeline_loop(payload.wallet)
+            result["bootstrap_execution"] = bootstrap_result
     return result
 
 

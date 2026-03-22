@@ -680,24 +680,30 @@ class AgentService:
             yield {"paso": "contract_active", "estado": "completed", "detalle": "Strategy executed without requiring contracts.", "source": source}
 
         moved_eth = self._estimate_value_moved_eth(plan)
+        simulated_execution = False
+        if moved_eth <= 0 and settings.AGENT_DEMO_MODE:
+            moved_eth = 0.001
+            simulated_execution = True
         if moved_eth > 0:
-            self.budget.consume(wallet_addr, moved_eth)
+            if not simulated_execution:
+                self.budget.consume(wallet_addr, moved_eth)
         first_tx_hash = next((getattr(a, "tx_hash", None) for a in plan.actions if getattr(a, "tx_hash", None)), None)
         self.learning.record_outcome(wallet_addr, "success", str(decision.get("strategy", "EXPLORE")), moved_eth, tx_hash=first_tx_hash)
         yield {
             "paso": "execution_value",
             "estado": "completed",
-            "detalle": f"Moved {round(moved_eth, 8)} ETH",
+            "detalle": f"Moved {round(moved_eth, 8)} ETH" if not simulated_execution else f"Simulated execution moved {round(moved_eth, 8)} ETH",
             "data": {
                 "moved_value_eth": round(moved_eth, 8),
                 "strategy": decision.get("strategy", "EXPLORE"),
                 "strategy_used": decision.get("strategy", "EXPLORE"),
+                "simulated": simulated_execution,
             },
             "source": source,
         }
-        yield {"paso": "execution_verified", "estado": "completed", "detalle": "Execution verified and persisted.", "data": {"moved_eth": moved_eth, "moved_value_eth": moved_eth, "strategy_used": decision.get("strategy", "EXPLORE")}, "source": source}
+        yield {"paso": "execution_verified", "estado": "completed", "detalle": "Execution verified and persisted." if not simulated_execution else "Simulated execution verified for demo mode.", "data": {"moved_eth": moved_eth, "moved_value_eth": moved_eth, "strategy_used": decision.get("strategy", "EXPLORE"), "simulated": simulated_execution}, "source": source}
 
-        yield {"paso": "execution_final_status", "data": {"status": "success", "last_fingerprint": plan.fingerprint, "moved_eth": moved_eth, "moved_value_eth": moved_eth, "strategy_used": decision.get("strategy", "EXPLORE")}}
+        yield {"paso": "execution_final_status", "data": {"status": "success", "last_fingerprint": plan.fingerprint, "moved_eth": moved_eth, "moved_value_eth": moved_eth, "strategy_used": decision.get("strategy", "EXPLORE"), "simulated": simulated_execution}}
 
     async def _run_runner_stream(self, runner: ExecutionRunner, plan: Any, source: str) -> AsyncGenerator[Dict[str, Any], None]:
         queue: asyncio.Queue = asyncio.Queue()
