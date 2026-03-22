@@ -40,11 +40,15 @@ export function AgentFundingPanel({
     }
   };
 
-  useEffect(() => {
-    loadState();
-    const id = window.setInterval(loadState, 8000);
-    return () => window.clearInterval(id);
-  }, []);
+useEffect(() => {
+  loadState();
+  fetch(`${API_BASE}/agent/address`)
+    .then(r => r.json())
+    .then(d => setAgentAddress(d.agent_wallet || d.address || ""))
+    .catch(() => {});
+  const id = window.setInterval(loadState, 8000);
+  return () => window.clearInterval(id);
+}, []);
 
   const agentWallet = agentState?.budget?.agent_wallet || "";
   const balance = Number(agentState?.budget?.total_balance_eth ?? 0);
