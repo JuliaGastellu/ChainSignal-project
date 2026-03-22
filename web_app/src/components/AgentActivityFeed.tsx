@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/hooks/useAgentSSE";
-import { History, ArrowRightLeft, Send, ShieldAlert, Eye } from "lucide-react";
+import { History, ArrowRightLeft, Send, ShieldAlert, Eye, Wallet } from "lucide-react";
 
 type ActivityItem = {
   wallet?: string;
@@ -55,7 +55,7 @@ export function AgentActivityFeed() {
           <div key={`${a.tx_hash || "action"}-${i}`} className="rounded border border-border bg-secondary/30 p-2">
             <div className="flex items-center justify-between text-xs">
               <div className="font-semibold flex items-center gap-1.5">
-                {a.type === "SWAP" ? <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" /> : a.type === "TRANSFER" ? <Send className="h-3.5 w-3.5 text-green-500" /> : a.status === "FAILED" ? <ShieldAlert className="h-3.5 w-3.5 text-yellow-600" /> : <Eye className="h-3.5 w-3.5 text-primary" />}
+                {a.type === "SWAP" ? <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" /> : a.type === "TRANSFER" ? <Send className="h-3.5 w-3.5 text-green-500" /> : a.type === "FUNDING" ? <Wallet className="h-3.5 w-3.5 text-emerald-600" /> : a.status === "FAILED" ? <ShieldAlert className="h-3.5 w-3.5 text-yellow-600" /> : <Eye className="h-3.5 w-3.5 text-primary" />}
                 {a.type || "MONITORING"} · {a.status || "SKIPPED"}
               </div>
               <div className="text-muted-foreground">{a.timestamp ? new Date(a.timestamp * 1000).toLocaleString() : "Not triggered"}</div>

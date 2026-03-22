@@ -57,6 +57,7 @@ Finalization guarantee:
 - **AgentIntelligenceFeed**: detected on-chain signals and confidence.
 - **StrategyEnginePanel**: selected strategy and rationale.
 - **WalletRadarPanel**: tracked wallet priority queue.
+- **AgentFundingPanel**: MetaMask one-click funding, tx confirmation states, and activation sync.
 
 Hero-first summary:
 
@@ -84,6 +85,14 @@ Demo behavior:
 
 - `AGENT_DEMO_MODE=true` increases execution frequency with low-risk micro actions.
 - ESL remains mandatory even in demo mode.
+
+## Funding Lifecycle
+
+1. User clicks **Fund Agent** in AgentFundingPanel.
+2. MetaMask signs and submits transaction to Agent Wallet.
+3. Frontend registers tx hash in `POST /agent/budget`.
+4. UI polls `/agent/state` every 3 seconds for balance increase.
+5. On funds received, UI marks autonomous execution as activated and triggers execution for selected wallet.
 
 ## Runtime Flow
 

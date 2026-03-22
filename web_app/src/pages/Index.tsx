@@ -13,6 +13,7 @@ import { StrategyEnginePanel } from "@/components/StrategyEnginePanel";
 import { WalletRadarPanel } from "@/components/WalletRadarPanel";
 import { AgentHeroSection } from "@/components/AgentHeroSection";
 import { ActionFlowBanner } from "@/components/ActionFlowBanner";
+import { AgentFundingPanel } from "@/components/AgentFundingPanel";
 import { useAgentSSE, API_BASE } from "@/hooks/useAgentSSE";
 import { motion } from "framer-motion";
 import { Bot, AlertCircle, RotateCcw, Monitor, Activity } from "lucide-react";
@@ -89,8 +90,15 @@ const Index = () => {
       </header>
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 space-y-6">
-        <AgentHeroSection />
-        <ActionFlowBanner />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <div className="lg:col-span-2 space-y-3">
+            <AgentHeroSection />
+            <ActionFlowBanner />
+          </div>
+          <div className="lg:col-span-1">
+            <AgentFundingPanel targetWallet={wallet || undefined} />
+          </div>
+        </div>
 
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">

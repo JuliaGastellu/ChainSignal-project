@@ -33,6 +33,13 @@ export function AgentHeroSection() {
   const pnl = state?.pnl?.estimated_eth ?? 0;
   const moved = state?.stats?.total_value_moved ?? 0;
   const lastAction = state?.last_action;
+  const hasFunds = balance > 0;
+  const statusLabel = hasFunds ? "ACTIVE" : "FUNDING_REQUIRED";
+  const lastActionLabel = lastAction
+    ? `${lastAction.type || "ACTION"} · ${lastAction.status || "DONE"}`
+    : hasFunds
+      ? "Preparing first action..."
+      : "Fund agent to unlock first autonomous action";
 
   return (
     <div className="space-y-2">
@@ -48,7 +55,7 @@ export function AgentHeroSection() {
       </div>
       <div className="rounded-xl border border-border bg-card p-3">
         <div className="text-[11px] text-muted-foreground flex items-center gap-1"><Activity className="h-3.5 w-3.5" /> Last Action</div>
-        <div className="mt-1 font-semibold">{lastAction ? `${lastAction.type || "ACTION"} · ${lastAction.status || "DONE"}` : "First autonomous action is being prepared"}</div>
+        <div className="mt-1 font-semibold">{lastActionLabel}</div>
       </div>
       <div className="rounded-xl border border-border bg-card p-3">
         <div className="text-[11px] text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> PnL (approx)</div>
@@ -60,7 +67,7 @@ export function AgentHeroSection() {
       </div>
       <div className="rounded-xl border border-border bg-card p-3">
         <div className="text-[11px] text-muted-foreground flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> Status</div>
-        <div className="mt-1 font-semibold">{state?.status === "active" ? "Autonomous active" : "Autonomous standby with safeguards"}</div>
+        <div className="mt-1 font-semibold">{statusLabel}</div>
       </div>
     </div>
     </div>

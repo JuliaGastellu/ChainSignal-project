@@ -17,15 +17,16 @@ class AgentBudgetService:
 
     def _load(self) -> Dict[str, Any]:
         if not self._path.exists():
-            return {"budgets": {}}
+            return {"budgets": {}, "processed_txs": {}}
         try:
             with self._path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict) and "budgets" in data:
+                    data.setdefault("processed_txs", {})
                     return data
         except Exception:
             pass
-        return {"budgets": {}}
+        return {"budgets": {}, "processed_txs": {}}
 
     def _save(self, data: Dict[str, Any]) -> None:
         tmp = self._path.with_suffix(".tmp")
@@ -46,6 +47,7 @@ class AgentBudgetService:
                 "created_at": None,
                 "updated_at": None,
                 "last_funding_tx": None,
+                "last_funding_amount_eth": 0.0,
             },
         )
         return item
@@ -80,6 +82,14 @@ class AgentBudgetService:
             return {"ok": False, "message": "RPC unavailable for on-chain verification."}
 
         try:
+            data = self._load()
+            processed = data.get("processed_txs", {}) or {}
+            if tx_hash in processed:
+                key = wallet.lower()
+                item = self.get_budget(key)
+                funded_eth = float(processed[tx_hash].get("funded_eth", 0.0) or 0.0)
+                return {"ok": True, "message": "Funding tx already registered.", "budget": item, "funded_eth": funded_eth}
+
             receipt = self.w3.eth.get_transaction_receipt(tx_hash)
             tx = self.w3.eth.get_transaction(tx_hash)
             if not receipt or receipt.get("status") != 1:
@@ -94,17 +104,44 @@ class AgentBudgetService:
 
             funded_eth = float(self.w3.from_wei(value_wei, "ether"))
             key = wallet.lower()
-            data = self._load()
             item = self.get_budget(key)
             item["balance_eth"] = float(item.get("balance_eth", 0.0)) + funded_eth
             item["created_at"] = item.get("created_at") or time.time()
             item["updated_at"] = time.time()
             item["last_funding_tx"] = tx_hash
+            item["last_funding_amount_eth"] = funded_eth
             data["budgets"][key] = item
+            data["processed_txs"][tx_hash] = {"wallet": key, "funded_eth": funded_eth, "timestamp": time.time()}
             self._save(data)
             return {"ok": True, "message": "Agent budget funded.", "budget": item, "funded_eth": funded_eth}
         except Exception as e:
             return {"ok": False, "message": f"Funding verification error: {e}"}
+
+    def get_recent_funding_events(self, limit: int = 20) -> list[Dict[str, Any]]:
+        data = self._load()
+        events: list[Dict[str, Any]] = []
+        for wallet, item in (data.get("budgets", {}) or {}).items():
+            tx_hash = item.get("last_funding_tx")
+            updated_at = item.get("updated_at")
+            amount = float(item.get("last_funding_amount_eth", 0.0) or 0.0)
+            if not tx_hash or not updated_at:
+                continue
+            events.append(
+                {
+                    "wallet": wallet,
+                    "timestamp": updated_at,
+                    "type": "FUNDING",
+                    "status": "SUCCESS",
+                    "tx_hash": tx_hash,
+                    "value_moved_eth": amount,
+                    "reason": f"Funding received: +{amount} ETH",
+                    "strategy": "FUNDING",
+                    "simulated": False,
+                    "explorer": f"https://sepolia.etherscan.io/tx/{tx_hash}",
+                }
+            )
+        events_sorted = sorted(events, key=lambda e: float(e.get("timestamp") or 0.0), reverse=True)
+        return events_sorted[:limit]
 
     def get_global_state(self) -> Dict[str, Any]:
         data = self._load()

@@ -153,11 +153,19 @@ Observe → Analyze → Detect Signal → Select Strategy → Simulate → Execu
 
 ## Demo Instructions
 
-1. Fund agent budget in UI.
-2. Set `AGENT_DEMO_MODE=true`.
-3. Run wallet analysis or block-window analysis.
-4. Verify timeline events: `signal_detected` → `strategy_selected` → `execution_submitted` → `execution_value` → `execution_verified`.
-5. Confirm Agent Activity Feed and Hero cards show moved capital.
+1. Set `AGENT_DEMO_MODE=true`.
+2. Use **Fund Agent Wallet** panel and approve MetaMask transaction.
+3. Wait for status: `Funds received. Autonomous execution activated.`
+4. Run wallet analysis or block-window analysis.
+5. Verify timeline events: `signal_detected` → `strategy_selected` → `execution_submitted` → `execution_value` → `execution_verified`.
+6. Confirm Hero and Activity Feed show updated balance and moved capital.
+
+## Funding Flow
+
+- Funding is signed only in MetaMask from the frontend.
+- Backend verifies tx receipt and recipient via `POST /agent/budget`.
+- Agent wallet is the sole execution wallet; analyzed wallet is intelligence input only.
+- On balance increase, UI triggers autonomous execution for the selected target wallet.
 
 ## Panel Meanings
 

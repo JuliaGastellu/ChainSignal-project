@@ -99,6 +99,9 @@ def _compute_activity_snapshot(limit: int = 25) -> dict:
                 }
             )
 
+    funding_events = _budget_service.get_recent_funding_events(limit=limit)
+    recent_actions.extend(funding_events)
+    recent_actions = sorted(recent_actions, key=lambda a: float(a.get("timestamp") or 0.0), reverse=True)
     recent_actions = recent_actions[:limit]
     if not recent_actions:
         learning = _agent_service.learning.summary()
