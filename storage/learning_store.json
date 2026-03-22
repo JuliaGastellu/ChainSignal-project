@@ -104,6 +104,195 @@
         }
       ],
       "strategy": "RISK_SHIELD"
+    },
+    {
+      "timestamp": 1774214790.951966,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "RISK_SHIELD"
+    },
+    {
+      "timestamp": 1774214822.9418643,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "RISK_SHIELD"
+    },
+    {
+      "timestamp": 1774214854.9323971,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "RISK_SHIELD"
+    },
+    {
+      "timestamp": 1774214886.941834,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "RISK_SHIELD"
+    },
+    {
+      "timestamp": 1774214918.9311528,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "RISK_SHIELD"
+    },
+    {
+      "timestamp": 1774214950.8749409,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "RISK_SHIELD"
+    },
+    {
+      "timestamp": 1774214982.851004,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "RISK_SHIELD"
     }
   ],
   "outcomes": []

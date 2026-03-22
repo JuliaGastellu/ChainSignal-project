@@ -30,10 +30,11 @@ export const FundingPanel: React.FC<FundingPanelProps> = ({
   const switchToSepolia = async () => {
     if (!window.ethereum) throw new Error('MetaMask not found');
 
+    const ethereum = window.ethereum as any;
     const sepoliaChainId = '0xaa36a7';
     
     try {
-      await window.ethereum.request({
+      await ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: sepoliaChainId }],
       });
@@ -41,7 +42,7 @@ export const FundingPanel: React.FC<FundingPanelProps> = ({
       // Chain not found, add it
       if (switchError.code === 4902) {
         try {
-          await window.ethereum.request({
+          await ethereum.request({
             method: 'wallet_addEthereumChain',
             params: [{
               chainId: sepoliaChainId,
@@ -81,32 +82,55 @@ export const FundingPanel: React.FC<FundingPanelProps> = ({
     setErrorMessage(null);
 
     try {
+      console.log('🚀 Starting funding process...');
+      console.log('Agent address:', agentAddress);
+      console.log('Amount:', amount, 'ETH');
+
+      const ethereum = window.ethereum as any;
+
       // Request accounts
-      const accounts = await window.ethereum.request({
+      const accounts = await ethereum.request({
         method: 'eth_requestAccounts',
       });
+
+      console.log('Accounts:', accounts);
 
       if (!accounts || accounts.length === 0) {
         throw new Error('No accounts available');
       }
 
       // Switch to Sepolia
+      console.log('Switching to Sepolia...');
       await switchToSepolia();
 
+      // Convert amount to wei hex
+      const amountWei = Math.floor(parseFloat(amount) * 1e18);
+      const amountHex = `0x${amountWei.toString(16)}`;
+      
+      console.log('Amount in wei:', amountWei);
+      console.log('Amount hex:', amountHex);
+
+      const txParams = {
+        from: accounts[0],
+        to: agentAddress,
+        value: amountHex,
+      };
+
+      console.log('Transaction params:', txParams);
+
       // Send transaction
-      const txHash = await window.ethereum.request({
+      const txHash = await ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{
-          from: accounts[0],
-          to: agentAddress,
-          value: `0x${(parseFloat(amount) * 1e18).toString(16)}`,
-        }],
+        params: [txParams],
       });
+
+      console.log('Transaction sent! Hash:', txHash);
 
       setTxHash(txHash);
       setFundingStatus('success');
 
       // Verify and register the funding
+      console.log('Registering funding with API...');
       const response = await fetch(`${API_BASE}/agent/budget`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,15 +140,23 @@ export const FundingPanel: React.FC<FundingPanelProps> = ({
         }),
       });
 
+      console.log('API response status:', response.status);
+
       if (response.ok) {
         // Refresh balance
         const statusRes = await fetch(`${API_BASE}/agent/status`);
         const statusData = await statusRes.json();
+        console.log('New balance:', statusData.agent_balance_eth);
         onFundingSuccess(statusData.agent_balance_eth || currentBalance);
+      } else {
+        console.error('API registration failed:', response.status, response.statusText);
       }
 
     } catch (error: any) {
-      console.error('Funding failed:', error);
+      console.error('❌ Funding failed:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       setErrorMessage(error.message || 'Funding failed');
       setFundingStatus('error');
     }
