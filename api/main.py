@@ -69,103 +69,36 @@ def _network_name(chain_id: int | None) -> str:
 
 def _compute_activity_snapshot(limit: int = 25) -> dict:
     plans = _persistence.get_all_plans()
-    plans_sorted = sorted(plans, key=lambda p: p.get("created_at", 0), reverse=True)
+    plans_sorted = sorted(plans, key=lambda p: p.created_at, reverse=True)
     recent_actions = []
     total_value_moved_eth = 0.0
     total_success_executions = 0
     total_attempted_executions = 0
 
     for plan in plans_sorted:
-        context = plan.get("context", {}) or {}
-        reason = context.get("reason", "")
-        created_at = plan.get("created_at")
-        actions = plan.get("actions", []) or []
-        if actions:
-            total_attempted_executions += 1
-        for action in actions:
-            status = str(action.get("status") or "UNKNOWN")
-            if status in {"PENDING", "IN_PROGRESS"}:
-                continue
-            params = action.get("params", {}) or {}
-            moved_wei = 0
-            if action.get("type") == "TRANSFER":
-                moved_wei = int(params.get("value_wei") or 0)
-            elif action.get("type") == "SWAP":
-                moved_wei = int(params.get("amount_wei") or 0)
-            moved_eth = float(moved_wei / 1e18) if moved_wei > 0 else 0.0
-            total_value_moved_eth += moved_eth
-            if status == "SUCCESS":
+        context = plan.context
+        for action in plan.actions:
+            recent_actions.append({
+                "wallet": plan.wallet,
+                "action_type": action.type,
+                "status": action.status.value,
+                "tx_hash": action.tx_hash,
+                "created_at": plan.created_at,
+                "risk_score": plan.risk_score
+            })
+            
+            if action.status.value == "SUCCESS":
                 total_success_executions += 1
-            tx_hash = action.get("tx_hash")
-            explorer = f"{settings.ETHERSCAN_TX_BASE_URL.rstrip('/')}/{tx_hash}" if tx_hash else None
-            recent_actions.append(
-                {
-                    "wallet": plan.get("wallet"),
-                    "timestamp": created_at,
-                    "type": action.get("type"),
-                    "status": status,
-                    "tx_hash": tx_hash,
-                    "value_moved_eth": moved_eth,
-                    "reason": reason or "Execution processed through ESL safeguards.",
-                    "strategy": params.get("strategy_used") or "EXPLORE",
-                    "simulated": tx_hash is None,
-                    "explorer": explorer,
-                }
-            )
+            total_attempted_executions += 1
 
-    learning = _agent_service.learning.summary()
-    latest_outcome = learning.get("latest_outcome")
-    funding_events = _budget_service.get_recent_funding_events(limit=limit)
-    recent_actions.extend(funding_events)
-    recent_actions = sorted(recent_actions, key=lambda a: float(a.get("timestamp") or 0.0), reverse=True)
-    recent_actions = recent_actions[:limit]
-    if not recent_actions:
-        if latest_outcome:
-            recent_actions = [
-                {
-                    "wallet": latest_outcome.get("wallet"),
-                    "timestamp": latest_outcome.get("timestamp"),
-                    "type": "TRANSFER",
-                    "status": str(latest_outcome.get("status", "SKIPPED")).upper(),
-                    "tx_hash": None,
-                    "value_moved_eth": float(latest_outcome.get("moved_eth", 0.0) or 0.0),
-                    "reason": "Learning outcome snapshot from latest autonomous cycle.",
-                    "strategy": latest_outcome.get("strategy", "EXPLORE"),
-                    "simulated": True,
-                    "explorer": None,
-                }
-            ]
-
-    if int(total_success_executions) == 0 and latest_outcome:
-        moved_from_learning = float(latest_outcome.get("moved_eth", 0.0) or 0.0)
-        if moved_from_learning > 0:
-            recent_actions.insert(
-                0,
-                {
-                    "wallet": latest_outcome.get("wallet"),
-                    "timestamp": latest_outcome.get("timestamp"),
-                    "type": "TRANSFER",
-                    "status": "SUCCESS",
-                    "tx_hash": latest_outcome.get("tx_hash"),
-                    "value_moved_eth": moved_from_learning,
-                    "reason": "Simulated execution (demo mode fallback)",
-                    "strategy": latest_outcome.get("strategy", "EXPLORE"),
-                    "simulated": not bool(latest_outcome.get("tx_hash")),
-                    "explorer": f"{settings.ETHERSCAN_TX_BASE_URL.rstrip('/')}/{latest_outcome.get('tx_hash')}" if latest_outcome.get("tx_hash") else None,
-                },
-            )
-            total_success_executions = 1
-            if total_value_moved_eth <= 0:
-                total_value_moved_eth = moved_from_learning
     recent_actions = recent_actions[:limit]
 
     return {
         "recent_actions": recent_actions,
-        "stats": {
-            "total_executions": total_success_executions,
-            "executions_triggered": total_attempted_executions,
-            "total_value_moved": round(total_value_moved_eth, 8),
-        },
+        "total_value_moved_eth": total_value_moved_eth,
+        "total_success_executions": total_success_executions,
+        "total_attempted_executions": total_attempted_executions,
+        "success_rate": (total_success_executions / total_attempted_executions * 100) if total_attempted_executions > 0 else 0.0
     }
 
 @asynccontextmanager
@@ -212,13 +145,13 @@ def health():
         "global_metrics": {
             **raw_metrics,
             "execution_attempts": raw_metrics.get("executions_triggered", 0),
-            "executions_triggered": activity["stats"]["total_executions"],
-            "executions_confirmed": activity["stats"]["total_executions"],
-            "total_value_moved": activity["stats"]["total_value_moved"],
+            "executions_triggered": activity["total_attempted_executions"],
+            "executions_confirmed": activity["total_success_executions"],
+            "total_value_moved": activity["total_value_moved_eth"],
         },
         "agent_budget": _budget_service.get_global_state(),
         "learning": _agent_service.learning.summary(),
-        "activity": activity["stats"],
+        "activity": activity,
     }
 
 
@@ -519,13 +452,22 @@ async def guardian_status():
     state = _compute_activity_snapshot(limit=10)
     history = _load_execution_history()
     budget = _budget_service.get_global_state()
+    
+    # Get agent wallet from the wallet agent
+    agent_wallet = None
+    try:
+        agent_wallet = _wallet_agent.get_agent_wallet_address()
+    except Exception:
+        pass
+    
     return {
         "running": _guardian_loop.is_running,
         "stop_requested": _guardian_loop.stop_requested,
         "cycles_completed": _guardian_loop.cycles_completed,
         "wallets_watched": len(_watch_queue.list_wallets()),
+        "agent_wallet": agent_wallet,
         "agent_balance_eth": budget.get("total_balance_eth", 0.0),
-        "total_eth_moved": state["stats"].get("total_value_moved", 0.0),
+        "total_eth_moved": state.get("total_value_moved_eth", 0.0),
         "last_action": history[0] if history else None,
     }
 

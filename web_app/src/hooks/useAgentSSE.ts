@@ -46,7 +46,7 @@ const runtimeApiBase = (import.meta.env.VITE_API_BASE as string | undefined)?.tr
 const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 export const API_BASE = runtimeApiBase !== undefined && runtimeApiBase.length > 0
   ? runtimeApiBase
-  : (isLocalHost ? "" : "https://chainsignal-project.onrender.com");
+  : (isLocalHost ? "http://localhost:8001" : "https://chainsignal-project.onrender.com");
 
 export function useAgentSSE() {
   const [events, setEvents] = useState<AgentEvent[]>([]);

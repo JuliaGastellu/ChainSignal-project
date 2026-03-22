@@ -20,35 +20,53 @@ class QueueManager:
             self.path.write_text(json.dumps({"wallets": []}, indent=2), encoding="utf-8")
 
     @contextmanager
-    def _file_lock(self, mode: str):
-        with open(self.path, mode, encoding="utf-8") as handle:
-            if os.name == "nt":
-                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+    def _file_lock(self, mode: str = "r"):
+        """Cross-platform file locking context manager."""
+        if os.name == "nt":
+            # Windows: Use msvcrt.locking
+            handle = open(self.path, mode, encoding="utf-8")
+            if "w" in mode or "+" in mode:
+                try:
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                    locked = True
+                except OSError:
+                    locked = False
             else:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                locked = False
             try:
                 yield handle
             finally:
-                if os.name == "nt":
-                    handle.flush()
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
+                if locked:
+                    try:
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass  # Ignore unlock errors
+                handle.close()
+        else:
+            # Unix: Use fcntl.flock
+            with open(self.path, mode, encoding="utf-8") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield handle
+                finally:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def _load(self) -> Dict[str, Any]:
         with self._thread_lock:
-            with self._file_lock("r+") as handle:
-                handle.seek(0)
-                raw = handle.read().strip()
-                if not raw:
-                    return {"wallets": []}
-                data = json.loads(raw)
-                if not isinstance(data, dict):
-                    return {"wallets": []}
-                wallets = data.get("wallets")
-                if not isinstance(wallets, list):
-                    data["wallets"] = []
-                return data
+            try:
+                with open(self.path, "r", encoding="utf-8") as handle:
+                    raw = handle.read().strip()
+                    if not raw:
+                        return {"wallets": []}
+                    data = json.loads(raw)
+                    if not isinstance(data, dict):
+                        return {"wallets": []}
+                    wallets = data.get("wallets")
+                    if not isinstance(wallets, list):
+                        data["wallets"] = []
+                    return data
+            except (FileNotFoundError, json.JSONDecodeError):
+                return {"wallets": []}
 
     def _save(self, payload: Dict[str, Any]) -> None:
         with self._thread_lock:

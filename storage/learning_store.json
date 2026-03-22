@@ -545,6 +545,224 @@
         }
       ],
       "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215295.2425928,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215303.223649,
+      "wallet": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+      "signals": [
+        {
+          "type": "WHALE_ACCUMULATION",
+          "severity": "high",
+          "confidence": 0.78
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215335.0860004,
+      "wallet": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+      "signals": [
+        {
+          "type": "WHALE_ACCUMULATION",
+          "severity": "high",
+          "confidence": 0.78
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215367.895236,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215375.8066008,
+      "wallet": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+      "signals": [
+        {
+          "type": "WHALE_ACCUMULATION",
+          "severity": "high",
+          "confidence": 0.78
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215407.6084337,
+      "wallet": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+      "signals": [
+        {
+          "type": "WHALE_ACCUMULATION",
+          "severity": "high",
+          "confidence": 0.78
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215453.0194838,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215486.699002,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
+    },
+    {
+      "timestamp": 1774215518.6826177,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "LIQUIDITY_SHIFT",
+          "severity": "medium",
+          "confidence": 0.7
+        },
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        },
+        {
+          "type": "HIGH_VALUE_TRANSFER",
+          "severity": "low",
+          "confidence": 0.62
+        },
+        {
+          "type": "SUSPICIOUS_PATTERN",
+          "severity": "high",
+          "confidence": 0.74
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
     }
   ],
   "outcomes": [

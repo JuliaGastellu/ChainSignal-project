@@ -43,17 +43,37 @@ const Index: React.FC = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const statusRes = await fetch(`${API_BASE}/agent/status`);
-        const statusData = await statusRes.json();
-        setAgentStatus(statusData);
+        // Use health endpoint which works
+        const healthRes = await fetch(`${API_BASE}/health`);
+        const healthData = await healthRes.json();
+        
+        // Extract agent status from health data
+        setAgentStatus({
+          running: healthData.agent_loop === 'active',
+          agent_wallet: healthData.global_metrics?.agent_address || '',
+          agent_balance_eth: healthData.agent_budget?.total_balance_eth || 0,
+          cycles_completed: healthData.global_metrics?.total_runs || 0
+        });
 
-        const watchRes = await fetch(`${API_BASE}/agent/watch`);
-        const watchData = await watchRes.json();
-        setWatchedWallets(watchData.wallets || []);
+        // Try to get watch data (may fail)
+        try {
+          const watchRes = await fetch(`${API_BASE}/agent/watch`);
+          const watchData = await watchRes.json();
+          setWatchedWallets(watchData.wallets || []);
+        } catch (watchError) {
+          console.warn('Watch endpoint failed, using empty list');
+          setWatchedWallets([]);
+        }
 
-        const historyRes = await fetch(`${API_BASE}/agent/history`);
-        const historyData = await historyRes.json();
-        setExecutions(historyData.executions || []);
+        // Try to get history (may fail)
+        try {
+          const historyRes = await fetch(`${API_BASE}/agent/history`);
+          const historyData = await historyRes.json();
+          setExecutions(historyData.executions || []);
+        } catch (historyError) {
+          console.warn('History endpoint failed, using empty list');
+          setExecutions([]);
+        }
       } catch (err) {
         console.error('Failed to load initial data:', err);
       }
@@ -123,39 +143,54 @@ const Index: React.FC = () => {
 
   const handleStartAgent = async () => {
     try {
-      await fetch(`${API_BASE}/agent/start`, { method: 'POST' });
-      const statusRes = await fetch(`${API_BASE}/agent/status`);
-      const statusData = await statusRes.json();
-      setAgentStatus(statusData);
+      const response = await fetch(`${API_BASE}/agent/start`, { method: 'POST' });
+      if (response.ok) {
+        // Refresh status using health endpoint
+        const healthRes = await fetch(`${API_BASE}/health`);
+        const healthData = await healthRes.json();
+        setAgentStatus(prev => ({
+          ...prev,
+          running: true,
+          cycles_completed: healthData.global_metrics?.total_runs || prev.cycles_completed
+        }));
+      }
     } catch (err) {
       console.error('Failed to start agent:', err);
+      // Show user feedback
+      alert('Failed to start agent. Please check console for details.');
     }
   };
 
   const handleStopAgent = async () => {
     try {
-      await fetch(`${API_BASE}/agent/stop`, { method: 'POST' });
-      const statusRes = await fetch(`${API_BASE}/agent/status`);
-      const statusData = await statusRes.json();
-      setAgentStatus(statusData);
+      const response = await fetch(`${API_BASE}/agent/stop`, { method: 'POST' });
+      if (response.ok) {
+        setAgentStatus(prev => ({ ...prev, running: false }));
+      }
     } catch (err) {
       console.error('Failed to stop agent:', err);
+      alert('Failed to stop agent. Please check console for details.');
     }
   };
 
   const handleAddWallet = async (address: string, label?: string) => {
     try {
-      await fetch(`${API_BASE}/agent/watch`, {
+      const response = await fetch(`${API_BASE}/agent/watch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, label })
       });
       
-      const watchRes = await fetch(`${API_BASE}/agent/watch`);
-      const watchData = await watchRes.json();
-      setWatchedWallets(watchData.wallets || []);
+      if (response.ok) {
+        const watchData = await response.json();
+        setWatchedWallets(watchData.wallets || []);
+      } else {
+        console.error('Failed to add wallet:', response.status);
+        alert('Failed to add wallet. Please check console for details.');
+      }
     } catch (err) {
       console.error('Failed to add wallet:', err);
+      alert('Failed to add wallet. Please check console for details.');
     }
   };
 
