@@ -93,6 +93,7 @@ def health():
         "agent_loop": "active" if _agent_loop.is_running else "inactive",
         "global_metrics": _agent_service.metrics.to_dict(),
         "agent_budget": _budget_service.get_global_state(),
+        "learning": _agent_service.learning.summary(),
     }
 
 
@@ -327,14 +328,49 @@ async def agent_activity(limit: int = 25):
 async def agent_state():
     actions = await agent_activity(limit=50)
     last_action = actions["recent_actions"][0] if actions["recent_actions"] else None
+    learning = _agent_service.learning.summary()
+    budget_state = _budget_service.get_global_state()
+    pnl = round(float(actions["stats"].get("total_value_moved", 0.0)) - float(budget_state.get("total_spent_eth", 0.0)), 8)
     return {
         "status": "active" if _agent_loop.is_running else "inactive",
         "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
         "metrics": _agent_service.metrics.to_dict(),
-        "budget": _budget_service.get_global_state(),
+        "budget": budget_state,
+        "positions": {"open_positions": 0, "closed_positions": int(actions["stats"].get("total_executions", 0))},
+        "pnl": {"estimated_eth": pnl},
         "stats": actions["stats"],
+        "learning": learning,
         "last_action": last_action,
     }
+
+
+@app.get("/agent/learning", summary="Learning store summary and latest signal/outcome")
+async def agent_learning():
+    return _agent_service.learning.summary()
+
+
+@app.get("/agent/radar", summary="Tracked wallets radar with priority and freshness")
+async def agent_radar(limit: int = 12):
+    if not _TRACKING_FILE.exists():
+        return {"wallets": []}
+    try:
+        with _TRACKING_FILE.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+    wallets = []
+    for wallet, cfg in data.items():
+        wallets.append(
+            {
+                "wallet": wallet,
+                "priority": cfg.get("priority", "medium"),
+                "last_evaluation": cfg.get("last_evaluation"),
+                "last_risk_score": cfg.get("last_risk_score", 0),
+                "interval_seconds": cfg.get("interval_seconds", 300),
+            }
+        )
+    wallets_sorted = sorted(wallets, key=lambda w: ({"high": 0, "medium": 1, "low": 2}.get(w["priority"], 3), -int(w.get("last_risk_score", 0))))
+    return {"wallets": wallets_sorted[:limit]}
 
 
 @app.post("/agent/execute", summary="Execute autonomous decision for a target wallet")

@@ -1,0 +1,17 @@
+{
+  "signals": [
+    {
+      "timestamp": 1774193666.478654,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "EXPLORE_TRIGGER",
+          "severity": "low",
+          "confidence": 0.55
+        }
+      ],
+      "strategy": "EXPLORE"
+    }
+  ],
+  "outcomes": []
+}

@@ -78,6 +78,8 @@ The FastAPI backend provides:
 - `GET /agent/budget/{wallet}` current budget for target wallet
 - `GET /agent/actions` recent autonomous actions
 - `GET /agent/state` global agent state and latest action
+- `GET /agent/learning` learning outcomes and signal history summary
+- `GET /agent/radar` tracked wallets radar for autonomous prioritization
 - `POST /track-wallet` add/update autonomous loop tracking
 - `GET /health` service and loop health
 
@@ -91,6 +93,14 @@ All SSE events include contextual fields to avoid ambiguity:
 - `agent_wallet`
 - `action_scope`: `{ target_wallet: "read_only", agent_wallet: "execution_enabled" }`
 - `decision_context`: `{ target_wallet, executor_wallet, funds_source }`
+
+Autonomous observability events:
+
+- `signal_detected`
+- `strategy_selected`
+- `simulation_passed`
+- `execution_submitted`
+- `execution_verified`
 
 Final event is always guaranteed as `decision_final` or `execution_final_status`.
 

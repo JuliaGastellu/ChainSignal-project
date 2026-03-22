@@ -16,6 +16,10 @@ from perfil_wallet.behavioral_scoring import BehavioralScorer
 from perfil_wallet.clasificador import ClasificadorWallet
 from services.servicio_wdk import ServicioWDK
 from services.agent_budget_service import AgentBudgetService
+from services.intelligence_layer import WalletIntelService, BlockIntelService, ProtocolIntelService
+from services.signal_detector import SignalDetector
+from services.strategy_engine import StrategyEngine
+from services.learning_store import LearningStore
 from strategy.estrategia_proteccion_wallet import EstrategiaProteccionWallet
 from tools.herramienta_compilar_contrato import compilar_contrato_tool
 from tools.herramienta_generar_contrato import generar_contrato
@@ -62,6 +66,12 @@ class AgentService:
         self.lock_manager = WalletLockManager()
         self.wdk = ServicioWDK()
         self.budget = AgentBudgetService()
+        self.wallet_intel = WalletIntelService()
+        self.block_intel = BlockIntelService()
+        self.protocol_intel = ProtocolIntelService()
+        self.signal_detector = SignalDetector()
+        self.strategy_engine = StrategyEngine()
+        self.learning = LearningStore()
         self.metrics = AgentMetrics()
         self._semaphore = asyncio.Semaphore(3)
         self._active_stream_wallets: set[str] = set()
@@ -208,8 +218,29 @@ class AgentService:
                     "source": source,
                 }
 
+                wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
+                protocol_intel = self.protocol_intel.analyze(metrics, profile)
+                signals = self.signal_detector.detect(wallet_intel, protocol_intel)
+                strategy_pick = self.strategy_engine.select(signals, {}, wallet_intel)
+                self.learning.record_signal(wallet_addr, signals, strategy_pick["strategy"])
+                yield {
+                    "paso": "signal_detected",
+                    "estado": "completed",
+                    "detalle": f"{len(signals)} signals detected",
+                    "data": {"signals": signals},
+                    "source": source,
+                }
+                yield {
+                    "paso": "strategy_selected",
+                    "estado": "completed",
+                    "detalle": strategy_pick["strategy"],
+                    "data": strategy_pick,
+                    "source": source,
+                }
+
                 yield {"paso": "evaluating_decision", "estado": "starting", "detalle": "Executing decision engine...", "source": source}
                 decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
+                decision, decision_estrategia = self._apply_strategy_overlay(decision, decision_estrategia, strategy_pick, insight_obj)
                 report_snapshot = self._build_report(wallet_addr, profile, scores_obj, scores_dict, risk_breakdown, metrics, decision, decision_estrategia)
                 decision_code = str(decision.get("decision") or "MONITOR")
                 has_actionable_strategy = bool(
@@ -217,13 +248,20 @@ class AgentService:
                     or decision_estrategia.requires_swap
                     or decision_estrategia.requires_contract
                 )
-                should_execute = decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy
+                low_confidence_defensive_execution = (
+                    decision_code == "INSUFFICIENT_DATA"
+                    and bool(decision_estrategia.requires_contract)
+                    and int(getattr(insight_obj, "risk_score", 0) or 0) >= 30
+                )
+                should_execute = (decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy) or low_confidence_defensive_execution
 
                 agent_intent = "No action required"
                 if should_execute:
                     agent_intent = "Protect funds due to elevated on-chain risk indicators"
                 elif decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
                     agent_intent = "Monitoring only: strategy found no actionable on-chain mitigation."
+                elif decision_code == "INSUFFICIENT_DATA":
+                    agent_intent = "Monitoring only: low-confidence profile without defensive trigger."
 
                 yield {
                     "paso": "evaluating_decision",
@@ -357,6 +395,12 @@ class AgentService:
 
             metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
             decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
+            wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
+            protocol_intel = self.protocol_intel.analyze(metrics, profile)
+            signals = self.signal_detector.detect(wallet_intel, protocol_intel)
+            strategy_pick = self.strategy_engine.select(signals, decision, wallet_intel)
+            decision, decision_estrategia = self._apply_strategy_overlay(decision, decision_estrategia, strategy_pick, insight_obj)
+            decision["signals"] = signals
             return self._build_report(wallet_addr, profile, scores_obj, scores_dict, risk_breakdown, metrics, decision, decision_estrategia)
         finally:
             self._semaphore.release()
@@ -375,13 +419,24 @@ class AgentService:
 
             metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
             decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
+            wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
+            protocol_intel = self.protocol_intel.analyze(metrics, profile)
+            signals = self.signal_detector.detect(wallet_intel, protocol_intel)
+            strategy_pick = self.strategy_engine.select(signals, decision, wallet_intel)
+            self.learning.record_signal(wallet_addr, signals, strategy_pick["strategy"])
+            decision, decision_estrategia = self._apply_strategy_overlay(decision, decision_estrategia, strategy_pick, insight_obj)
             decision_code = str(decision.get("decision") or "MONITOR")
             has_actionable_strategy = bool(
                 decision_estrategia.requires_funds_movement
                 or decision_estrategia.requires_swap
                 or decision_estrategia.requires_contract
             )
-            should_execute = decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy
+            low_confidence_defensive_execution = (
+                decision_code == "INSUFFICIENT_DATA"
+                and bool(decision_estrategia.requires_contract)
+                and int(getattr(insight_obj, "risk_score", 0) or 0) >= 30
+            )
+            should_execute = (decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy) or low_confidence_defensive_execution
             if not should_execute:
                 if decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
                     return {"status": "no_action", "decision": decision_code, "why_not_acting": "No actionable strategy was generated for this wallet."}
@@ -439,6 +494,26 @@ class AgentService:
         decision_estrategia = estrategia.evaluar(insight_obj)
         return decision, decision_estrategia
 
+    def _apply_strategy_overlay(self, decision: Dict[str, Any], decision_estrategia: Any, strategy_pick: Dict[str, Any], insight_obj: Any):
+        strategy_name = str(strategy_pick.get("strategy", "EXPLORE"))
+        decision["strategy"] = strategy_name
+        decision["strategy_reason"] = strategy_pick.get("reason")
+        force_execute = bool(strategy_pick.get("force_execute"))
+        if force_execute and decision.get("decision") in {"INSUFFICIENT_DATA", "MONITOR", "BLOCK"}:
+            decision["decision"] = "EXECUTE_BASIC"
+            decision["recommended_action"] = "explore"
+            decision["reasoning"] = f"Strategy fallback applied: {strategy_name}. {strategy_pick.get('reason', '')}".strip()
+            decision_estrategia.requires_execution = True
+            decision_estrategia.requires_funds_movement = True
+            decision_estrategia.requires_swap = False
+            decision_estrategia.requires_contract = False
+            if "Execute explore transfer with risk limits" not in decision_estrategia.actions:
+                decision_estrategia.actions.append("Execute explore transfer with risk limits")
+            setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), 100000000000000))
+            if int(getattr(insight_obj, "risk_score", 0) or 0) >= 80:
+                decision["recommended_action"] = "protect"
+        return decision, decision_estrategia
+
     async def _execute_with_esl(
         self,
         wallet_addr: str,
@@ -478,10 +553,13 @@ class AgentService:
         )
         if not valid:
             yield {"paso": "execution_safety", "estado": "error", "detalle": f"Safety Guard Abort: {reason}", "source": source}
+            self.learning.record_outcome(wallet_addr, "aborted", str(decision.get("strategy", "EXPLORE")), 0.0)
             yield {"paso": "execution_final_status", "data": {"status": "aborted", "reason": reason}}
             return
 
         yield {"paso": "execution_safety", "estado": "completed", "detalle": f"Safety checks passed. Fingerprint: {plan.fingerprint[:12]}...", "source": source}
+        yield {"paso": "simulation_passed", "estado": "completed", "detalle": "Execution simulation and ESL checks passed.", "data": {"fingerprint": plan.fingerprint}, "source": source}
+        yield {"paso": "execution_submitted", "estado": "starting", "detalle": f"Submitting {len(plan.actions)} actions to execution runner.", "data": {"actions": len(plan.actions)}, "source": source}
 
         if plan.actions:
             async for ev in self._run_runner_stream(runner, plan, source):
@@ -527,6 +605,7 @@ class AgentService:
             )
             if not valid2:
                 yield {"paso": "contract_deployment", "estado": "error", "detalle": f"Safety Guard Abort: {reason2}", "source": source}
+                self.learning.record_outcome(wallet_addr, "aborted", str(decision.get("strategy", "EXPLORE")), 0.0)
                 yield {"paso": "execution_final_status", "data": {"status": "aborted", "reason": reason2}}
                 return
 
@@ -534,6 +613,7 @@ class AgentService:
             success_deploy = await asyncio.to_thread(runner.run, deploy_plan)
             if not success_deploy:
                 yield {"paso": "contract_deployment", "estado": "error", "detalle": "Contract deployment failed.", "source": source}
+                self.learning.record_outcome(wallet_addr, "failed", str(decision.get("strategy", "EXPLORE")), 0.0)
                 yield {"paso": "execution_final_status", "data": {"status": "failed", "reason": "contract_deployment_failed"}}
                 return
 
@@ -556,9 +636,10 @@ class AgentService:
         moved_eth = self._estimate_value_moved_eth(plan)
         if moved_eth > 0:
             self.budget.consume(wallet_addr, moved_eth)
+        self.learning.record_outcome(wallet_addr, "success", str(decision.get("strategy", "EXPLORE")), moved_eth)
+        yield {"paso": "execution_verified", "estado": "completed", "detalle": "Execution verified and persisted.", "data": {"moved_eth": moved_eth}, "source": source}
 
-        if source == "loop":
-            yield {"paso": "execution_final_status", "data": {"status": "success", "last_fingerprint": plan.fingerprint}}
+        yield {"paso": "execution_final_status", "data": {"status": "success", "last_fingerprint": plan.fingerprint, "moved_eth": moved_eth}}
 
     async def _run_runner_stream(self, runner: ExecutionRunner, plan: Any, source: str) -> AsyncGenerator[Dict[str, Any], None]:
         queue: asyncio.Queue = asyncio.Queue()
@@ -620,6 +701,8 @@ class AgentService:
                 "contract_interactions_pct": metrics.porcentaje_interacciones_contratos,
             },
             "agent_decision": {"decision": decision.get("decision"), "reasoning": decision_estrategia.detail, "recommended_action": decision.get("recommended_action")},
+            "strategy": {"name": decision.get("strategy"), "reason": decision.get("strategy_reason")},
+            "signals": decision.get("signals", []),
             "agent_metrics": self.metrics.to_dict(),
             "x402_payment": "validated",
         }
@@ -627,7 +710,8 @@ class AgentService:
     def _gather_actions(self, decision_estrategia: Any, decision: Dict[str, Any], include_deploy: bool) -> List[Dict[str, Any]]:
         intended_actions: List[Dict[str, Any]] = []
         if decision_estrategia.requires_funds_movement:
-            intended_actions.append({"type": "TRANSFER", "params": {"to": settings.SAFE_WALLET_ADDRESS, "value_wei": decision_estrategia.cantidad_transferencia_wei}})
+            transfer_wei = int(getattr(decision_estrategia, "cantidad_transferencia_wei", settings.SWAP_AMOUNT_WEI) or settings.SWAP_AMOUNT_WEI)
+            intended_actions.append({"type": "TRANSFER", "params": {"to": settings.SAFE_WALLET_ADDRESS, "value_wei": transfer_wei}})
         if decision_estrategia.requires_swap:
             intended_actions.append({"type": "SWAP", "params": {"token_in": decision_estrategia.token_in, "token_out": decision_estrategia.token_out, "amount_wei": settings.SWAP_AMOUNT_WEI}})
         if include_deploy and decision_estrategia.requires_contract:

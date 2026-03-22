@@ -31,6 +31,9 @@ export interface AgentResults {
   agent_wallet?: string;
   action_scope?: Record<string, unknown>;
   decision_context?: Record<string, unknown>;
+  detected_signals?: Array<Record<string, unknown>>;
+  selected_strategy?: string;
+  strategy_reason?: string;
   raw?: Record<string, unknown>;
 }
 
@@ -150,6 +153,15 @@ export function useAgentSSE() {
           if (payload.action_scope && typeof payload.action_scope === "object") nextResults.action_scope = payload.action_scope as Record<string, unknown>;
           if (payload.decision_context && typeof payload.decision_context === "object") nextResults.decision_context = payload.decision_context as Record<string, unknown>;
 
+          if (paso === "signal_detected") {
+            if (Array.isArray(payload.signals)) nextResults.detected_signals = payload.signals as Array<Record<string, unknown>>;
+          }
+
+          if (paso === "strategy_selected") {
+            if (typeof payload.strategy === "string") nextResults.selected_strategy = payload.strategy;
+            if (typeof payload.reason === "string") nextResults.strategy_reason = payload.reason;
+          }
+
           // 1. Scoring step
           if (paso === "calculating_scores") {
             const risk = Number(payload.risk ?? payload.risk_score);
@@ -243,6 +255,8 @@ export function useAgentSSE() {
           if (typeof finalContractType === "string") {
             nextResults.contract_type = finalContractType;
           }
+          if (typeof payload.strategy === "string") nextResults.selected_strategy = payload.strategy;
+          if (typeof payload.strategy_reason === "string") nextResults.strategy_reason = payload.strategy_reason;
           if (typeof payload.risk === "number") nextResults.risk_score = payload.risk;
           if (typeof payload.activity === "number") nextResults.activity_score = payload.activity;
           nextResults.source = source;

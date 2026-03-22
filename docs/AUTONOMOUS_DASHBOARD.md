@@ -18,6 +18,8 @@
 - `GET /agent/budget/{wallet}`: budget for a target wallet context.
 - `GET /agent/actions`: recent autonomous executions and value moved.
 - `GET /agent/state`: global state, metrics and last action.
+- `GET /agent/learning`: learning summary of signals and outcomes.
+- `GET /agent/radar`: prioritized tracked wallets for autonomous loop.
 - `POST /track-wallet`: add/update wallet in autonomous loop tracking.
 
 ## SSE Context Fields
@@ -28,6 +30,11 @@ Each event includes:
 - `agent_wallet`
 - `action_scope`
 - `decision_context`
+- `signal_detected`
+- `strategy_selected`
+- `simulation_passed`
+- `execution_submitted`
+- `execution_verified`
 
 Finalization guarantee:
 
@@ -42,6 +49,9 @@ Finalization guarantee:
 - **AgentSummaryCard**: fast narrative of decision and intent.
 - **AgentTreasuryCard**: budget and funding.
 - **AgentActivityFeed**: autonomous action history.
+- **AgentIntelligenceFeed**: detected on-chain signals and confidence.
+- **StrategyEnginePanel**: selected strategy and rationale.
+- **WalletRadarPanel**: tracked wallet priority queue.
 
 ## Safety
 

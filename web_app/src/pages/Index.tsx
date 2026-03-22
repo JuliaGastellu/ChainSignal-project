@@ -8,6 +8,9 @@ import { AgentSummaryCard } from "@/components/AgentSummaryCard";
 import { AgentTreasuryCard } from "@/components/AgentTreasuryCard";
 import { WalletContextPanel } from "@/components/WalletContextPanel";
 import { BlockAnalysisPanel } from "@/components/BlockAnalysisPanel";
+import { AgentIntelligenceFeed } from "@/components/AgentIntelligenceFeed";
+import { StrategyEnginePanel } from "@/components/StrategyEnginePanel";
+import { WalletRadarPanel } from "@/components/WalletRadarPanel";
 import { useAgentSSE, API_BASE } from "@/hooks/useAgentSSE";
 import { motion } from "framer-motion";
 import { Bot, AlertCircle, RotateCcw, Monitor, Activity } from "lucide-react";
@@ -131,6 +134,9 @@ const Index = () => {
             <div className="space-y-4 lg:sticky lg:top-4 h-fit">
               {wallet && <WalletContextPanel targetWallet={wallet} />}
               <AgentSummaryCard results={results} />
+              <StrategyEnginePanel results={results} />
+              <AgentIntelligenceFeed results={results} />
+              <WalletRadarPanel />
               {wallet && <AgentTreasuryCard wallet={wallet} />}
               <SidePanel events={events} />
             </div>
