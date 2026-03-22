@@ -88,7 +88,7 @@ export function AgentBudgetPanel({ wallet }: { wallet: string }) {
           Fund Agent
         </button>
       </div>
-      <div className="text-[11px] text-muted-foreground break-all">Agent wallet: {budget?.agent_wallet || "No data available yet"}</div>
+      <div className="text-[11px] text-muted-foreground break-all">Agent wallet: {budget?.agent_wallet || "Resolving agent wallet from runtime config"}</div>
       {msg && <div className="text-[11px] text-muted-foreground">{msg}</div>}
     </div>
   );

@@ -6,6 +6,7 @@ type AgentState = {
   status?: string;
   budget?: { total_balance_eth?: number };
   pnl?: { estimated_eth?: number };
+  stats?: { total_value_moved?: number };
   last_action?: { type?: string; status?: string; strategy?: string };
 };
 
@@ -30,10 +31,17 @@ export function AgentHeroSection() {
 
   const balance = state?.budget?.total_balance_eth ?? 0;
   const pnl = state?.pnl?.estimated_eth ?? 0;
+  const moved = state?.stats?.total_value_moved ?? 0;
   const lastAction = state?.last_action;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="space-y-2">
+      {balance <= 0 && (
+        <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-800">
+          Fund the agent to activate autonomous execution.
+        </div>
+      )}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <div className="rounded-xl border border-border bg-card p-3">
         <div className="text-[11px] text-muted-foreground flex items-center gap-1"><Wallet className="h-3.5 w-3.5" /> Agent Balance</div>
         <div className="mt-1 font-semibold">{balance} ETH</div>
@@ -47,10 +55,14 @@ export function AgentHeroSection() {
         <div className="mt-1 font-semibold">{pnl} ETH</div>
       </div>
       <div className="rounded-xl border border-border bg-card p-3">
+        <div className="text-[11px] text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> Capital Moved</div>
+        <div className="mt-1 font-semibold">{moved} ETH</div>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-3">
         <div className="text-[11px] text-muted-foreground flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> Status</div>
         <div className="mt-1 font-semibold">{state?.status === "active" ? "Autonomous active" : "Autonomous standby with safeguards"}</div>
       </div>
     </div>
+    </div>
   );
 }
-

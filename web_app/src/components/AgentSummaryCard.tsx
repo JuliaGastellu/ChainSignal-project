@@ -41,7 +41,7 @@ export function AgentSummaryCard({ results }: { results: AgentResults | null }) 
         </div>
         <div className="rounded border border-border bg-secondary/30 p-2">
           <div className="text-muted-foreground">Last action executed</div>
-          <div className="font-medium mt-1">{results?.selected_strategy || "Waiting for first trigger"}</div>
+          <div className="font-medium mt-1">{results?.selected_strategy || "Exploration strategy queued for next safeguarded cycle"}</div>
         </div>
         <div className="rounded border border-border bg-secondary/30 p-2">
           <div className="text-muted-foreground">Capital moved</div>

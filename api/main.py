@@ -52,6 +52,82 @@ def _network_name(chain_id: int | None) -> str:
         return "polygon"
     return "unknown"
 
+
+def _compute_activity_snapshot(limit: int = 25) -> dict:
+    plans = _persistence.get_all_plans()
+    plans_sorted = sorted(plans, key=lambda p: p.get("created_at", 0), reverse=True)
+    recent_actions = []
+    total_value_moved_eth = 0.0
+    total_success_executions = 0
+    total_attempted_executions = 0
+
+    for plan in plans_sorted:
+        context = plan.get("context", {}) or {}
+        reason = context.get("reason", "")
+        created_at = plan.get("created_at")
+        actions = plan.get("actions", []) or []
+        if actions:
+            total_attempted_executions += 1
+        for action in actions:
+            status = str(action.get("status") or "UNKNOWN")
+            if status in {"PENDING", "IN_PROGRESS"}:
+                continue
+            params = action.get("params", {}) or {}
+            moved_wei = 0
+            if action.get("type") == "TRANSFER":
+                moved_wei = int(params.get("value_wei") or 0)
+            elif action.get("type") == "SWAP":
+                moved_wei = int(params.get("amount_wei") or 0)
+            moved_eth = float(moved_wei / 1e18) if moved_wei > 0 else 0.0
+            total_value_moved_eth += moved_eth
+            if status == "SUCCESS":
+                total_success_executions += 1
+            tx_hash = action.get("tx_hash")
+            explorer = f"https://sepolia.etherscan.io/tx/{tx_hash}" if tx_hash else None
+            recent_actions.append(
+                {
+                    "wallet": plan.get("wallet"),
+                    "timestamp": created_at,
+                    "type": action.get("type"),
+                    "status": status,
+                    "tx_hash": tx_hash,
+                    "value_moved_eth": moved_eth,
+                    "reason": reason or "Execution processed through ESL safeguards.",
+                    "strategy": params.get("strategy_used") or "EXPLORE",
+                    "simulated": tx_hash is None,
+                    "explorer": explorer,
+                }
+            )
+
+    recent_actions = recent_actions[:limit]
+    if not recent_actions:
+        learning = _agent_service.learning.summary()
+        latest_outcome = learning.get("latest_outcome")
+        if latest_outcome:
+            recent_actions = [
+                {
+                    "wallet": latest_outcome.get("wallet"),
+                    "timestamp": latest_outcome.get("timestamp"),
+                    "type": "TRANSFER",
+                    "status": str(latest_outcome.get("status", "SKIPPED")).upper(),
+                    "tx_hash": None,
+                    "value_moved_eth": float(latest_outcome.get("moved_eth", 0.0) or 0.0),
+                    "reason": "Learning outcome snapshot from latest autonomous cycle.",
+                    "strategy": latest_outcome.get("strategy", "EXPLORE"),
+                    "simulated": True,
+                    "explorer": None,
+                }
+            ]
+
+    return {
+        "recent_actions": recent_actions,
+        "stats": {
+            "total_executions": total_success_executions,
+            "executions_triggered": total_attempted_executions,
+            "total_value_moved": round(total_value_moved_eth, 8),
+        },
+    }
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and clean up resources during API lifespan."""
@@ -86,14 +162,23 @@ app.add_middleware(
 @app.get("/health", summary="Service health check")
 def health():
     """Service health check endpoint."""
+    activity = _compute_activity_snapshot(limit=10)
+    raw_metrics = _agent_service.metrics.to_dict()
     return {
         "status": "ok", 
         "service": "ChainSignal API", 
         "version": "0.2.2",
         "agent_loop": "active" if _agent_loop.is_running else "inactive",
-        "global_metrics": _agent_service.metrics.to_dict(),
+        "global_metrics": {
+            **raw_metrics,
+            "execution_attempts": raw_metrics.get("executions_triggered", 0),
+            "executions_triggered": activity["stats"]["total_executions"],
+            "executions_confirmed": activity["stats"]["total_executions"],
+            "total_value_moved": activity["stats"]["total_value_moved"],
+        },
         "agent_budget": _budget_service.get_global_state(),
         "learning": _agent_service.learning.summary(),
+        "activity": activity["stats"],
     }
 
 
@@ -299,72 +384,7 @@ async def track_wallet(payload: TrackWalletRequest):
 @app.get("/agent/actions", summary="Recent autonomous agent actions")
 @app.get("/agent-activity", include_in_schema=False)
 async def agent_activity(limit: int = 25):
-    plans = _persistence.get_all_plans()
-    plans_sorted = sorted(plans, key=lambda p: p.get("created_at", 0), reverse=True)
-    recent_actions = []
-    total_value_moved_eth = 0.0
-    total_success_executions = 0
-
-    for plan in plans_sorted:
-        context = plan.get("context", {}) or {}
-        reason = context.get("reason", "")
-        created_at = plan.get("created_at")
-        for action in plan.get("actions", []) or []:
-            status = action.get("status")
-            if status not in {"SUCCESS", "FAILED"}:
-                continue
-            params = action.get("params", {}) or {}
-            moved_wei = 0
-            if action.get("type") == "TRANSFER":
-                moved_wei = int(params.get("value_wei") or 0)
-            elif action.get("type") == "SWAP":
-                moved_wei = int(params.get("amount_wei") or 0)
-            moved_eth = float(moved_wei / 1e18) if moved_wei > 0 else 0.0
-            total_value_moved_eth += moved_eth
-            if status == "SUCCESS":
-                total_success_executions += 1
-            tx_hash = action.get("tx_hash")
-            explorer = f"https://sepolia.etherscan.io/tx/{tx_hash}" if tx_hash else None
-            recent_actions.append(
-                {
-                    "wallet": plan.get("wallet"),
-                    "timestamp": created_at,
-                    "type": action.get("type"),
-                    "status": status,
-                    "tx_hash": tx_hash,
-                    "value_moved_eth": moved_eth,
-                    "reason": reason,
-                    "strategy": params.get("strategy_used") or "EXPLORE",
-                    "explorer": explorer,
-                }
-            )
-    recent_actions = recent_actions[:limit]
-    if not recent_actions:
-        learning = _agent_service.learning.summary()
-        latest_outcome = learning.get("latest_outcome")
-        if latest_outcome:
-            recent_actions = [
-                {
-                    "wallet": latest_outcome.get("wallet"),
-                    "timestamp": latest_outcome.get("timestamp"),
-                    "type": "TRANSFER",
-                    "status": str(latest_outcome.get("status", "SKIPPED")).upper(),
-                    "tx_hash": None,
-                    "value_moved_eth": float(latest_outcome.get("moved_eth", 0.0) or 0.0),
-                    "reason": "Learning outcome snapshot",
-                    "strategy": latest_outcome.get("strategy", "EXPLORE"),
-                    "explorer": None,
-                }
-            ]
-
-    return {
-        "recent_actions": recent_actions,
-        "stats": {
-            "total_executions": total_success_executions,
-            "executions_triggered": total_success_executions,
-            "total_value_moved": round(total_value_moved_eth, 8),
-        },
-    }
+    return _compute_activity_snapshot(limit=limit)
 
 
 @app.get("/agent/state", summary="Global autonomous agent state")
@@ -403,13 +423,22 @@ async def agent_radar(limit: int = 12):
         data = {}
     wallets = []
     for wallet, cfg in data.items():
+        risk_score = cfg.get("last_risk_score", 0)
+        reason = "Scheduled autonomous monitoring"
+        if risk_score >= 70:
+            reason = "High transaction risk profile from recent evaluations"
+        elif risk_score >= 35:
+            reason = "Moderate behavioral risk requires frequent checks"
+        elif cfg.get("priority", "medium") == "high":
+            reason = "High priority wallet in monitoring queue"
         wallets.append(
             {
                 "wallet": wallet,
                 "priority": cfg.get("priority", "medium"),
                 "last_evaluation": cfg.get("last_evaluation"),
-                "last_risk_score": cfg.get("last_risk_score", 0),
+                "last_risk_score": risk_score,
                 "interval_seconds": cfg.get("interval_seconds", 300),
+                "reason": reason,
             }
         )
     wallets_sorted = sorted(wallets, key=lambda w: ({"high": 0, "medium": 1, "low": 2}.get(w["priority"], 3), -int(w.get("last_risk_score", 0))))

@@ -35,7 +35,7 @@ function deriveSafety(events: AgentEvent[]): SafetyState {
   });
 
   if (!hasExecution) {
-    return { idempotency: "not_required", simulation: "not_required", exposure: "not_required", note: "No execution performed → safety checks not required" };
+    return { idempotency: "not_required", simulation: "not_required", exposure: "not_required", note: "No execution yet → safety checks are idle until first action." };
   }
 
   const safetyEvents = events.filter((e) => e.paso.toLowerCase() === "execution_safety");
@@ -111,7 +111,7 @@ function CheckItem({
     return (
       <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="text-xs font-semibold text-muted-foreground">NOT_REQUIRED</span>
+        <span className="text-xs font-semibold text-muted-foreground">IDLE</span>
       </div>
     );
   }
@@ -168,7 +168,7 @@ function CheckItem({
   return (
     <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="text-xs font-semibold text-muted-foreground">Not available yet</span>
+      <span className="text-xs font-semibold text-muted-foreground">Pending next safeguarded execution</span>
     </div>
   );
 }

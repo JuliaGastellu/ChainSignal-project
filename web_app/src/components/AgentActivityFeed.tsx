@@ -11,6 +11,7 @@ type ActivityItem = {
   value_moved_eth?: number;
   reason?: string;
   strategy?: string;
+  simulated?: boolean;
   explorer?: string | null;
 };
 
@@ -61,7 +62,7 @@ export function AgentActivityFeed() {
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">{a.reason || "Autonomous action recorded with default reasoning snapshot"}</div>
             <div className="text-[11px] mt-1 text-muted-foreground">Strategy: {a.strategy || "EXPLORE"}</div>
-            <div className="text-[11px] mt-1">Moved: {a.value_moved_eth || 0} ETH</div>
+            <div className="text-[11px] mt-1">Moved: {a.value_moved_eth || 0} ETH {a.simulated ? "(simulated execution)" : ""}</div>
             {a.explorer && (
               <a href={a.explorer} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">
                 View tx

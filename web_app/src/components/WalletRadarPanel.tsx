@@ -7,6 +7,7 @@ type RadarWallet = {
   priority: string;
   last_risk_score?: number;
   last_evaluation?: string | null;
+  reason?: string;
 };
 
 export function WalletRadarPanel() {
@@ -34,17 +35,16 @@ export function WalletRadarPanel() {
         <Radar className="h-4 w-4" /> Wallet Radar
       </div>
       <div className="mt-3 space-y-2 max-h-48 overflow-auto pr-1">
-        {items.length === 0 && <div className="text-xs text-muted-foreground">No tracked wallets yet.</div>}
-        {items.map((w) => (
+        {(items.length === 0 ? [{ wallet: "tracking pending", priority: "medium", last_risk_score: 0, reason: "Radar will populate as autonomous tracking starts" }] : items).map((w) => (
           <div key={w.wallet} className="rounded border border-border bg-secondary/30 p-2 text-xs">
             <div className="font-mono truncate">{w.wallet}</div>
             <div className="text-muted-foreground mt-1">
               Priority: {w.priority} · Risk: {w.last_risk_score ?? 0}
             </div>
+            <div className="text-muted-foreground mt-1">{w.reason || "Scheduled autonomous monitoring"}</div>
           </div>
         ))}
       </div>
     </div>
   );
 }
-

@@ -36,7 +36,7 @@ class LearningStore:
         data["signals"] = data["signals"][-500:]
         self._save(data)
 
-    def record_outcome(self, wallet: str, status: str, strategy: str, moved_eth: float) -> None:
+    def record_outcome(self, wallet: str, status: str, strategy: str, moved_eth: float, tx_hash: str | None = None) -> None:
         data = self._load()
         data["outcomes"].append(
             {
@@ -45,6 +45,7 @@ class LearningStore:
                 "status": status,
                 "strategy": strategy,
                 "moved_eth": moved_eth,
+                "tx_hash": tx_hash,
             }
         )
         data["outcomes"] = data["outcomes"][-500:]

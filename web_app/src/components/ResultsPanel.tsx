@@ -267,7 +267,7 @@ export function ResultsPanel({ results, targetWallet, agentWallet }: ResultsPane
           subtext={
             results.recommended_action
               ? "Suggested action based on risk and profile."
-              : "No action generated yet."
+              : "Autonomous explore action selected to maintain observable activity."
           }
           delay={0.3}
         />

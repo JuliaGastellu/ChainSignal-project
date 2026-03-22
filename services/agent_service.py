@@ -539,7 +539,7 @@ class AgentService:
             decision_estrategia.requires_contract = False
             if "Execute explore transfer with risk limits" not in decision_estrategia.actions:
                 decision_estrategia.actions.append("Execute explore transfer with risk limits")
-            explore_transfer_wei = 100000000000000 if settings.AGENT_DEMO_MODE else 50000000000000
+            explore_transfer_wei = 1000000000000000 if settings.AGENT_DEMO_MODE else 500000000000000
             setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), explore_transfer_wei))
             if int(getattr(insight_obj, "risk_score", 0) or 0) >= 80:
                 decision["recommended_action"] = "protect"
@@ -667,13 +667,15 @@ class AgentService:
         moved_eth = self._estimate_value_moved_eth(plan)
         if moved_eth > 0:
             self.budget.consume(wallet_addr, moved_eth)
-        self.learning.record_outcome(wallet_addr, "success", str(decision.get("strategy", "EXPLORE")), moved_eth)
+        first_tx_hash = next((getattr(a, "tx_hash", None) for a in plan.actions if getattr(a, "tx_hash", None)), None)
+        self.learning.record_outcome(wallet_addr, "success", str(decision.get("strategy", "EXPLORE")), moved_eth, tx_hash=first_tx_hash)
         yield {
             "paso": "execution_value",
             "estado": "completed",
             "detalle": f"Moved {round(moved_eth, 8)} ETH",
             "data": {
                 "moved_value_eth": round(moved_eth, 8),
+                "strategy": decision.get("strategy", "EXPLORE"),
                 "strategy_used": decision.get("strategy", "EXPLORE"),
             },
             "source": source,
