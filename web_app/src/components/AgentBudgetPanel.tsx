@@ -68,7 +68,7 @@ export function AgentBudgetPanel({ wallet }: { wallet: string }) {
         <Wallet className="h-4 w-4" /> Agent Budget
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-        <div className="rounded border border-border bg-secondary/30 p-2"><div className="text-muted-foreground">Balance</div><div className="font-semibold">{budget?.balance_eth ?? 0} ETH</div></div>
+        <div className="rounded border border-border bg-secondary/30 p-2"><div className="text-muted-foreground">Balance</div><div className="font-semibold">{budget?.effective_balance_eth ?? budget?.balance_eth ?? 0} ETH</div></div>
         <div className="rounded border border-border bg-secondary/30 p-2"><div className="text-muted-foreground">Spent</div><div className="font-semibold">{budget?.spent_eth ?? 0} ETH</div></div>
         <div className="rounded border border-border bg-secondary/30 p-2"><div className="text-muted-foreground">Mode</div><div className="font-semibold">{budget?.simulation_only ? "Simulation only" : "Live funds"}</div></div>
       </div>

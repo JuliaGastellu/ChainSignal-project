@@ -42,6 +42,16 @@ class TrackWalletRequest(BaseModel):
 class ExecuteAgentRequest(BaseModel):
     wallet: str
 
+
+def _network_name(chain_id: int | None) -> str:
+    if chain_id == 11155111:
+        return "sepolia"
+    if chain_id == 1:
+        return "mainnet"
+    if chain_id == 137:
+        return "polygon"
+    return "unknown"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and clean up resources during API lifespan."""
@@ -134,7 +144,11 @@ async def analyze_block(block_number: int):
     try:
         latest_block = await asyncio.to_thread(lambda: _budget_service.w3.eth.block_number)
         chain_id = await asyncio.to_thread(lambda: _budget_service.w3.eth.chain_id)
+        network_name = _network_name(chain_id)
         if block_number < 0 or block_number > latest_block:
+            mismatch_hint = ""
+            if network_name == "sepolia" and block_number > (latest_block * 3):
+                mismatch_hint = " This block number looks like another network (possibly Ethereum mainnet)."
             return JSONResponse(
                 status_code=400,
                 content={
@@ -142,7 +156,8 @@ async def analyze_block(block_number: int):
                     "message": f"Block {block_number} is out of range for current network.",
                     "network_latest_block": latest_block,
                     "chain_id": chain_id,
-                    "hint": "Use a valid Sepolia block number less than or equal to network_latest_block.",
+                    "network": network_name,
+                    "hint": f"Use a valid {network_name} block number less than or equal to network_latest_block.{mismatch_hint}",
                 },
             )
 
@@ -177,6 +192,7 @@ async def analyze_block(block_number: int):
             "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
             "action_scope": {"target_wallet": "read_only", "agent_wallet": "execution_enabled"},
             "chain_id": chain_id,
+            "network": network_name,
         }
     except Exception as e:
         logger.error("Block analysis error: {}", e)
@@ -195,6 +211,7 @@ async def analyze_block(block_number: int):
                     "message": msg,
                     "network_latest_block": latest_block,
                     "chain_id": chain_id,
+                    "network": _network_name(chain_id),
                     "hint": "Block may not exist on this network or your RPC provider may not serve this historical block.",
                 },
             )
@@ -205,6 +222,7 @@ async def analyze_block(block_number: int):
                 "message": msg,
                 "network_latest_block": latest_block,
                 "chain_id": chain_id,
+                "network": _network_name(chain_id),
                 "hint": "Try a recent Sepolia block and ensure RPC is healthy.",
             },
         )
@@ -224,7 +242,9 @@ async def fund_agent(payload: FundAgentRequest):
 @app.get("/agent/state/{wallet}", include_in_schema=False)
 async def get_agent_budget(wallet: str):
     budget = _budget_service.get_budget(wallet)
-    budget["simulation_only"] = float(budget.get("balance_eth", 0.0)) <= 0
+    effective_balance = _budget_service.get_effective_balance_eth(wallet)
+    budget["effective_balance_eth"] = effective_balance
+    budget["simulation_only"] = effective_balance <= 0
     return budget
 
 

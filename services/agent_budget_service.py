@@ -50,6 +50,17 @@ class AgentBudgetService:
         )
         return item
 
+    def get_effective_balance_eth(self, wallet: str) -> float:
+        stored_balance = float(self.get_budget(wallet).get("balance_eth", 0.0))
+        if not self.w3 or not self.w3.is_connected():
+            return stored_balance
+        try:
+            onchain_wei = self.w3.eth.get_balance(settings.X402_PAYMENT_RECIPIENT)
+            onchain_eth = float(self.w3.from_wei(onchain_wei, "ether"))
+            return max(stored_balance, onchain_eth)
+        except Exception:
+            return stored_balance
+
     def consume(self, wallet: str, amount_eth: float) -> None:
         if amount_eth <= 0:
             return

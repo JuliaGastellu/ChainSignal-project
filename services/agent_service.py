@@ -272,8 +272,8 @@ class AgentService:
                     }
                     return
 
-                current_budget = self.budget.get_budget(wallet_addr)
-                if float(current_budget.get("balance_eth", 0.0)) <= 0:
+                effective_balance = self.budget.get_effective_balance_eth(wallet_addr)
+                if effective_balance <= 0:
                     yield {
                         "paso": "decision_final",
                         "estado": "completed",
@@ -283,6 +283,7 @@ class AgentService:
                             "recommended_action": "fund_agent_budget",
                             "execution": False,
                             "simulation_mode": True,
+                            "available_budget_eth": 0.0,
                         },
                         "source": source,
                     }
@@ -385,8 +386,8 @@ class AgentService:
                 if decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
                     return {"status": "no_action", "decision": decision_code, "why_not_acting": "No actionable strategy was generated for this wallet."}
                 return {"status": "no_action", "decision": decision_code, "why_not_acting": decision.get("reasoning")}
-            current_budget = self.budget.get_budget(wallet_addr)
-            if float(current_budget.get("balance_eth", 0.0)) <= 0:
+            effective_balance = self.budget.get_effective_balance_eth(wallet_addr)
+            if effective_balance <= 0:
                 return {"status": "simulation_only", "reason": "no_budget"}
 
             acquired = await asyncio.to_thread(self.lock_manager.acquire, wallet_addr)

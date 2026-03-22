@@ -16,6 +16,7 @@ type BlockAnalysis = {
   hint?: string;
   network_latest_block?: number;
   chain_id?: number;
+  network?: string;
 };
 
 export function BlockAnalysisPanel() {
@@ -25,6 +26,7 @@ export function BlockAnalysisPanel() {
   const [result, setResult] = useState<BlockAnalysis | null>(null);
   const [latestBlock, setLatestBlock] = useState<number | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
+  const [network, setNetwork] = useState<string | null>(null);
 
   const run = async () => {
     if (!block.trim()) return;
@@ -40,6 +42,7 @@ export function BlockAnalysisPanel() {
       const data = await res.json();
       if (typeof data.network_latest_block === "number") setLatestBlock(data.network_latest_block);
       if (typeof data.chain_id === "number") setChainId(data.chain_id);
+      if (typeof data.network === "string") setNetwork(data.network);
       if (!res.ok) {
         const latest = typeof data.network_latest_block === "number" ? ` Latest: ${data.network_latest_block}.` : "";
         const chain = typeof data.chain_id === "number" ? ` Chain: ${data.chain_id}.` : "";
@@ -55,6 +58,10 @@ export function BlockAnalysisPanel() {
     }
   };
 
+  const parsedBlock = Number(block);
+  const blockIsOutOfRange =
+    Number.isFinite(parsedBlock) && latestBlock !== null && parsedBlock > latestBlock;
+
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3 min-h-[220px] h-full flex flex-col">
       <div className="flex items-center justify-between gap-2">
@@ -63,7 +70,7 @@ export function BlockAnalysisPanel() {
         </div>
         {(chainId !== null || latestBlock !== null) && (
           <span className="text-[11px] px-2 py-1 rounded-full border border-border bg-secondary/40 text-muted-foreground">
-            {chainId !== null ? `Chain ${chainId}` : "Chain ?"} · {latestBlock !== null ? `Latest ${latestBlock}` : "Latest ?"}
+            {network ? `${network.toUpperCase()}` : (chainId !== null ? `Chain ${chainId}` : "Chain ?")} · {latestBlock !== null ? `Latest ${latestBlock}` : "Latest ?"}
           </span>
         )}
       </div>
@@ -83,14 +90,30 @@ export function BlockAnalysisPanel() {
           {loading ? "Running..." : "Analyze Block"}
         </button>
         {latestBlock !== null && (
-          <button
-            onClick={() => setBlock(String(latestBlock))}
-            className="text-xs px-2 py-1.5 rounded border border-border bg-secondary/40 text-muted-foreground hover:text-foreground"
-          >
-            Use latest
-          </button>
+          <>
+            <button
+              onClick={() => setBlock(String(latestBlock))}
+              className="text-xs px-2 py-1.5 rounded border border-border bg-secondary/40 text-muted-foreground hover:text-foreground"
+            >
+              Use latest
+            </button>
+            <button
+              onClick={() => {
+                setBlock(String(latestBlock));
+                setTimeout(() => run(), 0);
+              }}
+              className="text-xs px-2 py-1.5 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
+            >
+              Use latest + run
+            </button>
+          </>
         )}
       </div>
+      {blockIsOutOfRange && (
+        <div className="text-[11px] text-yellow-700">
+          Ese bloque está por encima del latest en esta red. Probablemente estás usando un bloque de otra network.
+        </div>
+      )}
       {error && <div className="text-xs text-destructive">{error}</div>}
       {result ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mt-auto">
