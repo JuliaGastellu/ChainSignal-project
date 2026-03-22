@@ -460,7 +460,7 @@ const FundingPanelContent: React.FC<{
 
   const fundWithMetaMask = async () => {
     if (!window.ethereum) {
-      setErrorMessage('MetaMask not detected');
+      setErrorMessage('MetaMask not detected. Please install MetaMask.');
       setStatus('error');
       return;
     }
@@ -485,17 +485,62 @@ const FundingPanelContent: React.FC<{
       console.log('🚀 Starting funding process...');
       console.log('Agent address:', agentAddress);
       
-      const ethereum = window.ethereum as any;
+      // Handle multiple wallet providers
+      let ethereum = window.ethereum as any;
+      
+      // Check if multiple providers exist and try to get MetaMask specifically
+      if (window.ethereum.providers) {
+        const metamaskProvider = window.ethereum.providers.find(
+          (provider: any) => provider.isMetaMask
+        );
+        if (metamaskProvider) {
+          ethereum = metamaskProvider;
+          console.log('Using MetaMask provider from providers array');
+        }
+      }
+      
+      // Fallback: try to access window.ethereum directly if it's MetaMask
+      if (!ethereum.isMetaMask && window.ethereum.isMetaMask) {
+        ethereum = window.ethereum;
+      }
+      
+      if (!ethereum.isMetaMask) {
+        setErrorMessage('MetaMask not detected. Please ensure MetaMask is installed and enabled.');
+        setStatus('error');
+        return;
+      }
       
       const accounts = await ethereum.request({
         method: 'eth_requestAccounts',
       });
 
       // Switch to Sepolia
-      await ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0xaa36a7' }],
-      });
+      try {
+        await ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0xaa36a7' }],
+        });
+      } catch (switchError: any) {
+        // Chain not found, try to add it
+        if (switchError.code === 4902) {
+          await ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: '0xaa36a7',
+              chainName: 'Sepolia Testnet',
+              nativeCurrency: {
+                name: 'ETH',
+                symbol: 'ETH',
+                decimals: 18,
+              },
+              rpcUrls: ['https://rpc.sepolia.org'],
+              blockExplorerUrls: ['https://sepolia.etherscan.io'],
+            }],
+          });
+        } else {
+          throw switchError;
+        }
+      }
 
       const amountWei = Math.floor(parseFloat(amount) * 1e18);
       const amountHex = `0x${amountWei.toString(16)}`;
@@ -534,7 +579,18 @@ const FundingPanelContent: React.FC<{
 
     } catch (error: any) {
       console.error('❌ Funding failed:', error);
-      setErrorMessage(error.message || 'Funding failed');
+      
+      // Handle specific MetaMask errors
+      if (error.code === 4001) {
+        setErrorMessage('Transaction rejected by user.');
+      } else if (error.code === -32603) {
+        setErrorMessage('Internal JSON-RPC error. Please check MetaMask.');
+      } else if (error.message?.includes('Invalid "to" address')) {
+        setErrorMessage('Invalid recipient address. Please try again.');
+      } else {
+        setErrorMessage(error.message || 'Funding failed');
+      }
+      
       setStatus('error');
     }
   };
@@ -575,6 +631,8 @@ const FundingPanelContent: React.FC<{
         <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Amount (ETH)</div>
         <input
           type="number"
+          id="funding-amount-input"
+          name="fundingAmount"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           step="0.001"
@@ -800,6 +858,8 @@ const WatchedWalletsColumn: React.FC<{
       }}>
         <input
           type="text"
+          id="wallet-address-input"
+          name="walletAddress"
           placeholder="Wallet address (0x...)"
           value={newAddress}
           onChange={(e) => setNewAddress(e.target.value)}
@@ -818,6 +878,8 @@ const WatchedWalletsColumn: React.FC<{
         
         <input
           type="text"
+          id="wallet-label-input"
+          name="walletLabel"
           placeholder="Label (optional)"
           value={newLabel}
           onChange={(e) => setNewLabel(e.target.value)}
