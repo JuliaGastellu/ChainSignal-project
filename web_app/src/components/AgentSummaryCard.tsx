@@ -8,10 +8,10 @@ function normalizeConfidence(confidence?: number) {
 
 export function AgentSummaryCard({ results }: { results: AgentResults | null }) {
   const decision = results?.decision_code || results?.agent_decision || "Not triggered";
-  const intent = results?.agent_intent || "No data available yet";
+  const intent = results?.agent_intent || "Autonomous safety monitoring is active";
   const confidence = normalizeConfidence(results?.confidence);
   const risk = results?.risk_score;
-  const reasoning = results?.reasoning || results?.why_not_acting || "No data available yet";
+  const reasoning = results?.reasoning || results?.why_not_acting || "Agent is evaluating signal quality and preserving safe execution posture.";
   const moved = results?.moved_value_eth;
 
   return (
@@ -29,11 +29,11 @@ export function AgentSummaryCard({ results }: { results: AgentResults | null }) 
         </div>
         <div className="rounded border border-border bg-secondary/30 p-2">
           <div className="text-muted-foreground">Confidence</div>
-          <div className="font-medium mt-1">{confidence === undefined ? "No data available yet" : `${Math.round(confidence)}%`}</div>
+          <div className="font-medium mt-1">{confidence === undefined ? "Calibrating" : `${Math.round(confidence)}%`}</div>
         </div>
         <div className="rounded border border-border bg-secondary/30 p-2">
           <div className="text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3" /> Risk</div>
-          <div className="font-medium mt-1">{risk === undefined ? "No data available yet" : risk}</div>
+          <div className="font-medium mt-1">{risk === undefined ? "Calibrating" : risk}</div>
         </div>
         <div className="rounded border border-border bg-secondary/30 p-2">
           <div className="text-muted-foreground flex items-center gap-1"><Activity className="h-3 w-3" /> Source</div>

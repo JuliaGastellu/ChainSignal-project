@@ -17,16 +17,22 @@ class StrategyEngine:
         if strategy_success:
             best_strategy = max(strategy_success.items(), key=lambda x: int(x[1]))[0]
             if best_strategy in {"COPY_TRADE", "LIQUIDITY_FOLLOW", "ARBITRAGE_SCOUT"} and confidence >= 0.45:
-                return {"strategy": best_strategy, "reason": "Learning bias selected historically successful strategy.", "force_execute": True}
+                return {
+                    "strategy": best_strategy,
+                    "reason": "Learning bias selected historically successful strategy.",
+                    "confidence": max(0.65, confidence),
+                    "trigger_signals": list(signal_types) or ["EXPLORE_TRIGGER"],
+                    "force_execute": True,
+                }
         if demo_mode and confidence < 0.5:
             confidence = 0.5
 
         if "SUSPICIOUS_PATTERN" in signal_types or risk >= 70:
-            return {"strategy": "RISK_SHIELD", "reason": "High risk pattern detected.", "force_execute": True}
+            return {"strategy": "RISK_SHIELD", "reason": "High risk pattern detected.", "confidence": max(0.7, confidence), "trigger_signals": list(signal_types), "force_execute": True}
         if "WHALE_ACCUMULATION" in signal_types and confidence >= 0.5:
-            return {"strategy": "COPY_TRADE", "reason": "Whale-style accumulation pattern detected.", "force_execute": True}
+            return {"strategy": "COPY_TRADE", "reason": "Whale-style accumulation pattern detected.", "confidence": max(0.65, confidence), "trigger_signals": list(signal_types), "force_execute": True}
         if "LIQUIDITY_SHIFT" in signal_types:
-            return {"strategy": "LIQUIDITY_FOLLOW", "reason": "Liquidity migration signal detected.", "force_execute": True}
+            return {"strategy": "LIQUIDITY_FOLLOW", "reason": "Liquidity migration signal detected.", "confidence": max(0.6, confidence), "trigger_signals": list(signal_types), "force_execute": True}
         if "CONTRACT_SPIKE" in signal_types:
-            return {"strategy": "ARBITRAGE_SCOUT", "reason": "Contract activity spike suggests market imbalance.", "force_execute": True}
-        return {"strategy": "EXPLORE", "reason": "No dominant signal, running low-risk exploration.", "force_execute": True}
+            return {"strategy": "ARBITRAGE_SCOUT", "reason": "Contract activity spike suggests market imbalance.", "confidence": max(0.58, confidence), "trigger_signals": list(signal_types), "force_execute": True}
+        return {"strategy": "EXPLORE", "reason": "No dominant signal, running low-risk exploration.", "confidence": max(0.55, confidence), "trigger_signals": list(signal_types) or ["EXPLORE_TRIGGER"], "force_execute": True}

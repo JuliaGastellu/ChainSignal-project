@@ -34,6 +34,8 @@ export interface AgentResults {
   detected_signals?: Array<Record<string, unknown>>;
   selected_strategy?: string;
   strategy_reason?: string;
+  strategy_confidence?: number;
+  trigger_signals?: string[];
   moved_value_eth?: number;
   raw?: Record<string, unknown>;
 }
@@ -161,6 +163,11 @@ export function useAgentSSE() {
           if (paso === "strategy_selected") {
             if (typeof payload.strategy === "string") nextResults.selected_strategy = payload.strategy;
             if (typeof payload.reason === "string") nextResults.strategy_reason = payload.reason;
+            const sConf = Number(payload.confidence);
+            if (!Number.isNaN(sConf)) nextResults.strategy_confidence = sConf;
+            if (Array.isArray(payload.trigger_signals)) {
+              nextResults.trigger_signals = payload.trigger_signals.map((x) => String(x));
+            }
           }
 
           if (paso === "execution_value") {
@@ -230,6 +237,15 @@ export function useAgentSSE() {
               if (typeof d.reasoning === "string") nextResults.reasoning = d.reasoning;
               if (typeof d.recommended_action === "string") nextResults.recommended_action = d.recommended_action;
             }
+            const snapStrategy = (payload as Record<string, unknown>).strategy;
+            if (snapStrategy && typeof snapStrategy === "object") {
+              const s = snapStrategy as Record<string, unknown>;
+              if (typeof s.name === "string") nextResults.selected_strategy = s.name;
+              if (typeof s.reason === "string") nextResults.strategy_reason = s.reason;
+              const sConf = Number(s.confidence);
+              if (!Number.isNaN(sConf)) nextResults.strategy_confidence = sConf;
+              if (Array.isArray(s.trigger_signals)) nextResults.trigger_signals = s.trigger_signals.map((x) => String(x));
+            }
           }
 
           // 5. Final/Result step
@@ -264,6 +280,7 @@ export function useAgentSSE() {
           }
           if (typeof payload.strategy === "string") nextResults.selected_strategy = payload.strategy;
           if (typeof payload.strategy_reason === "string") nextResults.strategy_reason = payload.strategy_reason;
+          if (typeof payload.strategy_confidence === "number") nextResults.strategy_confidence = payload.strategy_confidence;
           if (typeof payload.risk === "number") nextResults.risk_score = payload.risk;
           if (typeof payload.activity === "number") nextResults.activity_score = payload.activity;
           nextResults.source = source;

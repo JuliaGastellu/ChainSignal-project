@@ -2,6 +2,14 @@
 
 ChainSignal is an autonomous deterministic agent that analyzes on-chain wallet behavior, generates structured mitigation insights, and executes protective operations through the Tether Wallet Development Kit (WDK).
 
+## Product Definition
+
+ChainSignal is an autonomous capital intelligence agent:
+
+- Wallet/Block input is an intelligence source.
+- Agent Wallet is the only execution actor.
+- The agent detects signals, selects strategy, executes safely, and learns from outcomes.
+
 ## Architecture Overview
 
 The system is organized as follows:
@@ -142,6 +150,22 @@ Analyze & Monitor → Decision → ESL Validation → Autonomous Execution (if a
 Autonomous lifecycle:
 
 Observe → Analyze → Detect Signal → Select Strategy → Simulate → Execute → Verify → Learn
+
+## Demo Instructions
+
+1. Fund agent budget in UI.
+2. Set `AGENT_DEMO_MODE=true`.
+3. Run wallet analysis or block-window analysis.
+4. Verify timeline events: `signal_detected` → `strategy_selected` → `execution_submitted` → `execution_value` → `execution_verified`.
+5. Confirm Agent Activity Feed and Hero cards show moved capital.
+
+## Panel Meanings
+
+- Agent Hero: balance, last action, PnL, runtime status.
+- Strategy Engine: chosen strategy, confidence, trigger signals.
+- Agent Intelligence Feed: detected signal stream with severity/confidence.
+- Wallet Radar: prioritized tracked wallets for loop execution.
+- Agent Activity Feed: executed/skipped actions with strategy and moved value.
 
 - Timeline: append-only and phase-colored.
 - ResultsPanel + AnalysisDashboard: full analysis, free, no premium gate.

@@ -6,6 +6,10 @@
 - **Agent Wallet**: execution wallet, uses funded budget.
 - **Action Scope**: target wallet is never directly executed.
 
+## Product Narrative
+
+Analyze source -> Learn signal -> Select strategy -> Move agent capital -> Learn outcome
+
 ## API Surface
 
 - `GET /run-agent/{wallet}`: SSE stream for analysis, decision and execution.
@@ -53,6 +57,13 @@ Finalization guarantee:
 - **AgentIntelligenceFeed**: detected on-chain signals and confidence.
 - **StrategyEnginePanel**: selected strategy and rationale.
 - **WalletRadarPanel**: tracked wallet priority queue.
+
+Hero-first summary:
+
+- Agent balance
+- Last action executed
+- Approximate PnL
+- Autonomous runtime status
 
 ## Safety
 

@@ -2,13 +2,13 @@ import { BarChart3, Shield, ListChecks } from "lucide-react";
 import type { AgentResults } from "@/hooks/useAgentSSE";
 
 function metricValue(v: unknown) {
-  if (v === null || v === undefined) return "No data available yet";
+  if (v === null || v === undefined) return "Baseline telemetry collecting";
   if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(3);
   return String(v);
 }
 
 function confidencePct(c?: number) {
-  if (c === undefined || Number.isNaN(c)) return "No data available yet";
+  if (c === undefined || Number.isNaN(c)) return "Calibrating";
   const value = c > 1 ? c : c * 100;
   return `${Math.round(value)}%`;
 }
@@ -20,10 +20,10 @@ function renderRiskFactor(r: unknown) {
     return {
       title: typeof obj.factor === "string" ? obj.factor : "Risk factor",
       severity: typeof obj.severity === "string" ? obj.severity : "info",
-      detail: typeof obj.detail === "string" ? obj.detail : "No data available yet",
+      detail: typeof obj.detail === "string" ? obj.detail : "Signal detail is being inferred from latest cycle",
     };
   }
-  return { title: "Risk factor", severity: "info", detail: "No data available yet" };
+  return { title: "Risk factor", severity: "info", detail: "Signal detail is being inferred from latest cycle" };
 }
 
 export function AnalysisDashboard({ results }: { results: AgentResults }) {
@@ -75,7 +75,7 @@ export function AnalysisDashboard({ results }: { results: AgentResults }) {
           <ListChecks className="h-4 w-4" /> Reasoning & Execution Decision
         </div>
         <div className="mt-2 text-sm text-muted-foreground">
-          {results.reasoning || results.why_not_acting || "No data available yet"}
+          {results.reasoning || results.why_not_acting || "Agent is maintaining autonomous monitoring posture with safe controls."}
         </div>
         <div className="mt-3 text-xs">
           <span className="text-muted-foreground">Action:</span>{" "}

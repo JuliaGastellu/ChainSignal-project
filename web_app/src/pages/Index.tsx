@@ -11,6 +11,8 @@ import { BlockAnalysisPanel } from "@/components/BlockAnalysisPanel";
 import { AgentIntelligenceFeed } from "@/components/AgentIntelligenceFeed";
 import { StrategyEnginePanel } from "@/components/StrategyEnginePanel";
 import { WalletRadarPanel } from "@/components/WalletRadarPanel";
+import { AgentHeroSection } from "@/components/AgentHeroSection";
+import { ActionFlowBanner } from "@/components/ActionFlowBanner";
 import { useAgentSSE, API_BASE } from "@/hooks/useAgentSSE";
 import { motion } from "framer-motion";
 import { Bot, AlertCircle, RotateCcw, Monitor, Activity } from "lucide-react";
@@ -87,6 +89,9 @@ const Index = () => {
       </header>
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 space-y-6">
+        <AgentHeroSection />
+        <ActionFlowBanner />
+
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground"><Monitor className="h-4 w-4" /> Agent Status</div>
@@ -117,9 +122,9 @@ const Index = () => {
           <div className="lg:col-span-7">
             {events.length === 0 && !results ? (
               <div className="bg-card border border-border rounded-xl p-6 min-h-[420px] flex flex-col justify-center">
-                <h3 className="text-lg font-semibold text-foreground">Ready to analyze</h3>
+                <h3 className="text-lg font-semibold text-foreground">Autonomous engine primed</h3>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Ingresá una wallet para análisis estratégico o corré Block-Level Analysis. El stream en tiempo real aparecerá acá cuando inicies el flujo.
+                  Submit a wallet or block window and the agent will produce signals, choose a strategy, and execute safe capital actions through ESL.
                 </p>
               </div>
             ) : (

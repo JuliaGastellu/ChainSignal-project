@@ -303,6 +303,7 @@ async def agent_activity(limit: int = 25):
     plans_sorted = sorted(plans, key=lambda p: p.get("created_at", 0), reverse=True)
     recent_actions = []
     total_value_moved_eth = 0.0
+    total_success_executions = 0
 
     for plan in plans_sorted:
         context = plan.get("context", {}) or {}
@@ -320,6 +321,8 @@ async def agent_activity(limit: int = 25):
                 moved_wei = int(params.get("amount_wei") or 0)
             moved_eth = float(moved_wei / 1e18) if moved_wei > 0 else 0.0
             total_value_moved_eth += moved_eth
+            if status == "SUCCESS":
+                total_success_executions += 1
             tx_hash = action.get("tx_hash")
             explorer = f"https://sepolia.etherscan.io/tx/{tx_hash}" if tx_hash else None
             recent_actions.append(
@@ -335,15 +338,30 @@ async def agent_activity(limit: int = 25):
                     "explorer": explorer,
                 }
             )
-            if len(recent_actions) >= limit:
-                break
-        if len(recent_actions) >= limit:
-            break
+    recent_actions = recent_actions[:limit]
+    if not recent_actions:
+        learning = _agent_service.learning.summary()
+        latest_outcome = learning.get("latest_outcome")
+        if latest_outcome:
+            recent_actions = [
+                {
+                    "wallet": latest_outcome.get("wallet"),
+                    "timestamp": latest_outcome.get("timestamp"),
+                    "type": "TRANSFER",
+                    "status": str(latest_outcome.get("status", "SKIPPED")).upper(),
+                    "tx_hash": None,
+                    "value_moved_eth": float(latest_outcome.get("moved_eth", 0.0) or 0.0),
+                    "reason": "Learning outcome snapshot",
+                    "strategy": latest_outcome.get("strategy", "EXPLORE"),
+                    "explorer": None,
+                }
+            ]
 
     return {
         "recent_actions": recent_actions,
         "stats": {
-            "total_executions": len([a for a in recent_actions if a.get("status") == "SUCCESS"]),
+            "total_executions": total_success_executions,
+            "executions_triggered": total_success_executions,
             "total_value_moved": round(total_value_moved_eth, 8),
         },
     }

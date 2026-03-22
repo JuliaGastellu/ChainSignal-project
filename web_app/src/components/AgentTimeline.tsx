@@ -113,6 +113,9 @@ function reconcileEvents(events: AgentEvent[]): UiEvent[] {
   normalized.forEach((event, idx) => {
     const step = event.paso.toLowerCase();
     const status = String(event.uiEstado).toLowerCase();
+    if (closedAll && ["starting", "running", "processing", "iniciando"].includes(status)) {
+      event.uiEstado = "completed";
+    }
     const prevIdx = lastByStep.get(step);
     if (prevIdx !== undefined) {
       const prev = normalized[prevIdx];

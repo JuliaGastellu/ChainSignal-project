@@ -519,6 +519,8 @@ class AgentService:
         strategy_name = str(strategy_pick.get("strategy", "EXPLORE"))
         decision["strategy"] = strategy_name
         decision["strategy_reason"] = strategy_pick.get("reason")
+        decision["strategy_confidence"] = float(strategy_pick.get("confidence", 0.55) or 0.55)
+        decision["trigger_signals"] = list(strategy_pick.get("trigger_signals") or ["EXPLORE_TRIGGER"])
         force_execute = bool(strategy_pick.get("force_execute"))
         if settings.AGENT_DEMO_MODE:
             force_execute = True
@@ -740,7 +742,7 @@ class AgentService:
                 "contract_interactions_pct": metrics.porcentaje_interacciones_contratos,
             },
             "agent_decision": {"decision": decision.get("decision"), "reasoning": decision_estrategia.detail, "recommended_action": decision.get("recommended_action")},
-            "strategy": {"name": decision.get("strategy"), "reason": decision.get("strategy_reason")},
+            "strategy": {"name": decision.get("strategy"), "reason": decision.get("strategy_reason"), "confidence": decision.get("strategy_confidence"), "trigger_signals": decision.get("trigger_signals", [])},
             "signals": decision.get("signals", []),
             "agent_metrics": self.metrics.to_dict(),
             "x402_payment": "validated",

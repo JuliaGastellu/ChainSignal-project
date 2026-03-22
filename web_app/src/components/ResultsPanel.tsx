@@ -23,7 +23,7 @@ function getRiskBg(score: number | undefined) {
 }
 
 function getRiskLabel(score: number | undefined) {
-  if (score === undefined) return "N/A";
+  if (score === undefined) return "Baseline";
   if (score <= 33) return "Low";
   if (score <= 66) return "Medium";
   return "High";
@@ -165,7 +165,7 @@ export function ResultsPanel({ results, targetWallet, agentWallet }: ResultsPane
   const analyzedWallet =
     targetWallet ||
     ((results.full_analysis as Record<string, unknown> | undefined)?.wallet as string | undefined) ||
-    "No data available yet";
+    "Source wallet provided by current run";
   const executorWallet = agentWallet || "Agent Wallet";
 
   return (
@@ -237,7 +237,7 @@ export function ResultsPanel({ results, targetWallet, agentWallet }: ResultsPane
         <ScoreCard
           icon={Shield}
           label="Risk Score"
-          value={results.risk_score ?? "N/A"}
+          value={results.risk_score ?? "Calibrating"}
           subtext={getRiskLabel(results.risk_score)}
           colorClass={getRiskColor(results.risk_score)}
           delay={0}
@@ -245,14 +245,14 @@ export function ResultsPanel({ results, targetWallet, agentWallet }: ResultsPane
         <ScoreCard
           icon={Activity}
           label="Activity Score"
-          value={results.activity_score ?? "N/A"}
+          value={results.activity_score ?? "Calibrating"}
           colorClass="text-primary"
           delay={0.1}
         />
         <ScoreCard
           icon={FileText}
           label="Contract Type"
-          value={results.contract_type || "N/A"}
+          value={results.contract_type || "Adaptive strategy"}
           subtext={
             results.contract_type
               ? "Mitigation contract type suggested by the agent."
@@ -263,7 +263,7 @@ export function ResultsPanel({ results, targetWallet, agentWallet }: ResultsPane
         <ScoreCard
           icon={Zap}
           label="Recommended Action"
-          value={results.recommended_action || "N/A"}
+          value={results.recommended_action || "explore"}
           subtext={
             results.recommended_action
               ? "Suggested action based on risk and profile."

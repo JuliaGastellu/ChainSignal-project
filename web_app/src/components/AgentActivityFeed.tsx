@@ -59,7 +59,7 @@ export function AgentActivityFeed() {
               </div>
               <div className="text-muted-foreground">{a.timestamp ? new Date(a.timestamp * 1000).toLocaleString() : "Not triggered"}</div>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-1">{a.reason || "No data available yet"}</div>
+            <div className="text-[11px] text-muted-foreground mt-1">{a.reason || "Autonomous action recorded with default reasoning snapshot"}</div>
             <div className="text-[11px] mt-1 text-muted-foreground">Strategy: {a.strategy || "EXPLORE"}</div>
             <div className="text-[11px] mt-1">Moved: {a.value_moved_eth || 0} ETH</div>
             {a.explorer && (

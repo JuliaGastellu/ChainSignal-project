@@ -11,6 +11,18 @@
         }
       ],
       "strategy": "EXPLORE"
+    },
+    {
+      "timestamp": 1774208773.920948,
+      "wallet": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+      "signals": [
+        {
+          "type": "CONTRACT_SPIKE",
+          "severity": "medium",
+          "confidence": 0.66
+        }
+      ],
+      "strategy": "ARBITRAGE_SCOUT"
     }
   ],
   "outcomes": []

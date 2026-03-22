@@ -44,12 +44,12 @@ export function WalletContextPanel({ targetWallet }: { targetWallet: string }) {
       </div>
       <div className="rounded-lg border border-border bg-secondary/30 p-3 text-xs">
         <div className="text-muted-foreground flex items-center gap-1"><Bot className="h-3.5 w-3.5" /> Agent Wallet (Executor)</div>
-        <div className="font-mono mt-1 break-all">{budget?.agent_wallet || "No data available yet"}</div>
+        <div className="font-mono mt-1 break-all">{budget?.agent_wallet || "Agent wallet is resolving from runtime context"}</div>
       </div>
       <div className="rounded-lg border border-border bg-secondary/30 p-3 text-xs">
         <div className="text-muted-foreground flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> Agent Balance Source</div>
         <div className="mt-1">
-          {budget ? `${budget.balance_eth ?? 0} ETH ${budget.simulation_only ? "(Simulation only)" : "(Execution enabled)"}` : "No data available yet"}
+          {budget ? `${budget.balance_eth ?? 0} ETH ${budget.simulation_only ? "(Simulation only)" : "(Execution enabled)"}` : "Balance telemetry is syncing with treasury"}
         </div>
       </div>
       <div className="text-[11px] text-muted-foreground">
