@@ -14,6 +14,7 @@ type AgentState = {
 };
 
 type FundingStatus = "idle" | "pending_tx" | "awaiting_balance" | "confirmed" | "error";
+const DEFAULT_FUND_AMOUNT = ((import.meta.env.VITE_DEFAULT_FUND_AMOUNT as string | undefined)?.trim() || "0.01");
 
 export function AgentFundingPanel({
   targetWallet,
@@ -23,7 +24,7 @@ export function AgentFundingPanel({
   onFundingActivated?: () => void;
 }) {
   const [agentState, setAgentState] = useState<AgentState | null>(null);
-  const [amount, setAmount] = useState("0.01");
+  const [amount, setAmount] = useState(DEFAULT_FUND_AMOUNT);
   const [status, setStatus] = useState<FundingStatus>("idle");
   const [message, setMessage] = useState<string>("Ready to fund autonomous agent.");
   const [polling, setPolling] = useState(false);
@@ -189,7 +190,7 @@ export function AgentFundingPanel({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             className="mt-1 bg-background border border-border rounded px-2 py-1 text-xs w-full"
-            placeholder="0.01"
+            placeholder={DEFAULT_FUND_AMOUNT}
           />
         </div>
       </div>

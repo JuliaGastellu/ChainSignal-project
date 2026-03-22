@@ -91,8 +91,9 @@ Demo behavior:
 1. User clicks **Fund Agent** in AgentFundingPanel.
 2. MetaMask signs and submits transaction to Agent Wallet.
 3. Frontend registers tx hash in `POST /agent/budget`.
-4. UI polls `/agent/state` every 3 seconds for balance increase.
+4. UI polls `/agent/state` every 3 seconds for balance increase and only confirms after real delta.
 5. On funds received, UI marks autonomous execution as activated and triggers execution for selected wallet.
+6. In demo mode, backend triggers immediate bootstrap execution when successful executions are still zero.
 
 ## Runtime Flow
 

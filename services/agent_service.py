@@ -472,7 +472,7 @@ class AgentService:
                 decision_estrategia.requires_funds_movement = True
                 decision_estrategia.requires_swap = False
                 decision_estrategia.requires_contract = False
-                setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), 1000000000000000))
+                setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), int(settings.DEMO_FORCE_TRANSFER_WEI)))
                 should_execute = True
             if not should_execute:
                 if decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
@@ -554,7 +554,7 @@ class AgentService:
             decision_estrategia.requires_contract = False
             if "Execute explore transfer with risk limits" not in decision_estrategia.actions:
                 decision_estrategia.actions.append("Execute explore transfer with risk limits")
-            explore_transfer_wei = 1000000000000000 if settings.AGENT_DEMO_MODE else 500000000000000
+            explore_transfer_wei = int(settings.DEMO_FORCE_TRANSFER_WEI) if settings.AGENT_DEMO_MODE else int(settings.SWAP_AMOUNT_WEI)
             setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), explore_transfer_wei))
             if int(getattr(insight_obj, "risk_score", 0) or 0) >= 80:
                 decision["recommended_action"] = "protect"
@@ -668,7 +668,7 @@ class AgentService:
             tx_hash = deploy_action.tx_hash
             yield {"paso": "contract_deployment", "estado": "completed", "detalle": f"Deployed at {deployed_address}", "source": source}
 
-            etherscan_url = f"https://sepolia.etherscan.io/address/{deployed_address}" if deployed_address else None
+            etherscan_url = f"{settings.ETHERSCAN_ADDRESS_BASE_URL.rstrip('/')}/{deployed_address}" if deployed_address else None
             yield {
                 "paso": "contract_active",
                 "estado": "completed",
@@ -682,7 +682,7 @@ class AgentService:
         moved_eth = self._estimate_value_moved_eth(plan)
         simulated_execution = False
         if moved_eth <= 0 and settings.AGENT_DEMO_MODE:
-            moved_eth = 0.001
+            moved_eth = float(settings.DEMO_SIMULATED_MOVED_ETH)
             simulated_execution = True
         if moved_eth > 0:
             if not simulated_execution:

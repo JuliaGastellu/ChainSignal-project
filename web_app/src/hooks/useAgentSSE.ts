@@ -42,9 +42,11 @@ export interface AgentResults {
 
 type AgentStatus = "idle" | "connecting" | "streaming" | "completed" | "error";
 
-export const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "::"
-  ? ""
-  : "https://chainsignal-project.onrender.com";
+const runtimeApiBase = (import.meta.env.VITE_API_BASE as string | undefined)?.trim();
+const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+export const API_BASE = runtimeApiBase !== undefined && runtimeApiBase.length > 0
+  ? runtimeApiBase
+  : (isLocalHost ? "" : "https://chainsignal-project.onrender.com");
 
 export function useAgentSSE() {
   const [events, setEvents] = useState<AgentEvent[]>([]);
@@ -91,24 +93,20 @@ export function useAgentSSE() {
     receivedFinalEventRef.current = false;
     retryCountRef.current = 0;
 
-    const closeCurrent = (reason: string) => {
+    const closeCurrent = () => {
       if (eventSourceRef.current) {
-        console.debug("[SSE] closing:", reason);
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
     };
 
     const openEventSource = (openUrl: string, attempt: number) => {
-      closeCurrent("reopen");
+      closeCurrent();
 
       const es = new EventSource(openUrl);
       eventSourceRef.current = es;
 
-      console.debug("[SSE] opening:", openUrl, "attempt", attempt);
-
       es.onopen = () => {
-        console.debug("[SSE] open");
         setStatus("streaming");
         setError(null);
       };
@@ -305,8 +303,7 @@ export function useAgentSSE() {
 
         if ((finalPuntos.includes(paso) && (isCompleted || isError)) || systemBusy) {
           receivedFinalEventRef.current = true;
-          console.debug("[SSE] final event:", paso, estado, payload.decision);
-          closeCurrent("final");
+          closeCurrent();
           if (systemBusy) {
             setStatus("completed");
             setError(detalle || "System busy, retry shortly");
@@ -325,20 +322,16 @@ export function useAgentSSE() {
       es.onerror = () => {
         if (eventSourceRef.current !== es) return;
         if (receivedFinalEventRef.current) {
-          console.debug("[SSE] onerror after final; ignoring");
           return;
         }
 
-        console.debug("[SSE] onerror; readyState=", es.readyState);
-        closeCurrent("error");
+        closeCurrent();
 
         if (retryCountRef.current < 2 && currentUrlRef.current) {
           retryCountRef.current += 1;
           const delayMs = retryCountRef.current === 1 ? 1000 : 2000;
           setStatus("connecting");
           setError("Connection interrupted. Retrying...");
-          console.debug("[SSE] retry scheduled in", delayMs, "ms (attempt", retryCountRef.current, ")");
-
           retryTimerRef.current = window.setTimeout(() => {
             if (!currentUrlRef.current) return;
             openEventSource(currentUrlRef.current, retryCountRef.current);

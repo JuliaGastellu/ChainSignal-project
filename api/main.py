@@ -44,7 +44,7 @@ class ExecuteAgentRequest(BaseModel):
 
 
 def _network_name(chain_id: int | None) -> str:
-    if chain_id == 11155111:
+    if chain_id == settings.SEPOLIA_CHAIN_ID:
         return "sepolia"
     if chain_id == 1:
         return "mainnet"
@@ -83,7 +83,7 @@ def _compute_activity_snapshot(limit: int = 25) -> dict:
             if status == "SUCCESS":
                 total_success_executions += 1
             tx_hash = action.get("tx_hash")
-            explorer = f"https://sepolia.etherscan.io/tx/{tx_hash}" if tx_hash else None
+            explorer = f"{settings.ETHERSCAN_TX_BASE_URL.rstrip('/')}/{tx_hash}" if tx_hash else None
             recent_actions.append(
                 {
                     "wallet": plan.get("wallet"),
@@ -99,13 +99,13 @@ def _compute_activity_snapshot(limit: int = 25) -> dict:
                 }
             )
 
+    learning = _agent_service.learning.summary()
+    latest_outcome = learning.get("latest_outcome")
     funding_events = _budget_service.get_recent_funding_events(limit=limit)
     recent_actions.extend(funding_events)
     recent_actions = sorted(recent_actions, key=lambda a: float(a.get("timestamp") or 0.0), reverse=True)
     recent_actions = recent_actions[:limit]
     if not recent_actions:
-        learning = _agent_service.learning.summary()
-        latest_outcome = learning.get("latest_outcome")
         if latest_outcome:
             recent_actions = [
                 {
@@ -122,8 +122,6 @@ def _compute_activity_snapshot(limit: int = 25) -> dict:
                 }
             ]
 
-    learning = _agent_service.learning.summary()
-    latest_outcome = learning.get("latest_outcome")
     if int(total_success_executions) == 0 and latest_outcome:
         moved_from_learning = float(latest_outcome.get("moved_eth", 0.0) or 0.0)
         if moved_from_learning > 0:
@@ -139,7 +137,7 @@ def _compute_activity_snapshot(limit: int = 25) -> dict:
                     "reason": "Simulated execution (demo mode fallback)",
                     "strategy": latest_outcome.get("strategy", "EXPLORE"),
                     "simulated": not bool(latest_outcome.get("tx_hash")),
-                    "explorer": f"https://sepolia.etherscan.io/tx/{latest_outcome.get('tx_hash')}" if latest_outcome.get("tx_hash") else None,
+                    "explorer": f"{settings.ETHERSCAN_TX_BASE_URL.rstrip('/')}/{latest_outcome.get('tx_hash')}" if latest_outcome.get("tx_hash") else None,
                 },
             )
             total_success_executions = 1
@@ -423,7 +421,7 @@ async def agent_activity(limit: int = 25):
 
 @app.get("/agent/state", summary="Global autonomous agent state")
 async def agent_state():
-    actions = await agent_activity(limit=50)
+    actions = _compute_activity_snapshot(limit=50)
     last_action = actions["recent_actions"][0] if actions["recent_actions"] else None
     learning = _agent_service.learning.summary()
     budget_state = _budget_service.get_global_state()

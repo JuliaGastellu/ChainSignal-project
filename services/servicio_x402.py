@@ -44,8 +44,8 @@ class ChallengeX402:
     token: str           # Dirección del contrato del token de pago
     recipient: str       # Dirección Ethereum que recibirá el pago
     description: str     # Descripción del recurso que se está comprando
-    chain: str = "sepolia"
-    chain_id: int = 11155111
+    chain: str = settings.X402_CHAIN_NAME
+    chain_id: int = settings.SEPOLIA_CHAIN_ID
     symbol: str = "USDC"
     decimals: int = 6
 

@@ -1,6 +1,8 @@
 import type { AgentResults } from "@/hooks/useAgentSSE";
 import { Zap } from "lucide-react";
 
+const DEMO_TRANSFER_ETH = ((import.meta.env.VITE_DEMO_TRANSFER_ETH as string | undefined)?.trim() || "0.001");
+
 export function StrategyEnginePanel({ results }: { results: AgentResults | null }) {
   const strategy = results?.selected_strategy || "EXPLORE";
   const confidence = results?.strategy_confidence !== undefined ? `${Math.round(results.strategy_confidence * 100)}%` : "55%";
@@ -24,7 +26,7 @@ export function StrategyEnginePanel({ results }: { results: AgentResults | null 
           ? "Execute low-risk liquidity-following micro action"
           : strategy === "ARBITRAGE_SCOUT"
             ? "Scout imbalance with conservative execution size"
-            : "Testing low-risk transfer (0.001 ETH)";
+            : `Testing low-risk transfer (${DEMO_TRANSFER_ETH} ETH)`;
   return (
     <div className="bg-card border border-border rounded-xl p-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">

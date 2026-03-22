@@ -137,7 +137,7 @@ class AgentBudgetService:
                     "reason": f"Funding received: +{amount} ETH",
                     "strategy": "FUNDING",
                     "simulated": False,
-                    "explorer": f"https://sepolia.etherscan.io/tx/{tx_hash}",
+                    "explorer": f"{settings.ETHERSCAN_TX_BASE_URL.rstrip('/')}/{tx_hash}",
                 }
             )
         events_sorted = sorted(events, key=lambda e: float(e.get("timestamp") or 0.0), reverse=True)

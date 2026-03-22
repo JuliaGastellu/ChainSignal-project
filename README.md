@@ -155,17 +155,27 @@ Observe → Analyze → Detect Signal → Select Strategy → Simulate → Execu
 
 1. Set `AGENT_DEMO_MODE=true`.
 2. Use **Fund Agent Wallet** panel and approve MetaMask transaction.
-3. Wait for status: `Funds received. Autonomous execution activated.`
-4. Run wallet analysis or block-window analysis.
+3. Wait for status progression: `Transaction submitted` → `Waiting for funds` → `Funds received`.
+4. In demo mode, first funded wallet triggers immediate bootstrap execution.
 5. Verify timeline events: `signal_detected` → `strategy_selected` → `execution_submitted` → `execution_value` → `execution_verified`.
-6. Confirm Hero and Activity Feed show updated balance and moved capital.
+6. Confirm Hero and Activity Feed show updated balance, moved capital, and simulated labels when applicable.
 
 ## Funding Flow
 
 - Funding is signed only in MetaMask from the frontend.
 - Backend verifies tx receipt and recipient via `POST /agent/budget`.
 - Agent wallet is the sole execution wallet; analyzed wallet is intelligence input only.
-- On balance increase, UI triggers autonomous execution for the selected target wallet.
+- On confirmed balance increase, UI triggers autonomous execution for the selected target wallet.
+- In demo mode, backend also triggers immediate bootstrap execution when no previous successful execution exists.
+
+## Runtime Configuration
+
+- `AGENT_DEMO_MODE`: enables high-frequency demo behavior and bootstrap execution.
+- `DEMO_FORCE_TRANSFER_WEI`: micro transfer amount used for forced first execution.
+- `DEMO_SIMULATED_MOVED_ETH`: moved value used when fallback execution is simulated.
+- `ETHERSCAN_TX_BASE_URL` / `ETHERSCAN_ADDRESS_BASE_URL`: explorer URL roots.
+- `VITE_API_BASE`: frontend API base override.
+- `VITE_DEFAULT_FUND_AMOUNT`: default amount in funding panel.
 
 ## Panel Meanings
 
