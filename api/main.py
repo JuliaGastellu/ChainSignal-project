@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Any
@@ -16,16 +17,24 @@ from pydantic import BaseModel
 from services.agent_service import AgentService
 from services.agent_budget_service import AgentBudgetService
 from infra.config import settings
-from agent_loop import AutonomousAgentLoop
+from agent_loop import AutonomousAgentLoop, GuardianAgentLoop
+from agent_runtime.event_bus import AgentEventBus
+from watch_queue.queue_manager import QueueManager
+from wallet_controller.wallet_agent import WalletAgent
 from execution_guard.persistence import PersistenceManager
 
 # Instanciamos el servicio centralizado
 _agent_service = AgentService()
 # Instanciamos el loop autónomo
 _agent_loop = AutonomousAgentLoop(_agent_service)
+_agent_event_bus = AgentEventBus()
+_guardian_loop = GuardianAgentLoop(_agent_service, _agent_event_bus)
+_watch_queue = QueueManager()
+_wallet_agent = WalletAgent()
 _budget_service = AgentBudgetService()
 _persistence = PersistenceManager()
 _TRACKING_FILE = Path("tracking.json")
+_EXECUTIONS_FILE = Path("executions.json")
 
 
 class FundAgentRequest(BaseModel):
@@ -41,6 +50,11 @@ class TrackWalletRequest(BaseModel):
 
 class ExecuteAgentRequest(BaseModel):
     wallet: str
+
+
+class WatchWalletRequest(BaseModel):
+    address: str
+    label: str | None = None
 
 
 def _network_name(chain_id: int | None) -> str:
@@ -475,6 +489,112 @@ async def agent_radar(limit: int = 12):
         )
     wallets_sorted = sorted(wallets, key=lambda w: ({"high": 0, "medium": 1, "low": 2}.get(w["priority"], 3), -int(w.get("last_risk_score", 0))))
     return {"wallets": wallets_sorted[:limit]}
+
+
+def _load_execution_history() -> list[dict]:
+    if not _EXECUTIONS_FILE.exists():
+        return []
+    try:
+        with _EXECUTIONS_FILE.open("r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception:
+        return []
+    if not isinstance(raw, list):
+        return []
+    return sorted(raw, key=lambda x: str(x.get("timestamp", "")), reverse=True)
+
+
+@app.post("/agent/start", summary="Start guardian watch loop")
+async def start_guardian_agent():
+    return await _guardian_loop.start()
+
+
+@app.post("/agent/stop", summary="Request guardian watch loop stop")
+async def stop_guardian_agent():
+    return await _guardian_loop.stop()
+
+
+@app.get("/agent/status", summary="Guardian loop status")
+async def guardian_status():
+    state = _compute_activity_snapshot(limit=10)
+    history = _load_execution_history()
+    budget = _budget_service.get_global_state()
+    return {
+        "running": _guardian_loop.is_running,
+        "stop_requested": _guardian_loop.stop_requested,
+        "cycles_completed": _guardian_loop.cycles_completed,
+        "wallets_watched": len(_watch_queue.list_wallets()),
+        "agent_balance_eth": budget.get("total_balance_eth", 0.0),
+        "total_eth_moved": state["stats"].get("total_value_moved", 0.0),
+        "last_action": history[0] if history else None,
+    }
+
+
+@app.get("/agent/history", summary="Execution history")
+async def guardian_history():
+    return {"executions": _load_execution_history()}
+
+
+@app.get("/agent/address", summary="Agent wallet address")
+async def guardian_address():
+    wallet_data = _wallet_agent.create_agent_wallet()
+    return {"agent_wallet": wallet_data.get("address")}
+
+
+@app.post("/agent/watch", summary="Add wallet to watch queue")
+async def add_watch_wallet(payload: WatchWalletRequest):
+    item = _watch_queue.add_wallet(payload.address, payload.label)
+    return {"status": "ok", "wallet": item}
+
+
+@app.delete("/agent/watch/{address}", summary="Remove wallet from watch queue")
+async def delete_watch_wallet(address: str):
+    removed = _watch_queue.remove_wallet(address)
+    return {"status": "ok" if removed else "not_found", "address": address.lower()}
+
+
+@app.get("/agent/watch", summary="List watch queue")
+async def get_watch_wallets():
+    return {"wallets": _watch_queue.list_wallets()}
+
+
+@app.get("/agent/stream", summary="Guardian loop SSE stream")
+async def guardian_stream():
+    def _format_sse(payload: dict) -> str:
+        return f"data: {json.dumps(payload)}\n\n"
+
+    async def event_generator() -> AsyncGenerator[str, Any]:
+        queue = await _guardian_loop.event_bus.subscribe()
+        try:
+            # Send initial status if agent is not running
+            if not _guardian_loop.is_running:
+                yield _format_sse({
+                    "type": "agent_status",
+                    "running": False,
+                    "timestamp": datetime.now().isoformat()
+                })
+            
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    yield _format_sse(event)
+                except asyncio.TimeoutError:
+                    # Send heartbeat every 15 seconds
+                    yield ": ping\n\n"
+        except asyncio.CancelledError:
+            return
+        finally:
+            await _guardian_loop.event_bus.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/agent/execute", summary="Execute autonomous decision for a target wallet")

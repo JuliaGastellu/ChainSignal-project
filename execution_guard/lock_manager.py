@@ -50,4 +50,32 @@ class WalletLockManager:
 
     def is_locked(self, wallet: str) -> bool:
         """Checks if a wallet is currently locked."""
-        return self._get_lock_path(wallet).exists()
+        lock_path = self._get_lock_path(wallet)
+        
+        # Check for stale lock (e.g., > 60 seconds for is_locked checks)
+        if lock_path.exists():
+            if time.time() - lock_path.stat().st_mtime > 60:
+                logger.warning(f"Removing stale lock for wallet {wallet} (is_locked check)")
+                self.release(wallet)
+                return False
+        
+        return lock_path.exists()
+
+    def cleanup_stale_locks(self, stale_age_seconds: int = 60):
+        """Clean up all stale locks older than the specified age."""
+        if not LOCK_BASE.exists():
+            return
+            
+        stale_count = 0
+        for lock_file in LOCK_BASE.glob("*.lock"):
+            if time.time() - lock_file.stat().st_mtime > stale_age_seconds:
+                try:
+                    wallet = lock_file.stem
+                    logger.warning(f"Cleaning up stale lock for wallet {wallet}")
+                    lock_file.unlink()
+                    stale_count += 1
+                except Exception as e:
+                    logger.error(f"Error cleaning up stale lock {lock_file}: {e}")
+        
+        if stale_count > 0:
+            logger.info(f"Cleaned up {stale_count} stale lock files")

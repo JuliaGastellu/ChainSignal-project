@@ -8,6 +8,13 @@ from typing import Dict, Any, List, Optional
 
 from loguru import logger
 from services.agent_service import AgentService
+from generacion_features.extractor import ExtractorFeatures
+from ingestion_onchain.cliente_etherscan import ClienteEtherscan
+from perfil_wallet.behavioral_scoring import BehavioralScorer
+from watch_queue.queue_manager import QueueManager
+from agent_reasoning.reasoning_engine import ReasoningEngine
+from agent_executor.executor import AgentExecutor
+from agent_runtime.event_bus import AgentEventBus
 
 TRACKING_FILE = Path("tracking.json")
 TRACKING_LOCK = Path("tracking.json.lock")
@@ -197,3 +204,107 @@ if __name__ == "__main__":
         await loop.stop()
 
     asyncio.run(test())
+
+
+class GuardianAgentLoop:
+    def __init__(self, service: AgentService, event_bus: AgentEventBus):
+        self.service = service
+        self.event_bus = event_bus
+        self.queue = QueueManager()
+        self.reasoning = ReasoningEngine()
+        self.executor = AgentExecutor()
+        self.extractor = ExtractorFeatures()
+        self.client = ClienteEtherscan()
+        self.scorer = BehavioralScorer()
+        self.is_running = False
+        self.stop_requested = False
+        self.cycles_completed = 0
+        self._task: Optional[asyncio.Task] = None
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache_ttl = int(os.getenv("CACHE_TTL", "300"))
+        self._interval = int(os.getenv("MONITOR_INTERVAL", "20"))
+
+    async def start(self) -> Dict[str, Any]:
+        if self.is_running:
+            return {"status": "already_running", "cycles_completed": self.cycles_completed}
+        
+        # Clean up any stale locks from previous crashes
+        logger.info("Cleaning up stale locks before starting agent loop...")
+        await asyncio.to_thread(self.service.lock_manager.cleanup_stale_locks)
+        
+        self.is_running = True
+        self.stop_requested = False
+        self._task = asyncio.create_task(self._run())
+        await self.event_bus.publish({"type": "loop_started", "timestamp": datetime.utcnow().isoformat()})
+        return {"status": "started"}
+
+    async def stop(self) -> Dict[str, Any]:
+        self.stop_requested = True
+        await self.event_bus.publish({"type": "loop_stop_requested", "timestamp": datetime.utcnow().isoformat()})
+        return {"status": "stop_requested"}
+
+    async def _run(self) -> None:
+        while self.is_running:
+            cycle = self.cycles_completed + 1
+            await self.event_bus.publish({"type": "cycle_started", "cycle": cycle, "timestamp": datetime.utcnow().isoformat()})
+            wallets = self.queue.list_wallets()
+            if not wallets:
+                await self.event_bus.publish({"type": "cycle_idle", "cycle": cycle, "description": "No wallets in watch queue"})
+            for item in wallets:
+                if self.stop_requested:
+                    break
+                wallet = str(item.get("address", "")).lower()
+                try:
+                    payload = await self._analyze_wallet(wallet)
+                    agent_balance = self.service.budget.get_effective_balance_eth(wallet)
+                    decision = self.reasoning.decide(
+                        {
+                            "cycle": cycle,
+                            "address": wallet,
+                            "scores": payload["scores"],
+                            "agent_balance_eth": f"{agent_balance:.8f}",
+                        }
+                    )
+                    flagged = decision["decision"] in {"ALERT", "INTERVENE"}
+                    self.queue.update_wallet_state(wallet, last_signal=decision["decision"], increment_flagged=flagged)
+                    await self.event_bus.publish({"type": "reasoning", "cycle": cycle, "wallet": wallet, "decision": decision})
+                    if decision["decision"] in {"ALERT", "INTERVENE"}:
+                        result = await asyncio.to_thread(self.executor.execute, decision)
+                        await self.event_bus.publish({"type": "execution", "cycle": cycle, "wallet": wallet, "result": result})
+                    else:
+                        await self.event_bus.publish({"type": "monitor", "cycle": cycle, "wallet": wallet, "decision": decision["decision"]})
+                except Exception as exc:
+                    await self.event_bus.publish({"type": "wallet_error", "cycle": cycle, "wallet": wallet, "error": str(exc)})
+            self.cycles_completed += 1
+            await self.event_bus.publish({"type": "cycle_completed", "cycle": cycle, "timestamp": datetime.utcnow().isoformat()})
+            if self.stop_requested:
+                self.is_running = False
+                break
+            await asyncio.sleep(self._interval)
+        self.is_running = False
+        self.stop_requested = False
+        await self.event_bus.publish({"type": "loop_stopped", "timestamp": datetime.utcnow().isoformat()})
+
+    async def _analyze_wallet(self, wallet: str) -> Dict[str, Any]:
+        now_ts = time.time()
+        cache_item = self._cache.get(wallet)
+        if cache_item and (now_ts - float(cache_item.get("ts", 0.0))) < self._cache_ttl:
+            await self.event_bus.publish({"type": "cache_hit", "wallet": wallet})
+            return cache_item["payload"]
+
+        await self.event_bus.publish({"type": "analysis_started", "wallet": wallet})
+        raw = await asyncio.to_thread(self.client.obtener_datos_wallet, wallet)
+        metrics = await asyncio.to_thread(self.extractor.extraer, raw)
+        scores_obj = self.scorer.calcular_scores(metrics)
+        payload = {
+            "scores": {
+                "activity": int(scores_obj.activity_score.value),
+                "risk": int(scores_obj.risk_score.value),
+                "defi_engagement": int(scores_obj.defi_engagement.value),
+                "diversity": int(min(100, max(0, int(getattr(metrics, "porcentaje_interacciones_contratos", 0) or 0)))),
+                "exploration": int(min(100, max(0, int(getattr(metrics, "variedad_contratos_unicos", 0) or 0)))),
+            }
+        }
+        self._cache[wallet] = {"ts": now_ts, "payload": payload}
+        await self.event_bus.publish({"type": "analysis_completed", "wallet": wallet, "scores": payload["scores"]})
+        return payload
