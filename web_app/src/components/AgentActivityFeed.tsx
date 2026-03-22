@@ -47,10 +47,10 @@ export function AgentActivityFeed() {
         </div>
       </div>
       <div className="mt-2 text-[11px] text-muted-foreground">
-        Last action executed: {items[0] ? `${items[0].type || "ACTION"} (${items[0].status || "UNKNOWN"})` : "Agent has not executed yet (waiting for first trigger)"}
+        Last action executed: {items[0] ? `${items[0].type || "ACTION"} (${items[0].status || "UNKNOWN"})` : "Agent is preparing first execution cycle"}
       </div>
       <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
-        {items.length === 0 && <div className="text-xs text-muted-foreground">Agent has not executed yet (waiting for first trigger).</div>}
+        {items.length === 0 && <div className="text-xs text-muted-foreground">Agent is preparing first execution cycle.</div>}
         {items.map((a, i) => (
           <div key={`${a.tx_hash || "action"}-${i}`} className="rounded border border-border bg-secondary/30 p-2">
             <div className="flex items-center justify-between text-xs">
@@ -58,7 +58,7 @@ export function AgentActivityFeed() {
                 {a.type === "SWAP" ? <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" /> : a.type === "TRANSFER" ? <Send className="h-3.5 w-3.5 text-green-500" /> : a.type === "FUNDING" ? <Wallet className="h-3.5 w-3.5 text-emerald-600" /> : a.status === "FAILED" ? <ShieldAlert className="h-3.5 w-3.5 text-yellow-600" /> : <Eye className="h-3.5 w-3.5 text-primary" />}
                 {a.type || "MONITORING"} · {a.status || "SKIPPED"}
               </div>
-              <div className="text-muted-foreground">{a.timestamp ? new Date(a.timestamp * 1000).toLocaleString() : "Not triggered"}</div>
+              <div className="text-muted-foreground">{a.timestamp ? new Date(a.timestamp * 1000).toLocaleString() : "Monitoring active"}</div>
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">{a.reason || "Autonomous action recorded with default reasoning snapshot"}</div>
             <div className="text-[11px] mt-1 text-muted-foreground">Strategy: {a.strategy || "EXPLORE"}</div>

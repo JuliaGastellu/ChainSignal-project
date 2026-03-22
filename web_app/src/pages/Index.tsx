@@ -74,7 +74,7 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-4">
             <span className={`text-[10px] px-2 py-0.5 rounded-full border ${loopActive ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-secondary text-muted-foreground border-border"}`}>
-              {loopActive ? "AGENT ACTIVE" : "AGENT IDLE"}
+              {loopActive ? "AGENT ACTIVE" : "AGENT READY"}
             </span>
             {status !== "idle" && (
               <button

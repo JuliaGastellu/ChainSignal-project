@@ -8,7 +8,7 @@ function metricValue(v: unknown) {
 }
 
 function confidencePct(c?: number) {
-  if (c === undefined || Number.isNaN(c)) return "Calibrating";
+  if (c === undefined || Number.isNaN(c)) return "Learning from environment";
   const value = c > 1 ? c : c * 100;
   return `${Math.round(value)}%`;
 }

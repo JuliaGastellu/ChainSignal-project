@@ -13,7 +13,7 @@ type AgentState = {
   budget?: { agent_wallet?: string; total_balance_eth?: number };
 };
 
-type FundingStatus = "idle" | "pending" | "success" | "error";
+type FundingStatus = "idle" | "pending_tx" | "awaiting_balance" | "confirmed" | "error";
 
 export function AgentFundingPanel({
   targetWallet,
@@ -49,8 +49,9 @@ export function AgentFundingPanel({
   const balance = Number(agentState?.budget?.total_balance_eth ?? 0);
 
   const statusText = useMemo(() => {
-    if (status === "pending") return "Waiting for confirmation in MetaMask...";
-    if (status === "success") return message;
+    if (status === "pending_tx") return "Transaction submitted. Waiting for confirmation...";
+    if (status === "awaiting_balance") return "Transaction submitted. Waiting for funds...";
+    if (status === "confirmed") return message;
     if (status === "error") return message;
     return message;
   }, [status, message]);
@@ -78,8 +79,8 @@ export function AgentFundingPanel({
       return;
     }
 
-    setStatus("pending");
-    setMessage("Waiting for confirmation in MetaMask...");
+    setStatus("idle");
+    setMessage("Open MetaMask to approve funding transaction.");
 
     try {
       const baselineBalance = balance;
@@ -94,8 +95,8 @@ export function AgentFundingPanel({
         value: parseEther(amount || "0"),
       });
 
-      setStatus("success");
-      setMessage("Transaction submitted. Waiting for funds...");
+      setStatus("pending_tx");
+      setMessage("Transaction submitted. Waiting for confirmation...");
 
       let fundingRegistered = false;
       const firstRegister = await fetch(`${API_BASE}/agent/budget`, {
@@ -104,6 +105,8 @@ export function AgentFundingPanel({
         body: JSON.stringify({ wallet: targetWallet || fromAddress, tx_hash: tx.hash }),
       });
       if (firstRegister.ok) fundingRegistered = true;
+      setStatus("awaiting_balance");
+      setMessage("Transaction submitted. Waiting for funds...");
 
       setPolling(true);
       let attempts = 0;
@@ -125,8 +128,9 @@ export function AgentFundingPanel({
           if (nextBalance > baselineBalance) {
             window.clearInterval(timer);
             setPolling(false);
-            setStatus("success");
-            setMessage("Funds received. Autonomous execution activated.");
+            const fundedDelta = Math.max(0, nextBalance - baselineBalance);
+            setStatus("confirmed");
+            setMessage(`Funds received: +${fundedDelta.toFixed(6)} ETH · Autonomous execution activated.`);
             if (targetWallet) {
               await fetch(`${API_BASE}/agent/execute`, {
                 method: "POST",
@@ -139,7 +143,7 @@ export function AgentFundingPanel({
           if (attempts >= 20) {
             window.clearInterval(timer);
             setPolling(false);
-            setStatus("success");
+            setStatus("awaiting_balance");
             setMessage("Funding transaction submitted. Balance sync may take a few more seconds.");
           }
         } catch {
@@ -193,11 +197,11 @@ export function AgentFundingPanel({
       </div>
       <button
         onClick={handleFundAgent}
-        disabled={status === "pending" || polling || !agentWallet}
+        disabled={status === "pending_tx" || status === "awaiting_balance" || polling || !agentWallet}
         className="w-full text-xs px-3 py-2 rounded bg-primary text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2"
         type="button"
       >
-        {status === "pending" || polling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+        {status === "pending_tx" || status === "awaiting_balance" || polling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
         Fund Agent
       </button>
       <div className={`text-[11px] flex items-center gap-1 ${status === "error" ? "text-destructive" : "text-muted-foreground"}`}>

@@ -284,7 +284,7 @@ export function AgentTimeline({ events, isStreaming }: AgentTimelineProps) {
                 </div>
                 <div className="mt-2 flex flex-col gap-1">
                   <p className={`text-sm ${isActive ? "text-foreground font-semibold" : "text-muted-foreground"}`}>
-                    {event.detalle || "Waiting for new update..."}
+                    {event.detalle || "Preparing next action..."}
                   </p>
                   {event.data && (event.data as Record<string, unknown>).decision && (
                     <p className="text-[11px] text-primary font-medium">Decision: {((event.data as Record<string, unknown>).decision as string)}</p>

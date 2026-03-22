@@ -26,7 +26,7 @@ function Card({ label, value, icon: Icon }: { label: string; value: string; icon
 
 export function HealthStatusCards({ health }: { health: HealthObj | null }) {
   const status = (health?.status || "unknown").toUpperCase();
-  const loop = health?.agent_loop === "active" ? "ACTIVE" : "IDLE";
+  const loop = health?.agent_loop === "active" ? "ACTIVE" : "READY";
   const runs = String(health?.global_metrics?.total_runs ?? 0);
   const executionAttempts = String(health?.global_metrics?.execution_attempts ?? 0);
   const executions = String(health?.global_metrics?.executions_triggered ?? 0);

@@ -237,7 +237,7 @@ export function ResultsPanel({ results, targetWallet, agentWallet }: ResultsPane
         <ScoreCard
           icon={Shield}
           label="Risk Score"
-          value={results.risk_score ?? "Calibrating"}
+          value={results.risk_score ?? "Learning from environment"}
           subtext={getRiskLabel(results.risk_score)}
           colorClass={getRiskColor(results.risk_score)}
           delay={0}
@@ -245,7 +245,7 @@ export function ResultsPanel({ results, targetWallet, agentWallet }: ResultsPane
         <ScoreCard
           icon={Activity}
           label="Activity Score"
-          value={results.activity_score ?? "Calibrating"}
+          value={results.activity_score ?? "Learning from environment"}
           colorClass="text-primary"
           delay={0.1}
         />

@@ -7,7 +7,7 @@ function normalizeConfidence(confidence?: number) {
 }
 
 export function AgentSummaryCard({ results }: { results: AgentResults | null }) {
-  const decision = results?.decision_code || results?.agent_decision || "Not triggered";
+  const decision = results?.decision_code || results?.agent_decision || "Monitoring active";
   const intent = results?.agent_intent || "Autonomous safety monitoring is active";
   const confidence = normalizeConfidence(results?.confidence);
   const risk = results?.risk_score;
@@ -29,11 +29,11 @@ export function AgentSummaryCard({ results }: { results: AgentResults | null }) 
         </div>
         <div className="rounded border border-border bg-secondary/30 p-2">
           <div className="text-muted-foreground">Confidence</div>
-          <div className="font-medium mt-1">{confidence === undefined ? "Calibrating" : `${Math.round(confidence)}%`}</div>
+          <div className="font-medium mt-1">{confidence === undefined ? "Learning from environment" : `${Math.round(confidence)}%`}</div>
         </div>
         <div className="rounded border border-border bg-secondary/30 p-2">
           <div className="text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3" /> Risk</div>
-          <div className="font-medium mt-1">{risk === undefined ? "Calibrating" : risk}</div>
+          <div className="font-medium mt-1">{risk === undefined ? "Learning from environment" : risk}</div>
         </div>
         <div className="rounded border border-border bg-secondary/30 p-2">
           <div className="text-muted-foreground flex items-center gap-1"><Activity className="h-3 w-3" /> Source</div>

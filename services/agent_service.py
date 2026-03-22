@@ -457,12 +457,27 @@ class AgentService:
                 and bool(decision_estrategia.requires_contract)
                 and int(getattr(insight_obj, "risk_score", 0) or 0) >= 30
             )
+            effective_balance = self.budget.get_effective_balance_eth(wallet_addr)
             should_execute = (decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy) or low_confidence_defensive_execution
+            demo_force_first_execution = (
+                settings.AGENT_DEMO_MODE
+                and effective_balance > 0
+                and int(learning_summary.get("success_count", 0) or 0) == 0
+            )
+            if demo_force_first_execution and not should_execute:
+                decision["decision"] = "EXECUTE_BASIC"
+                decision["recommended_action"] = "explore"
+                decision["reasoning"] = "Demo bootstrap: first funded cycle executes a visible micro-transfer."
+                decision_estrategia.requires_execution = True
+                decision_estrategia.requires_funds_movement = True
+                decision_estrategia.requires_swap = False
+                decision_estrategia.requires_contract = False
+                setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), 1000000000000000))
+                should_execute = True
             if not should_execute:
                 if decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
                     return {"status": "no_action", "decision": decision_code, "why_not_acting": "No actionable strategy was generated for this wallet."}
                 return {"status": "no_action", "decision": decision_code, "why_not_acting": decision.get("reasoning")}
-            effective_balance = self.budget.get_effective_balance_eth(wallet_addr)
             if effective_balance <= 0:
                 return {"status": "simulation_only", "reason": "no_budget"}
 

@@ -22,7 +22,7 @@ type SafetyState = {
 };
 
 function formatWhen(iso?: string | null) {
-  if (!iso) return "Not triggered";
+  if (!iso) return "Monitoring active";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "Not available yet";
   return d.toLocaleString();
@@ -111,7 +111,7 @@ function CheckItem({
     return (
       <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/40 px-3 py-2">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="text-xs font-semibold text-muted-foreground">IDLE</span>
+        <span className="text-xs font-semibold text-muted-foreground">READY</span>
       </div>
     );
   }
@@ -215,7 +215,7 @@ export function SidePanel({ events }: { events: AgentEvent[] }) {
     };
   }, []);
 
-  const loopState = health?.agent_loop === "active" ? "ACTIVE" : "IDLE";
+  const loopState = health?.agent_loop === "active" ? "ACTIVE" : "READY";
   const metrics = health?.global_metrics;
 
   return (
