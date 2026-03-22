@@ -34,6 +34,7 @@ Each event includes:
 - `strategy_selected`
 - `simulation_passed`
 - `execution_submitted`
+- `execution_value`
 - `execution_verified`
 
 Finalization guarantee:
@@ -67,6 +68,11 @@ Guarantees:
 - exposure validation
 - wallet lock
 - semaphore concurrency limit
+
+Demo behavior:
+
+- `AGENT_DEMO_MODE=true` increases execution frequency with low-risk micro actions.
+- ESL remains mandatory even in demo mode.
 
 ## Runtime Flow
 

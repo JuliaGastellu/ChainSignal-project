@@ -139,7 +139,7 @@ async def analyze_wallet(wallet_address: str):
 
 
 @app.get("/analyze/block/{block_number}", summary="Block-level strategic analysis")
-async def analyze_block(block_number: int):
+async def analyze_block(block_number: int, window: int = Query(12, ge=3, le=60)):
     if not _budget_service.w3 or not _budget_service.w3.is_connected():
         return JSONResponse(status_code=503, content={"error": "rpc_unavailable", "message": "RPC unavailable for block analysis."})
     try:
@@ -162,23 +162,44 @@ async def analyze_block(block_number: int):
                 },
             )
 
-        block = await asyncio.to_thread(lambda: _budget_service.w3.eth.get_block(block_number, full_transactions=True))
-        txs = block.get("transactions", []) or []
-        tx_count = len(txs)
-        total_value_wei = sum(int((tx.get("value") or 0)) for tx in txs)
-        total_value_eth = float(_budget_service.w3.from_wei(total_value_wei, "ether"))
-        avg_gas_price = int(sum(int((tx.get("gasPrice") or 0)) for tx in txs) / tx_count) if tx_count > 0 else 0
-        high_value_txs = sum(1 for tx in txs if int((tx.get("value") or 0)) >= 10**18)
+        start_block = max(0, block_number - window + 1)
+        block_numbers = list(range(start_block, block_number + 1))
+
+        def _fetch_block(n: int):
+            return _budget_service.w3.eth.get_block(n, full_transactions=True)
+
+        blocks = await asyncio.gather(*[asyncio.to_thread(_fetch_block, n) for n in block_numbers])
+        tx_counts = []
+        values_eth = []
+        gas_prices = []
+        high_value_txs = 0
+        for block in blocks:
+            txs = block.get("transactions", []) or []
+            tx_count_local = len(txs)
+            tx_counts.append(tx_count_local)
+            value_wei = sum(int((tx.get("value") or 0)) for tx in txs)
+            values_eth.append(float(_budget_service.w3.from_wei(value_wei, "ether")))
+            gas_local = int(sum(int((tx.get("gasPrice") or 0)) for tx in txs) / tx_count_local) if tx_count_local > 0 else 0
+            gas_prices.append(gas_local)
+            high_value_txs += sum(1 for tx in txs if int((tx.get("value") or 0)) >= 10**18)
+
+        tx_count = int(sum(tx_counts) / len(tx_counts)) if tx_counts else 0
+        total_value_eth = float(sum(values_eth))
+        avg_gas_price = int(sum(gas_prices) / len(gas_prices)) if gas_prices else 0
+        tx_density = round(sum(tx_counts) / max(1, len(tx_counts)), 2)
+        value_spike = round(max(values_eth), 8) if values_eth else 0.0
+        gas_anomaly = bool(avg_gas_price > 1_000_000_000)
         suggested_action = "monitor"
-        if high_value_txs > 15:
+        if high_value_txs > 15 or gas_anomaly:
             suggested_action = "protect"
-        elif tx_count > 200:
+        elif tx_density > 200:
             suggested_action = "rebalance"
 
         return {
             "block_number": block_number,
             "decision_context": {
                 "what_was_analyzed": f"block:{block_number}",
+                "window_blocks": len(block_numbers),
                 "who_executes": settings.X402_PAYMENT_RECIPIENT,
                 "funds_source": "agent_budget",
             },
@@ -187,8 +208,11 @@ async def analyze_block(block_number: int):
                 "total_value_eth": round(total_value_eth, 8),
                 "avg_gas_price_wei": avg_gas_price,
                 "high_value_transactions": high_value_txs,
+                "tx_density": tx_density,
+                "value_spike_eth": value_spike,
+                "gas_anomaly": gas_anomaly,
             },
-            "reasoning": "Block-level flow analyzed for abnormal activity and value density.",
+            "reasoning": "Block-window flow analyzed for tx density, value spikes and gas anomalies.",
             "recommended_action": suggested_action,
             "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
             "action_scope": {"target_wallet": "read_only", "agent_wallet": "execution_enabled"},
@@ -307,6 +331,7 @@ async def agent_activity(limit: int = 25):
                     "tx_hash": tx_hash,
                     "value_moved_eth": moved_eth,
                     "reason": reason,
+                    "strategy": params.get("strategy_used") or "EXPLORE",
                     "explorer": explorer,
                 }
             )

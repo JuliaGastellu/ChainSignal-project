@@ -221,7 +221,14 @@ class AgentService:
                 wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
                 protocol_intel = self.protocol_intel.analyze(metrics, profile)
                 signals = self.signal_detector.detect(wallet_intel, protocol_intel)
-                strategy_pick = self.strategy_engine.select(signals, {}, wallet_intel)
+                learning_summary = self.learning.summary()
+                strategy_pick = self.strategy_engine.select(
+                    signals,
+                    {},
+                    wallet_intel,
+                    learning_summary=learning_summary,
+                    demo_mode=settings.AGENT_DEMO_MODE,
+                )
                 self.learning.record_signal(wallet_addr, signals, strategy_pick["strategy"])
                 yield {
                     "paso": "signal_detected",
@@ -398,7 +405,14 @@ class AgentService:
             wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
             protocol_intel = self.protocol_intel.analyze(metrics, profile)
             signals = self.signal_detector.detect(wallet_intel, protocol_intel)
-            strategy_pick = self.strategy_engine.select(signals, decision, wallet_intel)
+            learning_summary = self.learning.summary()
+            strategy_pick = self.strategy_engine.select(
+                signals,
+                decision,
+                wallet_intel,
+                learning_summary=learning_summary,
+                demo_mode=settings.AGENT_DEMO_MODE,
+            )
             decision, decision_estrategia = self._apply_strategy_overlay(decision, decision_estrategia, strategy_pick, insight_obj)
             decision["signals"] = signals
             return self._build_report(wallet_addr, profile, scores_obj, scores_dict, risk_breakdown, metrics, decision, decision_estrategia)
@@ -422,7 +436,14 @@ class AgentService:
             wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
             protocol_intel = self.protocol_intel.analyze(metrics, profile)
             signals = self.signal_detector.detect(wallet_intel, protocol_intel)
-            strategy_pick = self.strategy_engine.select(signals, decision, wallet_intel)
+            learning_summary = self.learning.summary()
+            strategy_pick = self.strategy_engine.select(
+                signals,
+                decision,
+                wallet_intel,
+                learning_summary=learning_summary,
+                demo_mode=settings.AGENT_DEMO_MODE,
+            )
             self.learning.record_signal(wallet_addr, signals, strategy_pick["strategy"])
             decision, decision_estrategia = self._apply_strategy_overlay(decision, decision_estrategia, strategy_pick, insight_obj)
             decision_code = str(decision.get("decision") or "MONITOR")
@@ -499,7 +520,14 @@ class AgentService:
         decision["strategy"] = strategy_name
         decision["strategy_reason"] = strategy_pick.get("reason")
         force_execute = bool(strategy_pick.get("force_execute"))
-        if force_execute and decision.get("decision") in {"INSUFFICIENT_DATA", "MONITOR", "BLOCK"}:
+        if settings.AGENT_DEMO_MODE:
+            force_execute = True
+        has_actionable = bool(
+            getattr(decision_estrategia, "requires_funds_movement", False)
+            or getattr(decision_estrategia, "requires_swap", False)
+            or getattr(decision_estrategia, "requires_contract", False)
+        )
+        if force_execute and (decision.get("decision") in {"INSUFFICIENT_DATA", "MONITOR", "BLOCK"} or not has_actionable):
             decision["decision"] = "EXECUTE_BASIC"
             decision["recommended_action"] = "explore"
             decision["reasoning"] = f"Strategy fallback applied: {strategy_name}. {strategy_pick.get('reason', '')}".strip()
@@ -509,7 +537,8 @@ class AgentService:
             decision_estrategia.requires_contract = False
             if "Execute explore transfer with risk limits" not in decision_estrategia.actions:
                 decision_estrategia.actions.append("Execute explore transfer with risk limits")
-            setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), 100000000000000))
+            explore_transfer_wei = 100000000000000 if settings.AGENT_DEMO_MODE else 50000000000000
+            setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), explore_transfer_wei))
             if int(getattr(insight_obj, "risk_score", 0) or 0) >= 80:
                 decision["recommended_action"] = "protect"
         return decision, decision_estrategia
@@ -637,9 +666,19 @@ class AgentService:
         if moved_eth > 0:
             self.budget.consume(wallet_addr, moved_eth)
         self.learning.record_outcome(wallet_addr, "success", str(decision.get("strategy", "EXPLORE")), moved_eth)
-        yield {"paso": "execution_verified", "estado": "completed", "detalle": "Execution verified and persisted.", "data": {"moved_eth": moved_eth}, "source": source}
+        yield {
+            "paso": "execution_value",
+            "estado": "completed",
+            "detalle": f"Moved {round(moved_eth, 8)} ETH",
+            "data": {
+                "moved_value_eth": round(moved_eth, 8),
+                "strategy_used": decision.get("strategy", "EXPLORE"),
+            },
+            "source": source,
+        }
+        yield {"paso": "execution_verified", "estado": "completed", "detalle": "Execution verified and persisted.", "data": {"moved_eth": moved_eth, "moved_value_eth": moved_eth, "strategy_used": decision.get("strategy", "EXPLORE")}, "source": source}
 
-        yield {"paso": "execution_final_status", "data": {"status": "success", "last_fingerprint": plan.fingerprint, "moved_eth": moved_eth}}
+        yield {"paso": "execution_final_status", "data": {"status": "success", "last_fingerprint": plan.fingerprint, "moved_eth": moved_eth, "moved_value_eth": moved_eth, "strategy_used": decision.get("strategy", "EXPLORE")}}
 
     async def _run_runner_stream(self, runner: ExecutionRunner, plan: Any, source: str) -> AsyncGenerator[Dict[str, Any], None]:
         queue: asyncio.Queue = asyncio.Queue()
@@ -709,13 +748,14 @@ class AgentService:
 
     def _gather_actions(self, decision_estrategia: Any, decision: Dict[str, Any], include_deploy: bool) -> List[Dict[str, Any]]:
         intended_actions: List[Dict[str, Any]] = []
+        strategy_used = str(decision.get("strategy", "EXPLORE"))
         if decision_estrategia.requires_funds_movement:
             transfer_wei = int(getattr(decision_estrategia, "cantidad_transferencia_wei", settings.SWAP_AMOUNT_WEI) or settings.SWAP_AMOUNT_WEI)
-            intended_actions.append({"type": "TRANSFER", "params": {"to": settings.SAFE_WALLET_ADDRESS, "value_wei": transfer_wei}})
+            intended_actions.append({"type": "TRANSFER", "params": {"to": settings.SAFE_WALLET_ADDRESS, "value_wei": transfer_wei, "strategy_used": strategy_used}})
         if decision_estrategia.requires_swap:
-            intended_actions.append({"type": "SWAP", "params": {"token_in": decision_estrategia.token_in, "token_out": decision_estrategia.token_out, "amount_wei": settings.SWAP_AMOUNT_WEI}})
+            intended_actions.append({"type": "SWAP", "params": {"token_in": decision_estrategia.token_in, "token_out": decision_estrategia.token_out, "amount_wei": settings.SWAP_AMOUNT_WEI, "strategy_used": strategy_used}})
         if include_deploy and decision_estrategia.requires_contract:
-            intended_actions.append({"type": "DEPLOY", "params": {"type": decision.get("contract_type", "unknown")}})
+            intended_actions.append({"type": "DEPLOY", "params": {"type": decision.get("contract_type", "unknown"), "strategy_used": strategy_used}})
         return intended_actions
 
     def _estimate_value_moved_eth(self, plan: Any) -> float:

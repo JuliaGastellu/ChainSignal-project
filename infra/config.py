@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # App Config
     APP_ENV: str = os.getenv("APP_ENV", "local")
     ENABLE_CACHE: bool = os.getenv("ENABLE_CACHE", "true").lower() == "true"
+    AGENT_DEMO_MODE: bool = os.getenv("AGENT_DEMO_MODE", "false").lower() == "true"
     
     # Server Config
     PORT: int = int(os.getenv("PORT", "8001"))

@@ -10,6 +10,7 @@ type ActivityItem = {
   tx_hash?: string;
   value_moved_eth?: number;
   reason?: string;
+  strategy?: string;
   explorer?: string | null;
 };
 
@@ -44,8 +45,11 @@ export function AgentActivityFeed() {
           Exec: {stats.total_executions || 0} · Moved: {stats.total_value_moved || 0} ETH
         </div>
       </div>
+      <div className="mt-2 text-[11px] text-muted-foreground">
+        Last action executed: {items[0] ? `${items[0].type || "ACTION"} (${items[0].status || "UNKNOWN"})` : "Agent has not executed yet (waiting for first trigger)"}
+      </div>
       <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
-        {items.length === 0 && <div className="text-xs text-muted-foreground">No data available yet.</div>}
+        {items.length === 0 && <div className="text-xs text-muted-foreground">Agent has not executed yet (waiting for first trigger).</div>}
         {items.map((a, i) => (
           <div key={`${a.tx_hash || "action"}-${i}`} className="rounded border border-border bg-secondary/30 p-2">
             <div className="flex items-center justify-between text-xs">
@@ -56,6 +60,7 @@ export function AgentActivityFeed() {
               <div className="text-muted-foreground">{a.timestamp ? new Date(a.timestamp * 1000).toLocaleString() : "Not triggered"}</div>
             </div>
             <div className="text-[11px] text-muted-foreground mt-1">{a.reason || "No data available yet"}</div>
+            <div className="text-[11px] mt-1 text-muted-foreground">Strategy: {a.strategy || "EXPLORE"}</div>
             <div className="text-[11px] mt-1">Moved: {a.value_moved_eth || 0} ETH</div>
             {a.explorer && (
               <a href={a.explorer} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">

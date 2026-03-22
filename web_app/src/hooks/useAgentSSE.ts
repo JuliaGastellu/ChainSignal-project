@@ -34,6 +34,7 @@ export interface AgentResults {
   detected_signals?: Array<Record<string, unknown>>;
   selected_strategy?: string;
   strategy_reason?: string;
+  moved_value_eth?: number;
   raw?: Record<string, unknown>;
 }
 
@@ -160,6 +161,12 @@ export function useAgentSSE() {
           if (paso === "strategy_selected") {
             if (typeof payload.strategy === "string") nextResults.selected_strategy = payload.strategy;
             if (typeof payload.reason === "string") nextResults.strategy_reason = payload.reason;
+          }
+
+          if (paso === "execution_value") {
+            const moved = Number(payload.moved_value_eth ?? payload.moved_eth);
+            if (!Number.isNaN(moved)) nextResults.moved_value_eth = moved;
+            if (typeof payload.strategy_used === "string") nextResults.selected_strategy = payload.strategy_used;
           }
 
           // 1. Scoring step

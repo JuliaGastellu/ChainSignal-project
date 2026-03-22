@@ -52,14 +52,25 @@ class LearningStore:
 
     def summary(self) -> Dict[str, Any]:
         data = self._load()
+        signals = data.get("signals", [])
         outcomes = data.get("outcomes", [])
         success = [o for o in outcomes if o.get("status") == "success"]
+        signal_frequency: Dict[str, int] = {}
+        for item in signals[-200:]:
+            for signal in item.get("signals", []) or []:
+                key = str(signal.get("type", "UNKNOWN"))
+                signal_frequency[key] = signal_frequency.get(key, 0) + 1
+        strategy_success: Dict[str, int] = {}
+        for item in success[-200:]:
+            key = str(item.get("strategy", "EXPLORE"))
+            strategy_success[key] = strategy_success.get(key, 0) + 1
         return {
-            "signals_count": len(data.get("signals", [])),
+            "signals_count": len(signals),
             "outcomes_count": len(outcomes),
             "success_count": len(success),
             "total_moved_eth": round(sum(float(o.get("moved_eth", 0.0) or 0.0) for o in success), 8),
-            "latest_signal": data.get("signals", [])[-1] if data.get("signals") else None,
+            "latest_signal": signals[-1] if signals else None,
             "latest_outcome": outcomes[-1] if outcomes else None,
+            "signal_frequency": signal_frequency,
+            "strategy_success": strategy_success,
         }
-

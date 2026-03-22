@@ -100,6 +100,7 @@ Autonomous observability events:
 - `strategy_selected`
 - `simulation_passed`
 - `execution_submitted`
+- `execution_value`
 - `execution_verified`
 
 Final event is always guaranteed as `decision_final` or `execution_final_status`.
@@ -109,6 +110,7 @@ Final event is always guaranteed as `decision_final` or `execution_final_status`
 - Production mode (`APP_ENV=production`) executes real blockchain operations through ESL/WDK.
 - Simulation mode runs deterministic flows without real on-chain transactions.
 - If budget is empty, the agent returns `SIMULATION_ONLY` (no funds at risk).
+- Demo mode (`AGENT_DEMO_MODE=true`) lowers action thresholds and forces low-risk explore execution when budget is available.
 
 ## Production Mode Requirements
 
@@ -136,6 +138,10 @@ The deterministic decision engine returns explicit outputs:
 ## Dashboard Flow
 
 Analyze & Monitor → Decision → ESL Validation → Autonomous Execution (if applicable) → Activity Feed
+
+Autonomous lifecycle:
+
+Observe → Analyze → Detect Signal → Select Strategy → Simulate → Execute → Verify → Learn
 
 - Timeline: append-only and phase-colored.
 - ResultsPanel + AnalysisDashboard: full analysis, free, no premium gate.
