@@ -47,10 +47,22 @@ const Index: React.FC = () => {
         const healthRes = await fetch(`${API_BASE}/health`);
         const healthData = await healthRes.json();
         
+        // Try to get agent address from dedicated endpoint
+        let agentAddress = '';
+        try {
+          const addrRes = await fetch(`${API_BASE}/agent/address`);
+          if (addrRes.ok) {
+            const addrData = await addrRes.json();
+            agentAddress = addrData.address || '';
+          }
+        } catch (addrError) {
+          console.warn('Agent address endpoint failed');
+        }
+        
         // Extract agent status from health data
         setAgentStatus({
           running: healthData.agent_loop === 'active',
-          agent_wallet: healthData.global_metrics?.agent_address || '',
+          agent_wallet: agentAddress,
           agent_balance_eth: healthData.agent_budget?.total_balance_eth || 0,
           cycles_completed: healthData.global_metrics?.total_runs || 0
         });
@@ -453,11 +465,25 @@ const FundingPanelContent: React.FC<{
       return;
     }
 
+    if (!agentAddress) {
+      setErrorMessage('Agent address not available. Please wait for the agent to load.');
+      setStatus('error');
+      return;
+    }
+
+    // Validate agent address format
+    if (!agentAddress.startsWith('0x') || agentAddress.length !== 42) {
+      setErrorMessage('Invalid agent address format');
+      setStatus('error');
+      return;
+    }
+
     setStatus('funding');
     setErrorMessage(null);
 
     try {
       console.log('🚀 Starting funding process...');
+      console.log('Agent address:', agentAddress);
       
       const ethereum = window.ethereum as any;
       
@@ -502,9 +528,9 @@ const FundingPanelContent: React.FC<{
       });
 
       // Refresh balance
-      const statusRes = await fetch(`${API_BASE}/agent/status`);
+      const statusRes = await fetch(`${API_BASE}/health`);
       const statusData = await statusRes.json();
-      onSuccess(statusData.agent_balance_eth || currentBalance);
+      onSuccess(statusData.agent_budget?.total_balance_eth || currentBalance);
 
     } catch (error: any) {
       console.error('❌ Funding failed:', error);
