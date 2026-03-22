@@ -53,7 +53,7 @@ const Index: React.FC = () => {
           const addrRes = await fetch(`${API_BASE}/agent/address`);
           if (addrRes.ok) {
             const addrData = await addrRes.json();
-            agentAddress = addrData.address || '';
+            agentAddress = addrData.agent_wallet || addrData.address || '';
           }
         } catch (addrError) {
           console.warn('Agent address endpoint failed');
@@ -459,108 +459,69 @@ const FundingPanelContent: React.FC<{
   };
 
   const fundWithMetaMask = async () => {
-    if (!window.ethereum) {
-      setErrorMessage('MetaMask not detected. Please install MetaMask.');
-      setStatus('error');
-      return;
-    }
-
     if (!agentAddress) {
-      setErrorMessage('Agent address not available. Please wait for the agent to load.');
-      setStatus('error');
+      setErrorMessage("Agent address not loaded. Please wait and retry.");
       return;
     }
 
-    // Validate agent address format
-    if (!agentAddress.startsWith('0x') || agentAddress.length !== 42) {
-      setErrorMessage('Invalid agent address format');
+    if (!window.ethereum) {
+      setErrorMessage("MetaMask is not installed or not accessible.");
       setStatus('error');
       return;
     }
-
-    setStatus('funding');
-    setErrorMessage(null);
 
     try {
-      console.log('🚀 Starting funding process...');
-      console.log('Agent address:', agentAddress);
-      
-      // Handle multiple wallet providers
-      let ethereum = window.ethereum as any;
-      
-      // Check if multiple providers exist and try to get MetaMask specifically
-      if (window.ethereum.providers) {
-        const metamaskProvider = window.ethereum.providers.find(
-          (provider: any) => provider.isMetaMask
-        );
-        if (metamaskProvider) {
-          ethereum = metamaskProvider;
-          console.log('Using MetaMask provider from providers array');
-        }
-      }
-      
-      // Fallback: try to access window.ethereum directly if it's MetaMask
-      if (!ethereum.isMetaMask && window.ethereum.isMetaMask) {
-        ethereum = window.ethereum;
-      }
-      
-      if (!ethereum.isMetaMask) {
-        setErrorMessage('MetaMask not detected. Please ensure MetaMask is installed and enabled.');
-        setStatus('error');
-        return;
-      }
-      
-      const accounts = await ethereum.request({
-        method: 'eth_requestAccounts',
-      });
+      setErrorMessage("Requesting MetaMask access...");
+      setStatus('funding');
+
+      // Request accounts
+      await (window.ethereum as any).request({ method: "eth_requestAccounts" });
 
       // Switch to Sepolia
       try {
-        await ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0xaa36a7' }],
+        await (window.ethereum as any).request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xaa36a7" }],
         });
       } catch (switchError: any) {
-        // Chain not found, try to add it
         if (switchError.code === 4902) {
-          await ethereum.request({
-            method: 'wallet_addEthereumChain',
+          await (window.ethereum as any).request({
+            method: "wallet_addEthereumChain",
             params: [{
-              chainId: '0xaa36a7',
-              chainName: 'Sepolia Testnet',
-              nativeCurrency: {
-                name: 'ETH',
-                symbol: 'ETH',
-                decimals: 18,
-              },
-              rpcUrls: ['https://rpc.sepolia.org'],
-              blockExplorerUrls: ['https://sepolia.etherscan.io'],
+              chainId: "0xaa36a7",
+              chainName: "Sepolia",
+              nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              rpcUrls: ["https://rpc.sepolia.org"],
+              blockExplorerUrls: ["https://sepolia.etherscan.io"],
             }],
           });
-        } else {
-          throw switchError;
         }
       }
 
-      const amountWei = Math.floor(parseFloat(amount) * 1e18);
-      const amountHex = `0x${amountWei.toString(16)}`;
+      // Get sender address
+      const accounts = await (window.ethereum as any).request({ method: "eth_accounts" });
+      const from = accounts[0];
 
-      const txParams = {
-        from: accounts[0],
-        to: agentAddress,
-        value: amountHex,
-      };
+      // Convert amount to hex wei
+      const amountEth = parseFloat(amount) || 0.01;
+      const amountWei = BigInt(Math.floor(amountEth * 1e18));
+      const amountHex = "0x" + amountWei.toString(16);
 
-      console.log('Transaction params:', txParams);
+      setErrorMessage("Confirm transaction in MetaMask...");
 
-      const hash = await ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [txParams],
+      // Send transaction
+      const txHash = await (window.ethereum as any).request({
+        method: "eth_sendTransaction",
+        params: [{
+          from,
+          to: agentAddress,
+          value: amountHex,
+        }],
       });
 
-      setTxHash(hash);
-      setStatus('success');
-      console.log('Transaction sent:', hash);
+      setTxHash(txHash);
+      setErrorMessage(`Transaction submitted: ${txHash}`);
+      setStatus("success");
 
       // Register with API
       await fetch(`${API_BASE}/agent/budget`, {
@@ -568,7 +529,7 @@ const FundingPanelContent: React.FC<{
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wallet: agentAddress,
-          tx_hash: hash
+          tx_hash: txHash
         }),
       });
 
@@ -578,20 +539,12 @@ const FundingPanelContent: React.FC<{
       onSuccess(statusData.agent_budget?.total_balance_eth || currentBalance);
 
     } catch (error: any) {
-      console.error('❌ Funding failed:', error);
-      
-      // Handle specific MetaMask errors
-      if (error.code === 4001) {
-        setErrorMessage('Transaction rejected by user.');
-      } else if (error.code === -32603) {
-        setErrorMessage('Internal JSON-RPC error. Please check MetaMask.');
-      } else if (error.message?.includes('Invalid "to" address')) {
-        setErrorMessage('Invalid recipient address. Please try again.');
+      if (error?.code === 4001) {
+        setErrorMessage("Transaction rejected by user.");
       } else {
-        setErrorMessage(error.message || 'Funding failed');
+        setErrorMessage(`Error: ${error?.message || "Unknown error"}`);
       }
-      
-      setStatus('error');
+      setStatus("error");
     }
   };
 
@@ -653,7 +606,7 @@ const FundingPanelContent: React.FC<{
       <div>
         <button
           onClick={fundWithMetaMask}
-          disabled={status === 'funding'}
+          disabled={status === 'funding' || !agentAddress}
           style={{
             padding: '8px 16px',
             fontSize: '13px',

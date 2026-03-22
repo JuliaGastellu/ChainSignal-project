@@ -24,6 +24,7 @@ export function AgentFundingPanel({
   onFundingActivated?: () => void;
 }) {
   const [agentState, setAgentState] = useState<AgentState | null>(null);
+  const [agentWallet, setAgentWallet] = useState<string>("");
   const [amount, setAmount] = useState(DEFAULT_FUND_AMOUNT);
   const [status, setStatus] = useState<FundingStatus>("idle");
   const [message, setMessage] = useState<string>("Ready to fund autonomous agent.");
@@ -40,17 +41,23 @@ export function AgentFundingPanel({
     }
   };
 
-useEffect(() => {
-  loadState();
-  fetch(`${API_BASE}/agent/address`)
-    .then(r => r.json())
-    .then(d => setAgentAddress(d.agent_wallet || d.address || ""))
-    .catch(() => {});
-  const id = window.setInterval(loadState, 8000);
-  return () => window.clearInterval(id);
-}, []);
+  const loadAddress = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/agent/address`);
+      const data = await res.json();
+      setAgentWallet(data.agent_wallet || data.address || "");
+    } catch (err) {
+      console.error("Failed to load agent address:", err);
+    }
+  };
 
-  const agentWallet = agentState?.budget?.agent_wallet || "";
+  useEffect(() => {
+    loadState();
+    loadAddress();
+    const id = window.setInterval(loadState, 8000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const balance = Number(agentState?.budget?.total_balance_eth ?? 0);
 
   const statusText = useMemo(() => {
@@ -74,94 +81,73 @@ useEffect(() => {
 
   const handleFundAgent = async () => {
     if (!agentWallet) {
-      setStatus("error");
-      setMessage("Agent wallet is unavailable. Refresh state and try again.");
-      return;
-    }
-    if (!window.ethereum) {
-      setStatus("error");
-      setMessage("MetaMask is not installed.");
+      setMessage("Agent address not loaded. Please wait and retry.");
       return;
     }
 
-    setStatus("idle");
-    setMessage("Open MetaMask to approve funding transaction.");
+    if (!window.ethereum) {
+      setMessage("MetaMask is not installed or not accessible.");
+      return;
+    }
 
     try {
-      const baselineBalance = balance;
-      const provider = new BrowserProvider(window.ethereum as any);
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      const fromAddress = await signer.getAddress();
+      setMessage("Requesting MetaMask access...");
 
-      const tx = await signer.sendTransaction({
-        from: fromAddress,
-        to: agentWallet,
-        value: parseEther(amount || "0"),
-      });
+      // Request accounts
+      await (window.ethereum as any).request({ method: "eth_requestAccounts" });
 
-      setStatus("pending_tx");
-      setMessage("Transaction submitted. Waiting for confirmation...");
-
-      let fundingRegistered = false;
-      const firstRegister = await fetch(`${API_BASE}/agent/budget`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wallet: targetWallet || fromAddress, tx_hash: tx.hash }),
-      });
-      if (firstRegister.ok) fundingRegistered = true;
-      setStatus("awaiting_balance");
-      setMessage("Transaction submitted. Waiting for funds...");
-
-      setPolling(true);
-      let attempts = 0;
-      const timer = window.setInterval(async () => {
-        attempts += 1;
-        try {
-          if (!fundingRegistered) {
-            const registerRes = await fetch(`${API_BASE}/agent/budget`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ wallet: targetWallet || fromAddress, tx_hash: tx.hash }),
-            });
-            if (registerRes.ok) fundingRegistered = true;
-          }
-          const res = await fetch(`${API_BASE}/agent/state`);
-          const next = await res.json();
-          const nextBalance = Number(next?.budget?.total_balance_eth ?? 0);
-          setAgentState(next as AgentState);
-          if (nextBalance > baselineBalance) {
-            window.clearInterval(timer);
-            setPolling(false);
-            const fundedDelta = Math.max(0, nextBalance - baselineBalance);
-            setStatus("confirmed");
-            setMessage(`Funds received: +${fundedDelta.toFixed(6)} ETH · Autonomous execution activated.`);
-            await fetch(`${API_BASE}/agent/execute`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ wallet: targetWallet || fromAddress }),
-            });
-            onFundingActivated?.();
-          }
-          if (attempts >= 20) {
-            window.clearInterval(timer);
-            setPolling(false);
-            setStatus("awaiting_balance");
-            setMessage("Funding transaction submitted. Balance sync may take a few more seconds.");
-          }
-        } catch {
-          if (attempts >= 20) {
-            window.clearInterval(timer);
-            setPolling(false);
-          }
+      // Switch to Sepolia
+      try {
+        await (window.ethereum as any).request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xaa36a7" }],
+        });
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          await (window.ethereum as any).request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: "0xaa36a7",
+              chainName: "Sepolia",
+              nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              rpcUrls: ["https://rpc.sepolia.org"],
+              blockExplorerUrls: ["https://sepolia.etherscan.io"],
+            }],
+          });
         }
-      }, 3000);
+      }
+
+      // Get sender address
+      const accounts = await (window.ethereum as any).request({ method: "eth_accounts" });
+      const from = accounts[0];
+
+      // Convert amount to hex wei
+      const amountEth = parseFloat(amount) || 0.01;
+      const amountWei = BigInt(Math.floor(amountEth * 1e18));
+      const amountHex = "0x" + amountWei.toString(16);
+
+      setMessage("Confirm transaction in MetaMask...");
+
+      // Send transaction
+      const txHash = await (window.ethereum as any).request({
+        method: "eth_sendTransaction",
+        params: [{
+          from,
+          to: agentWallet,
+          value: amountHex,
+        }],
+      });
+
+      setMessage(`Transaction submitted: ${txHash}`);
+      setStatus("confirmed");
+
     } catch (error: any) {
-      const code = error?.code;
-      const rejected = code === 4001 || String(error?.message || "").toLowerCase().includes("rejected");
+      if (error?.code === 4001) {
+        setMessage("Transaction rejected by user.");
+      } else {
+        setMessage(`Error: ${error?.message || "Unknown error"}`);
+      }
       setStatus("error");
-      setMessage(rejected ? "Transaction rejected in MetaMask." : "Funding failed. Please retry.");
-      setPolling(false);
     }
   };
 
