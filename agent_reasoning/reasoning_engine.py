@@ -31,6 +31,14 @@ class ReasoningDecision:
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def generate_reasoning(address, scores, threat_score, decision):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return (
+            f"Wallet {address[:8]}... shows risk score {scores['risk']}/100 "
+            f"and activity {scores['activity']}/100, producing threat score {threat_score:.2f}. "
+            f"Decision: {decision}."
+        )
+
     prompt = f"""You are an autonomous on-chain financial guardian agent.
 
 Wallet analyzed: {address}
@@ -51,6 +59,7 @@ Write 2 sentences explaining this decision. Reference the specific numbers. Be d
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
+        logger.warning(f"OpenAI reasoning failed (possibly invalid key): {e}")
         # Deterministic fallback — never block the agent cycle
         return (
             f"Wallet {address[:8]}... shows risk score {scores['risk']}/100 "

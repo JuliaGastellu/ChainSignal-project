@@ -1,13 +1,13 @@
 {
     "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae": {
         "priority": "high",
-        "last_evaluation": "2026-03-23T15:29:48.497203",
+        "last_evaluation": "2026-03-23T15:36:13.807934",
         "last_risk_score": 0,
         "interval_seconds": 60
     },
     "0x742d35Cc6634C0532925a3b844Bc454e4438f44e": {
         "priority": "medium",
-        "last_evaluation": "2026-03-23T15:24:54.462303",
+        "last_evaluation": "2026-03-23T15:37:44.655377",
         "last_risk_score": 0,
         "interval_seconds": 300
     }

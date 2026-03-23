@@ -25,8 +25,7 @@ from execution_guard.persistence import PersistenceManager
 
 # Instanciamos el servicio centralizado
 _agent_service = AgentService()
-# Instanciamos el loop autónomo
-_agent_loop = AutonomousAgentLoop(_agent_service)
+# Instanciamos el bus de eventos y el loop guardián (instrumentado)
 _agent_event_bus = AgentEventBus()
 _guardian_loop = GuardianAgentLoop(_agent_service, _agent_event_bus)
 _watch_queue = QueueManager()
@@ -104,15 +103,15 @@ def _compute_activity_snapshot(limit: int = 25) -> dict:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and clean up resources during API lifespan."""
-    logger.info("Starting ChainSignal API and Autonomous Agent Loop...")
+    logger.info("Starting ChainSignal API and Guardian Agent Loop...")
     
-    # Iniciar el loop autónomo en background
-    await _agent_loop.start()
+    # Iniciar el loop guardián en background por defecto
+    await _guardian_loop.start()
     
     yield
     
     # Detener el loop de forma segura
-    await _agent_loop.stop()
+    await _guardian_loop.stop()
     logger.info("Shutting down ChainSignal API...")
 
 
@@ -148,7 +147,7 @@ def health():
         "status": "ok", 
         "service": "ChainSignal API", 
         "version": "0.2.2",
-        "agent_loop": "active" if _agent_loop.is_running else "inactive",
+        "agent_loop": "active" if _guardian_loop.is_running else "inactive",
         "global_metrics": {
             **raw_metrics,
             "execution_attempts": raw_metrics.get("executions_triggered", 0),
@@ -381,7 +380,7 @@ async def agent_state():
     budget_state = _budget_service.get_global_state()
     pnl = round(float(actions["stats"].get("total_value_moved", 0.0)) - float(budget_state.get("total_spent_eth", 0.0)), 8)
     return {
-        "status": "active" if _agent_loop.is_running else "inactive",
+        "status": "active" if _guardian_loop.is_running else "inactive",
         "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
         "metrics": _agent_service.metrics.to_dict(),
         "budget": budget_state,

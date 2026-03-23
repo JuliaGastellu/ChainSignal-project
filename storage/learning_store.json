@@ -5524,6 +5524,54 @@
         }
       ],
       "strategy": "EXPLORE"
+    },
+    {
+      "timestamp": 1774279941.4838147,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "EXPLORE_TRIGGER",
+          "severity": "low",
+          "confidence": 0.55
+        }
+      ],
+      "strategy": "EXPLORE"
+    },
+    {
+      "timestamp": 1774280042.5583892,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "EXPLORE_TRIGGER",
+          "severity": "low",
+          "confidence": 0.55
+        }
+      ],
+      "strategy": "EXPLORE"
+    },
+    {
+      "timestamp": 1774280143.6873882,
+      "wallet": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+      "signals": [
+        {
+          "type": "EXPLORE_TRIGGER",
+          "severity": "low",
+          "confidence": 0.55
+        }
+      ],
+      "strategy": "EXPLORE"
+    },
+    {
+      "timestamp": 1774280234.5423052,
+      "wallet": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+      "signals": [
+        {
+          "type": "EXPLORE_TRIGGER",
+          "severity": "low",
+          "confidence": 0.55
+        }
+      ],
+      "strategy": "EXPLORE"
     }
   ],
   "outcomes": [
