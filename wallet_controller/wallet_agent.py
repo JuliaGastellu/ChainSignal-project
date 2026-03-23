@@ -31,7 +31,13 @@ class WalletAgent:
         self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
         self.w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
         self.account = None
+        # Inicializar wallet al crear la instancia
+        self.create_agent_wallet()
         
+    def get_address(self):
+        """Devuelve la dirección de la wallet del agente."""
+        return self.account.address if self.account else None
+
     def create_agent_wallet(self):
         """Crea una nueva wallet para el agente o la carga de memoria si existe."""
         seed_phrase = os.getenv("AGENT_SEED_PHRASE")
@@ -109,6 +115,7 @@ class WalletAgent:
             if resp.status_code == 200:
                 data = resp.json()
                 logger.success(f"Transacción WDK exitosa. Hash: {data['hash']}")
+                logger.info(f"[WDK] Transfer sent. Hash: {data['hash']}")
                 return data['hash']
             else:
                 logger.error(f"Fallo en microservicio WDK: {resp.text}")

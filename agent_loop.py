@@ -232,6 +232,13 @@ class GuardianAgentLoop:
         logger.info("Cleaning up stale locks before starting agent loop...")
         await asyncio.to_thread(self.service.lock_manager.cleanup_stale_locks)
         
+        # Ensure demo wallets exist
+        wallets = self.queue.list_wallets()
+        if not wallets:
+            logger.info("Watch queue empty. Adding demo wallets...")
+            self.queue.add_wallet("0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAE", "Ethereum Foundation")
+            self.queue.add_wallet("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "Vitalik Buterin")
+
         self.is_running = True
         self.stop_requested = False
         self._task = asyncio.create_task(self._run())
@@ -246,14 +253,15 @@ class GuardianAgentLoop:
     async def _run(self) -> None:
         while self.is_running:
             cycle = self.cycles_completed + 1
-            await self.event_bus.publish({"type": "cycle_started", "cycle": cycle, "timestamp": datetime.utcnow().isoformat()})
+            await self.event_bus.publish({"type": "cycle_start", "cycle": cycle, "timestamp": datetime.utcnow().isoformat()})
             wallets = self.queue.list_wallets()
             if not wallets:
-                await self.event_bus.publish({"type": "cycle_idle", "cycle": cycle, "description": "No wallets in watch queue"})
+                await self.event_bus.publish({"type": "agent_idle", "cycle": cycle, "description": "No wallets in watch queue", "next_cycle_in": self._interval})
             for item in wallets:
                 if self.stop_requested:
                     break
                 wallet = str(item.get("address", "")).lower()
+                logger.info(f"[LOOP] Sending wallet {wallet} to reasoning engine")
                 try:
                     payload = await self._analyze_wallet(wallet)
                     agent_balance = self.service.budget.get_effective_balance_eth(wallet)
@@ -281,6 +289,7 @@ class GuardianAgentLoop:
             if self.stop_requested:
                 self.is_running = False
                 break
+            await self.event_bus.publish({"type": "agent_idle", "next_cycle_in": self._interval})
             await asyncio.sleep(self._interval)
         self.is_running = False
         self.stop_requested = False
@@ -293,7 +302,7 @@ class GuardianAgentLoop:
             await self.event_bus.publish({"type": "cache_hit", "wallet": wallet})
             return cache_item["payload"]
 
-        await self.event_bus.publish({"type": "analysis_started", "wallet": wallet})
+        await self.event_bus.publish({"type": "wallet_analyzing", "wallet": wallet})
         raw = await asyncio.to_thread(self.client.obtener_datos_wallet, wallet)
         metrics = await asyncio.to_thread(self.extractor.extraer, raw)
         scores_obj = self.scorer.calcular_scores(metrics)
