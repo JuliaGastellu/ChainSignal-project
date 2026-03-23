@@ -4,15 +4,15 @@
       "address": "0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAE",
       "label": "Ethereum Foundation",
       "added_at": "2024-01-01T00:00:00Z",
-      "last_analyzed": "2026-03-23T15:26:56.666800+00:00",
+      "last_analyzed": "2026-03-23T15:30:18.737556+00:00",
       "last_signal": "ALERT",
-      "times_flagged": 4
+      "times_flagged": 6
     },
     {
       "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
       "label": "Vitalik Buterin",
       "added_at": "2024-01-01T00:00:00Z",
-      "last_analyzed": "2026-03-23T15:27:26.777392+00:00",
+      "last_analyzed": "2026-03-23T15:30:48.929079+00:00",
       "last_signal": "INSUFFICIENT_FUNDS",
       "times_flagged": 0
     }

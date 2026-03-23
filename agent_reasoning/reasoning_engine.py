@@ -166,7 +166,8 @@ class ReasoningEngine:
                 "confidence": confidence,
                 "decision": decision,
                 "reasoning": reasoning,
-                "action": action
+                "action": action,
+                "scores": scores
             })
 
         return ReasoningDecision(cycle, address, round(threat_score, 4), round(confidence, 4), decision, reasoning, action).to_dict()
