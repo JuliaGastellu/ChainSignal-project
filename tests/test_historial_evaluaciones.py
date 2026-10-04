@@ -1,9 +1,21 @@
 """El historial cuenta; no decide (E07)."""
 
 import inspect
+from pathlib import Path
 
 from services.historial_evaluaciones import HistorialEvaluaciones
 from services.strategy_engine import NO_ACTION, StrategyEngine
+
+
+def test_servicio_arranca_sin_escribir_en_el_directorio_del_codigo(monkeypatch):
+    from services.agent_service import AgentService
+
+    def sin_permiso(*args, **kwargs):
+        raise PermissionError("directorio de solo lectura")
+
+    monkeypatch.setattr(Path, "mkdir", sin_permiso)
+    servicio = AgentService()
+    assert servicio.historial.path == Path("storage/historial_evaluaciones.json")
 
 
 def test_resumen_no_trata_aceptacion_como_exito_por_estrategia(tmp_path):

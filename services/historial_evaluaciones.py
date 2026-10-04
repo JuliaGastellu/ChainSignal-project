@@ -20,7 +20,9 @@ from typing import Any, Dict, List
 class HistorialEvaluaciones:
     def __init__(self, ruta: str = "storage/historial_evaluaciones.json"):
         self.path = Path(ruta)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        # No escribo al construir el historial: la API debe arrancar también
+        # cuando el código está montado en un directorio de solo lectura.
+        # Creo el directorio en _save únicamente si guardo una evaluación.
 
     def _load(self) -> Dict[str, Any]:
         if not self.path.exists():
