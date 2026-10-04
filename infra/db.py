@@ -13,6 +13,7 @@ El esquema se versiona con Alembic (migrations/). init_db aplica las
 migraciones pendientes; ya no uso create_all. Todavía no resuelvo locking
 distribuido, centralización de nonce ni reconciliación tras una caída.
 """
+import os
 import tempfile
 import threading
 import weakref
@@ -33,7 +34,10 @@ def _default_sqlite_url() -> str:
     # una carpeta sincronizada (OneDrive) y el cliente de sincronización
     # bloquea los archivos de journal de SQLite, lo que produce "disk I/O
     # error". Es solo un recurso de desarrollo local.
-    db_path = Path(tempfile.gettempdir()) / "chainsignal" / "chainsignal.db"
+    # En Linux uso mi UID efectivo: la plataforma puede reemplazar el usuario
+    # del contenedor y dejar el directorio de la imagen con otro propietario.
+    nombre_directorio = f"chainsignal-{os.geteuid()}" if hasattr(os, "geteuid") else "chainsignal"
+    db_path = Path(tempfile.gettempdir()) / nombre_directorio / "chainsignal.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     return f"sqlite:///{db_path.as_posix()}"
 

@@ -19,6 +19,22 @@ from infra.db import init_db, make_engine
 from agent_executor.executor import AgentExecutor, load_execution_history
 
 
+def test_sqlite_temporal_usa_el_usuario_del_runtime(tmp_path, monkeypatch):
+    import infra.db as db
+
+    heredado = tmp_path / "chainsignal"
+    heredado.mkdir()
+    monkeypatch.setattr(db.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(db.os, "geteuid", lambda: 1000, raising=False)
+    engine_local = make_engine(db._default_sqlite_url())
+    try:
+        assert engine_local.url.database == (tmp_path / "chainsignal-1000" / "chainsignal.db").as_posix()
+        with engine_local.begin() as conexion:
+            conexion.exec_driver_sql("CREATE TABLE prueba (id INTEGER)")
+    finally:
+        engine_local.dispose()
+
+
 def _sqlite_url(tmp_path, name: str) -> str:
     return f"sqlite:///{tmp_path / name}"
 
