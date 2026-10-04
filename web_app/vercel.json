@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
+    { "source": "/auth/:path*", "destination": "https://chainsignal-project.onrender.com/auth/:path*" },
+    { "source": "/demo", "destination": "https://chainsignal-project.onrender.com/demo" },
+    { "source": "/orgs/:path*", "destination": "https://chainsignal-project.onrender.com/orgs/:path*" },
+    { "source": "/invitations/:path*", "destination": "https://chainsignal-project.onrender.com/invitations/:path*" },
     { "source": "/login", "destination": "/index.html" },
     { "source": "/registro", "destination": "/index.html" },
     { "source": "/invitacion", "destination": "/index.html" },
