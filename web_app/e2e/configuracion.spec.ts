@@ -8,6 +8,7 @@ async function invitarYAceptar(browser: Browser, page: import("@playwright/test"
   await personas.getByLabel("Email de la persona").fill(email);
   await personas.locator("#rol-invitacion").selectOption(rol);
   await personas.getByRole("button", { name: "Invitar" }).click();
+  await expect(personas.getByRole("status")).toContainText(`Invitación creada para ${email}.`);
   const enlace = (await personas.locator("code").textContent()) ?? "";
   expect(enlace).toContain("/invitacion#token=");
   const contexto = await browser.newContext();
