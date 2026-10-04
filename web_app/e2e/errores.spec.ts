@@ -50,6 +50,8 @@ test("si el stream de eventos se corta, muestra que está reconectando y vuelve"
 
 test("la navegación funciona con teclado", async ({ page }) => {
   const org = await entrarADemo(page);
+  // Espero el layout: si aprieto Tab antes de que se dibuje, el foco cae en otro lado.
+  await expect(page.getByRole("heading", { name: "Resumen" })).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Saltar al contenido" })).toBeFocused();
   await page.goto(`/app/${org}/configuracion`);
