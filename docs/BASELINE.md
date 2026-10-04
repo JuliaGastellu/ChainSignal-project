@@ -27,7 +27,7 @@ Saqué estas dependencias sin uso comprobado:
 
 | Dependencia | Motivo |
 |---|---|
-| `openclaw` | Solo instanciaba un cliente y registraba un mensaje (no-op). Quité también `OPENCLAW_ENABLED`. |
+| Cliente de orquestación externa opcional | Solo instanciaba un cliente y registraba un mensaje (no-op). Quité también su variable de activación. |
 | `python-multipart` | Ninguna ruta usa `Form` ni `UploadFile`. |
 | Plugin de etiquetado de componentes del scaffolding inicial | Solo actuaba en modo desarrollo y no aporta al producto. |
 | `@playwright/test` y su configuración | No hay pruebas end-to-end y la configuración importaba un paquete de scaffolding no declarado. |

@@ -1,8 +1,8 @@
 """Agente de análisis determinístico de ChainSignal.
 
-Genera un InsightContrato estructurado a partir de métricas y perfil. Retiré la
-orquestación opcional con OpenClaw porque solo registraba un mensaje y no
-ejecutaba nada.
+Genera un InsightContrato estructurado a partir de métricas y perfil. Retiré una
+orquestación opcional externa porque solo registraba un mensaje y no ejecutaba
+nada.
 """
 
 from typing import Any

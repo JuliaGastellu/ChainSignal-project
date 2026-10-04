@@ -74,7 +74,7 @@ export default function Registro() {
           </span>
         </label>
         {error && (
-          <p role="alert" className="text-sm text-risk-high">
+          <p role="alert" className="text-sm text-risk-text-high">
             {error}
           </p>
         )}

@@ -35,9 +35,10 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.engine import Engine
 
-PASOS = ["org_created", "account_added", "first_snapshot", "policy_created", "channel_tested",
+PASOS = ["org_created", "account_added", "first_snapshot", "policy_created", "external_channel_tested",
          "incident_reviewed", "incident_acknowledged"]
-ACTIVACION = {"account_added", "first_snapshot", "policy_created", "channel_tested"}
+# Igual que "monitoreo preparado": un canal simulado (sandbox) no cuenta como verificación operativa.
+ACTIVACION = {"account_added", "first_snapshot", "policy_created", "external_channel_tested"}
 REVISION = {"data_reviewed", "incident_reviewed"}
 DIA = 86400.0
 PUERTA = {"paid_pilots": 3, "renewals": 2}
@@ -53,16 +54,20 @@ def medir(engine_: Optional[Engine] = None, ahora: Optional[float] = None, sinte
     with get_session_factory(engine_ or engine_por_defecto)() as s:
         orgs = s.execute(select(OrganizationRecord.id, OrganizationRecord.name, OrganizationRecord.created_at)
                          .where(OrganizationRecord.is_demo.is_(False))).all()
-        eventos = s.execute(select(ProductEventRecord.organization_id, ProductEventRecord.name, ProductEventRecord.occurred_at)
-                            .where(ProductEventRecord.is_demo.is_(False))).all()
+        eventos = s.execute(select(ProductEventRecord.organization_id, ProductEventRecord.name, ProductEventRecord.occurred_at,
+                                   ProductEventRecord.properties).where(ProductEventRecord.is_demo.is_(False))).all()
         subs = {sub.organization_id: estado_efectivo(sub, ahora) for sub in s.execute(select(SubscriptionRecord)).scalars()}
         pagos = s.execute(select(PaymentRecord.organization_id, PaymentRecord.period_end)).all()
 
     primeros: Dict[str, Dict[str, float]] = {o: {} for o, _, _ in orgs}
     revisiones: Dict[str, List[float]] = {o: [] for o, _, _ in orgs}
-    for org, nombre, momento in eventos:
+    for org, nombre, momento, propiedades in eventos:
         if org not in primeros:
             continue
+        if nombre == "channel_tested":
+            if (propiedades or {}).get("channel_kind") != "webhook":
+                continue
+            nombre = "external_channel_tested"
         if nombre not in primeros[org] or momento < primeros[org][nombre]:
             primeros[org][nombre] = momento
         if nombre in REVISION:
@@ -89,7 +94,7 @@ def medir(engine_: Optional[Engine] = None, ahora: Optional[float] = None, sinte
         "organizations": total,
         "funnel": embudo,
         "activation": {"activated": activadas, "ratio": round(activadas / total, 3) if total else None,
-                       "definition": "account + first snapshot + policy + tested channel"},
+                       "definition": "account + first snapshot + policy + external channel accepted a test"},
         "time_to_first_value_minutes": {"count": len(primer_valor),
                                         "median": round(statistics.median(primer_valor), 1) if primer_valor else None},
         "recurrence_week_4": {"eligible": len(elegibles), "returning": recurrentes},
@@ -172,7 +177,8 @@ def sembrar_sintetico(engine_: Engine, ahora: float) -> None:
             s.query(ProductEventRecord).filter(ProductEventRecord.organization_id == org).delete()
             s.commit()
         for i, paso in enumerate(pasos):
-            registrar(engine_, org, paso, {}, recurso=f"sintetico-{i}", ahora=creado + (i + 1) * 600)
+            nombre, props = ("channel_tested", {"channel_kind": "webhook"}) if paso == "external_channel_tested" else (paso, {})
+            registrar(engine_, org, nombre, props, recurso=f"sintetico-{i}", ahora=creado + (i + 1) * 600)
         if revisa:
             registrar(engine_, org, "data_reviewed", {}, ahora=creado + 24 * DIA)
         for n in range(pagos):

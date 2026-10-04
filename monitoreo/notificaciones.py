@@ -8,8 +8,15 @@ duplicados; no prometo que lo haga.
 Canales:
 - sandbox: guarda la entrega en notification_deliveries. Nunca sale del sistema;
   sirve para probar el circuito completo en la demo y en las pruebas.
-- webhook: POST HTTPS con header Idempotency-Key. Está deshabilitado salvo
-  NOTIFICATIONS_WEBHOOKS_ENABLED=true; en este entorno no envío mensajes reales.
+- webhook: POST HTTPS firmado, con header Idempotency-Key y protección contra
+  SSRF (monitoreo/webhook_seguro.py). Está deshabilitado salvo
+  NOTIFICATIONS_WEBHOOKS_ENABLED=true; si está apagado, crear o probar un
+  webhook falla con un motivo claro: nunca lo reemplazo en silencio por el sandbox.
+
+Qué puedo afirmar de una entrega:
+- sandbox: registré una simulación; no salió nada del sistema;
+- webhook: el destino aceptó la solicitud (HTTP 2xx). No sé si una persona la
+  leyó: eso no lo puedo afirmar sin una confirmación aparte.
 
 Las pruebas inyectan un TransporteFalso que registra envíos y simula fallas.
 """
@@ -23,13 +30,31 @@ from sqlalchemy import select, update
 from sqlalchemy.engine import Engine
 
 from identidad import seguridad
-from identidad.servicio import ContextoOrg, NoEncontrado, SolicitudInvalida, registrar_evento
+from identidad.servicio import ContextoOrg, ErrorIdentidad, NoEncontrado, SolicitudInvalida, registrar_evento
 from infra.config import settings
 from infra.db import engine as engine_por_defecto
 from infra.db import get_session_factory, init_db
 from infra.db_models import NotificationChannelRecord, NotificationDeliveryRecord, OutboxRecord
 
 TIPOS_CANAL = ("sandbox", "webhook")
+
+
+class WebhooksDeshabilitados(ErrorIdentidad):
+    estado = 409
+    codigo = "webhooks_disabled"
+
+
+class DestinoInvalido(SolicitudInvalida):
+    codigo = "webhook_destination_invalid"
+
+
+def resultado_de_entrega(tipo: str, estado: str) -> str:
+    """Lo que puedo afirmar de una entrega, según el canal y su estado."""
+    if estado == "sent":
+        return "simulated" if tipo == "sandbox" else "accepted_by_destination"
+    if estado in ("failed", "dead"):
+        return "failed"
+    return "pending"
 
 
 class ErrorEntrega(Exception):
@@ -70,24 +95,27 @@ class TransporteWebhook:
 
     def enviar(self, canal: NotificationChannelRecord, payload: Dict[str, Any], clave: str) -> None:
         if not settings.NOTIFICATIONS_WEBHOOKS_ENABLED:
-            raise ErrorEntrega("webhooks are disabled in this environment", reintentable=False)
-        import requests
+            raise ErrorEntrega("webhooks_disabled", reintentable=False)
+        from monitoreo.webhook_seguro import DestinoNoPermitido, ErrorDeRed, enviar
 
         try:
-            respuesta = requests.post(canal.config["url"], json=payload, timeout=self.timeout,
-                                      headers={"Idempotency-Key": clave, "User-Agent": "chainsignal-notifier/0.3"})
-        except requests.RequestException as e:
-            raise ErrorEntrega(type(e).__name__, reintentable=True)
-        if respuesta.status_code == 429 or respuesta.status_code >= 500:
-            raise ErrorEntrega(f"HTTP {respuesta.status_code}", reintentable=True)
-        if respuesta.status_code >= 400:
-            raise ErrorEntrega(f"HTTP {respuesta.status_code}", reintentable=False)
+            codigo = enviar(canal.config["url"], payload, clave, canal.config.get("signing_secret", ""), self.timeout)
+        except DestinoNoPermitido as error:
+            raise ErrorEntrega(str(error), reintentable=False)
+        except ErrorDeRed as error:
+            raise ErrorEntrega(str(error), reintentable=str(error) != "tls_error")
+        if 300 <= codigo < 400:
+            raise ErrorEntrega(f"redirect_not_followed_{codigo}", reintentable=False)
+        if codigo == 429 or codigo >= 500:
+            raise ErrorEntrega(f"http_{codigo}", reintentable=True)
+        if codigo >= 400:
+            raise ErrorEntrega(f"http_{codigo}", reintentable=False)
 
 
 def _canal_a_dict(c: NotificationChannelRecord) -> Dict[str, Any]:
     config = dict(c.config)
     if "url" in config:
-        # Muestro solo el host: la URL puede contener tokens.
+        # Muestro solo el host: la URL puede contener tokens. El secreto de firma no sale nunca.
         config = {"host": urlparse(config["url"]).hostname}
     return {"id": c.id, "kind": c.kind, "name": c.name, "config": config, "enabled": c.enabled,
             "verified_at": c.verified_at, "created_at": c.created_at}
@@ -112,11 +140,19 @@ class ServicioNotificaciones:
         nombre = (nombre or "").strip()
         if not nombre or len(nombre) > 200:
             raise SolicitudInvalida("name is required (max 200 characters).")
+        secreto = None
         if tipo == "webhook":
+            if not settings.NOTIFICATIONS_WEBHOOKS_ENABLED:
+                raise WebhooksDeshabilitados("External webhooks are disabled in this environment.")
+            from monitoreo.webhook_seguro import DestinoNoPermitido, resolver
+
             url = str((config or {}).get("url", ""))
-            if urlparse(url).scheme != "https" or not urlparse(url).hostname or len(url) > 500:
-                raise SolicitudInvalida("webhook channels need an https url.")
-            config = {"url": url}
+            try:
+                resolver(url)
+            except DestinoNoPermitido as error:
+                raise DestinoInvalido(str(error))
+            secreto = seguridad.nuevo_token()
+            config = {"url": url, "signing_secret": secreto}
         else:
             config = {}
         canal = NotificationChannelRecord(id=seguridad.nuevo_id(), organization_id=ctx.organization_id, kind=tipo,
@@ -125,13 +161,27 @@ class ServicioNotificaciones:
             s.add(canal)
             registrar_evento(s, ctx.organization_id, "channel.created", {"channel_id": canal.id, "kind": tipo}, ctx.user_id)
             s.commit()
-            return _canal_a_dict(canal)
+            resultado = _canal_a_dict(canal)
+        if secreto:
+            # El secreto de firma se muestra una sola vez, para configurarlo en el destino.
+            resultado["signing_secret"] = secreto
+        return resultado
 
     def listar_canales(self, ctx: ContextoOrg) -> List[Dict[str, Any]]:
         with self._Session() as s:
             canales = s.execute(select(NotificationChannelRecord).where(
                 NotificationChannelRecord.organization_id == ctx.organization_id).order_by(NotificationChannelRecord.created_at)).scalars().all()
-            return [_canal_a_dict(c) for c in canales]
+            resultado = []
+            for c in canales:
+                prueba = s.execute(select(OutboxRecord).where(
+                    OutboxRecord.channel_id == c.id, OutboxRecord.organization_id == ctx.organization_id,
+                    OutboxRecord.alert_id.is_(None)).order_by(OutboxRecord.id.desc()).limit(1)).scalar_one_or_none()
+                datos = _canal_a_dict(c)
+                datos["last_test"] = None if prueba is None else {
+                    "status": prueba.status, "outcome": resultado_de_entrega(c.kind, prueba.status),
+                    "error": prueba.last_error, "at": prueba.sent_at or prueba.created_at}
+                resultado.append(datos)
+            return resultado
 
     def _canal(self, s, ctx: ContextoOrg, channel_id: str) -> NotificationChannelRecord:
         canal = s.execute(select(NotificationChannelRecord).where(
@@ -147,32 +197,36 @@ class ServicioNotificaciones:
         ahora = self.reloj()
         with self._Session() as s:
             canal = self._canal(s, ctx, channel_id)
+            if canal.kind == "webhook" and not settings.NOTIFICATIONS_WEBHOOKS_ENABLED:
+                raise WebhooksDeshabilitados("External webhooks are disabled in this environment.")
+            # Una prueba es un solo intento: quiero el resultado ahora, no reintentos en segundo plano.
             fila = OutboxRecord(organization_id=ctx.organization_id, channel_id=canal.id, alert_id=None,
                                 idempotency_key=f"test:{canal.id}:{seguridad.nuevo_id()}",
                                 payload={"type": "channel.test", "channel_id": canal.id, "message": "ChainSignal test notification."},
-                                status="pending", attempts=0, max_attempts=3, available_at=ahora, created_at=ahora)
+                                status="pending", attempts=0, max_attempts=1, available_at=ahora, created_at=ahora)
             s.add(fila)
             registrar_evento(s, ctx.organization_id, "channel.test_requested", {"channel_id": canal.id}, ctx.user_id)
             s.commit()
             outbox_id, tipo = fila.id, canal.kind
-        if tipo == "sandbox":
-            # El sandbox no sale del sistema: lo entrego en el momento para que la
-            # prueba del canal tenga resultado inmediato.
-            estado = self.entregar_uno(f"api:{ctx.user_id}"[:64], outbox_id) or "pending"
-            if estado == "sent":
-                from comercial.analitica import registrar
+        # Entrego la prueba en el momento para que tenga resultado inmediato.
+        estado = self.entregar_uno(f"api:{ctx.user_id}"[:64], outbox_id) or "pending"
+        with self._Session() as s:
+            fila = s.get(OutboxRecord, outbox_id)
+            error = fila.last_error if fila is not None else None
+        if estado == "sent":
+            from comercial.analitica import registrar
 
-                registrar(self._engine, ctx.organization_id, "channel_tested", {"channel_kind": "sandbox"})
-            return {"outbox_id": outbox_id, "status": estado}
-        return {"outbox_id": outbox_id, "status": "pending"}
+            registrar(self._engine, ctx.organization_id, "channel_tested", {"channel_kind": tipo})
+        return {"outbox_id": outbox_id, "status": estado, "kind": tipo, "outcome": resultado_de_entrega(tipo, estado), "error": error}
 
     def entregas(self, ctx: ContextoOrg, channel_id: str, limite: int = 50) -> List[Dict[str, Any]]:
         with self._Session() as s:
-            self._canal(s, ctx, channel_id)
+            canal = self._canal(s, ctx, channel_id)
             filas = s.execute(select(OutboxRecord).where(
                 OutboxRecord.channel_id == channel_id, OutboxRecord.organization_id == ctx.organization_id,
             ).order_by(OutboxRecord.id.desc()).limit(min(max(limite, 1), 200))).scalars().all()
-            return [{"id": o.id, "status": o.status, "attempts": o.attempts, "payload_type": o.payload.get("type"),
+            return [{"id": o.id, "status": o.status, "outcome": resultado_de_entrega(canal.kind, o.status), "attempts": o.attempts,
+                     "payload_type": o.payload.get("type"),
                      "created_at": o.created_at, "sent_at": o.sent_at, "last_error": o.last_error} for o in filas]
 
     # --- despacho -------------------------------------------------------------------------

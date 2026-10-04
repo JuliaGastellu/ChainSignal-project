@@ -1,16 +1,17 @@
 import { expect, test } from "@playwright/test";
-import { capturar, irA, crearOrganizacion, DIRECCION_FIXTURE } from "./ayudantes";
+import { capturar, crearOrganizacion, crearPoliticaHF, crearWebhook, DIRECCION_FIXTURE, irA, WEBHOOK_OK } from "./ayudantes";
 
-// Recorrido completo de activación con datos controlados: alta, dirección y red,
-// primer snapshot, política, canal probado, incidente abierto por el worker,
-// seguimiento y resolución.
-test("activación y revisión de un incidente", async ({ page }) => {
+// Recorrido completo con datos controlados: alta, dirección y red, primer
+// snapshot, política con vista previa, webhook externo probado contra un
+// receptor local (monitoreo preparado), incidente abierto por el worker,
+// explicación con referencias legibles, seguimiento y resolución.
+test("activación, monitoreo preparado y revisión de un incidente", async ({ page }) => {
   await page.goto("/");
   await capturar(page, "01-landing");
 
   const { email, org } = await crearOrganizacion(page, "Tesorería Norte");
-  await expect(page.getByText("Primeros pasos (0 de 5)")).toBeVisible();
-  await expect(page.getByText("En vivo")).toBeVisible();
+  await expect(page.getByText("Monitoreo preparado: 0 de 4")).toBeVisible();
+  await expect(page.getByText("Servicio: en vivo")).toBeVisible();
   await capturar(page, "02-resumen-vacio");
 
   // Dirección y red.
@@ -21,51 +22,54 @@ test("activación y revisión de un incidente", async ({ page }) => {
   await page.getByLabel("Nombre (opcional)").fill("Prestataria USDC");
   await page.getByRole("button", { name: "Agregar" }).click();
 
-  // Primer snapshot.
+  // Primer snapshot. Los snapshots son datos públicos de la dirección: si otra organización ya la leyó, el botón dice "Leer de nuevo".
   await expect(page.getByRole("heading", { name: "Prestataria USDC" })).toBeVisible();
-  // Los snapshots son datos públicos de la dirección: si otra organización ya la leyó, el botón dice "Leer de nuevo".
   await page.getByRole("button", { name: /Obtener primer snapshot|Leer de nuevo/ }).click();
   await expect(page.getByText("1,2254")).toBeVisible();
   await expect(page.getByText("26.116.392")).toBeVisible();
-  await expect(page.getByText("Datos actualizados")).toBeVisible();
+  await expect(page.getByText("Dato actualizado", { exact: true })).toBeVisible();
+  await expect(page.getByText("Posición con deuda")).toBeVisible();
+  await expect(page.getByText("Sin alertas abiertas")).toBeVisible();
   await expect(page.getByText("Sin política de health factor")).toBeVisible();
   await capturar(page, "03-posicion-detalle");
 
-  // Política y canal probado. El plan está a la vista: prueba de 14 días, uso y precio como hipótesis.
+  // Política con vista previa y webhook externo verificado.
   await irA(page, "Configuración");
-  await expect(page.getByText("Piloto de lectura")).toBeVisible();
   await expect(page.getByText("1 de 10")).toBeVisible();
-  await expect(page.getByText(/La prueba termina el/)).toBeVisible();
-  await page.getByLabel("Umbral de health factor").fill("1.5");
-  await page.getByRole("button", { name: "Crear política" }).click();
-  await expect(page.getByText("Health factor menor a 1,5; se despeja sobre 1,575.")).toBeVisible();
-  await page.getByRole("button", { name: "Crear canal" }).click();
-  await expect(page.getByText("Sin probar")).toBeVisible();
-  await page.getByRole("button", { name: /Enviar prueba/ }).click();
-  await expect(page.getByText("La prueba llegó al canal.")).toBeVisible();
-  await expect(page.getByText(/^Probado/)).toBeVisible();
+  await crearPoliticaHF(page, "1.5");
+  await crearWebhook(page, WEBHOOK_OK);
+  const canales = page.getByRole("region", { name: "Canales de notificación" });
+  await canales.getByRole("button", { name: /Enviar prueba/ }).click();
+  await expect(canales.getByText(/El destino externo aceptó la prueba \(HTTP 2xx\)/)).toBeVisible();
+  await expect(canales.getByText("Aceptada por el destino externo")).toBeVisible();
   await capturar(page, "04-configuracion");
+
+  // Con cuenta, lectura válida, política y canal externo verificado, el monitoreo está preparado aunque no haya incidentes.
+  await irA(page, "Resumen");
+  await expect(page.getByText("Monitoreo preparado", { exact: true })).toBeVisible();
 
   // El worker evalúa y abre el incidente; la interfaz se entera por el stream.
   await irA(page, "Posiciones");
   await page.getByRole("link", { name: /Prestataria USDC/ }).click();
   await page.getByRole("button", { name: "Evaluar políticas ahora" }).click();
-  await expect(page.getByRole("status").filter({ hasText: /Evaluación en cola|Ya había una evaluación/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Alta: Health factor 1,2254 por debajo del umbral 1,5/ })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("region", { name: "Alertas abiertas" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Alerta abierta: health factor bajo el umbral")).toBeVisible();
 
-  await irA(page, "Incidentes");
-  await expect(page.getByLabel("1 activos")).toBeVisible();
-  await page.getByRole("link", { name: /Health factor bajo/ }).click();
-  await expect(page.getByText("Health factor 1,2254 por debajo del umbral 1,5.")).toBeVisible();
+  await irA(page, "Resumen");
+  const atencion = page.getByRole("list", { name: "Elementos que necesitan atención" });
+  await expect(atencion.getByText("Health factor 1,2254 por debajo del umbral de alerta 1,5.")).toBeVisible();
+  await capturar(page, "05-resumen-con-alerta");
+  await atencion.getByRole("link", { name: "Revisar el incidente" }).click();
+
   await expect(page.getByText("Sin asignar")).toBeVisible();
   await expect(page.getByText("Versión 1", { exact: true })).toBeVisible();
-  await expect(page.getByText("Canal de prueba")).toBeVisible();
-  // Explicación por plantilla, con referencias; sin modelo habilitado no hay costo.
+  // La entrega al webhook la aceptó el destino; no digo que alguien la leyó.
+  await expect(page.getByRole("region", { name: "Notificaciones" }).getByText("Aceptada por el destino externo")).toBeVisible();
+  // Explicación por plantilla con referencias legibles.
   await expect(page.getByText("Plantilla determinista")).toBeVisible();
-  await expect(page.getByText(/\[snapshot:\d+, rule_version:1\]/).first()).toBeVisible();
-  await page.getByRole("button", { name: "Generar explicación" }).click();
-  await expect(page.getByText(/el modelo no está habilitado/)).toBeVisible();
-  await capturar(page, "05-incidente-abierto");
+  await expect(page.getByRole("link", { name: "Lectura del bloque 26.116.392" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Política, versión 1" }).first()).toBeVisible();
+  await capturar(page, "06-incidente-abierto");
 
   // Seguimiento y resolución.
   await page.getByRole("button", { name: "Tomar el incidente" }).click();
@@ -75,16 +79,11 @@ test("activación y revisión de un incidente", async ({ page }) => {
   await page.getByRole("button", { name: "Resolver" }).click();
   await expect(page.getByText("Resuelto", { exact: true })).toBeVisible();
   await expect(page.locator("p", { hasText: "Nota de resolución:" })).toContainText("Repagué parte de la deuda; sigo mirando el umbral.");
-  await capturar(page, "06-incidente-resuelto");
+  await capturar(page, "07-incidente-resuelto");
 
   await irA(page, "Incidentes");
   await expect(page.getByText("No hay incidentes activos")).toBeVisible();
   await page.getByRole("tab", { name: "Resueltos" }).click();
   await expect(page.getByRole("link", { name: /Health factor bajo/ })).toBeVisible();
-
-  // Con todo hecho, la checklist desaparece del resumen.
-  await irA(page, "Resumen");
-  await expect(page.getByText(/Primeros pasos/)).toHaveCount(0);
-  await expect(page).toHaveURL(new RegExp(`/app/${org}/resumen$`));
-  await capturar(page, "07-resumen-activado");
+  await expect(page).toHaveURL(new RegExp(`/app/${org}/incidentes$`));
 });

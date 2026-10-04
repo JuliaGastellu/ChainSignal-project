@@ -1,32 +1,32 @@
 {
-  "started_at": "2026-10-04T13:49:31-0300",
+  "started_at": "2026-10-04T18:50:07-0300",
   "steps": {
     "levantar": {
       "ok": true,
-      "seconds": 33.44,
+      "seconds": 61.75,
       "api_replicas": 2,
       "migrate": "migrate exited 0",
-      "alembic_version": "0008",
+      "alembic_version": "0009",
       "ready": {
         "status": "ready"
       }
     },
     "flujo": {
       "ok": true,
-      "seconds": 2.69,
+      "seconds": 4.7,
       "health_factor": "1.225421528368654169",
-      "incident_wait_seconds": 1.05,
+      "incident_wait_seconds": 1.03,
       "detection_latency_seconds": {
         "count": 1,
-        "p50": 0.34,
-        "p95": 0.34,
-        "max": 0.34
+        "p50": 0.938,
+        "p95": 0.938,
+        "max": 0.938
       },
       "delivery_latency_seconds": {
         "count": 2,
-        "p50": 0.026,
-        "p95": 0.041,
-        "max": 0.041
+        "p50": 0.023,
+        "p95": 0.036,
+        "max": 0.036
       },
       "coverage": {
         "accounts": 1,
@@ -36,23 +36,37 @@
       "workers": {
         "alive": 1,
         "known": 1,
-        "last_seen_age_seconds": 0.873
+        "last_seen_age_seconds": 0.239
       }
+    },
+    "https_y_entrega_externa": {
+      "ok": true,
+      "seconds": 7.16,
+      "cookie_session": "Secure; HttpOnly; SameSite=Lax",
+      "cookie_csrf": "Secure; SameSite=Lax",
+      "hsts": "max-age=31536000; includeSubDomains",
+      "untrusted_certificate_rejected": true,
+      "webhook_test_outcome": "accepted_by_destination",
+      "webhook_failure_error": "http_500",
+      "private_destination_rejected": true,
+      "receiver_arrivals": 2,
+      "signature_header_present": true,
+      "secret_absent_from_logs": true
     },
     "replicas": {
       "ok": true,
-      "seconds": 1.59,
+      "seconds": 2.14,
       "requests_per_replica": {
-        "21ab998bf6ba": 20,
-        "280721f09c3c": 20
+        "0855895d5eb4": 20,
+        "26460f7d4000": 20
       }
     },
     "reinicio": {
       "ok": true,
-      "seconds": 27.94,
-      "api_ready_after_restart_seconds": 3.12,
+      "seconds": 25.97,
+      "api_ready_after_restart_seconds": 5.12,
       "lease_seconds": 15,
-      "job_recovered_after_seconds": 15.59,
+      "job_recovered_after_seconds": 16.12,
       "last_job_done": true,
       "active_incidents": 1,
       "jobs": {
@@ -61,8 +75,8 @@
     },
     "proveedor_caido": {
       "ok": true,
-      "seconds": 78.28,
-      "unavailable_after_seconds": 70.88,
+      "seconds": 73.78,
+      "unavailable_after_seconds": 63.58,
       "recovered_after_seconds": 2.06,
       "provider_not_fresh_24h": {},
       "job_errors_24h": {
@@ -73,18 +87,18 @@
     },
     "respaldo_y_restauracion": {
       "ok": true,
-      "seconds": 33.39,
+      "seconds": 37.08,
       "dump": {
-        "seconds": 0.36,
-        "bytes": 90360
+        "seconds": 0.48,
+        "bytes": 106333
       },
       "restore_seconds": 1.58,
-      "recovery_seconds_measured": 21.31,
+      "recovery_seconds_measured": 21.83,
       "fingerprint_equal": true,
       "tables_compared": 20,
-      "alembic_version": "0008",
+      "alembic_version": "0009",
       "login_after_restore": true
     }
   },
-  "finished_at": "2026-10-04T13:52:28-0300"
+  "finished_at": "2026-10-04T18:53:39-0300"
 }

@@ -7,7 +7,7 @@ import path from "path";
 // la API local; nunca apunto el proxy a producción.
 const destinoApi = process.env.CHAINSIGNAL_API_PROXY ?? "http://127.0.0.1:8001";
 const proxyApi = Object.fromEntries(
-  ["/health", "/auth", "/demo", "/orgs", "/invitations", "/contact", "/billing"].map((ruta) => [ruta, { target: destinoApi, changeOrigin: true, secure: false }]),
+  ["/health", "/auth", "/demo", "/orgs", "/invitations", "/contact", "/billing", "/practice"].map((ruta) => [ruta, { target: destinoApi, changeOrigin: true, secure: false }]),
 );
 
 export default defineConfig(() => ({

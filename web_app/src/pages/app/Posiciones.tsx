@@ -1,61 +1,62 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
-import { useCuentas, useMutacionOrg, usePosicion } from "@/lib/consultas";
+import { useCuentas, useIncidentes, useMutacionOrg, usePosicion } from "@/lib/consultas";
 import {
   acortarDireccion,
+  actividadCuenta,
+  alertasCuenta,
   DIRECCION_VALIDA,
   describirError,
-  estadoCuenta,
   formatearMontoBase,
   formatearNumero,
+  frescuraDato,
   haceCuanto,
-  TEXTO_ESTADO_CUENTA,
+  TEXTO_FRESCURA,
 } from "@/lib/formato";
 import { useOrgActual } from "@/lib/sesion";
-import type { Cuenta } from "@/lib/tipos";
-import { Cargando, ErrorVista, Insignia, Tarjeta, Vacio } from "@/components/Estados";
+import type { Cuenta, Incidente } from "@/lib/tipos";
+import { Boton, Cargando, ErrorVista, Insignia, Senales, Tarjeta, Titulo, Vacio } from "@/components/Estados";
 
 // Por ahora observo una sola red: Ethereum mainnet (chain_id 1).
 const REDES = [{ chainId: 1, nombre: "Ethereum (mainnet)" }];
 
-function FilaCuenta({ org, cuenta }: { org: string; cuenta: Cuenta }) {
+function FilaCuenta({ org, cuenta, incidentes }: { org: string; cuenta: Cuenta; incidentes: Incidente[] }) {
   const { data: posicion, error, isLoading } = usePosicion(org, cuenta.id);
-  const estado = estadoCuenta(posicion, cuenta.interval_seconds);
-  const texto = TEXTO_ESTADO_CUENTA[estado];
+  const alertas = alertasCuenta(incidentes);
   return (
     <li>
       <Link
         to={`/app/${org}/posiciones/${cuenta.id}`}
-        className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 hover:border-primary/60 sm:flex-row sm:items-center sm:justify-between"
+        className="block rounded-lg border border-border bg-card p-4 hover:border-primary/60"
+        aria-label={`${cuenta.label || acortarDireccion(cuenta.address)}: ${alertas.etiqueta}`}
       >
-        <div className="min-w-0">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <p className="font-medium">{cuenta.label || acortarDireccion(cuenta.address)}</p>
-          <p className="truncate font-mono text-xs text-muted-foreground">{cuenta.address}</p>
+          {posicion?.health_factor && !posicion.no_debt && (
+            <p className="text-sm">
+              Health factor <strong className="tabular-nums">{formatearNumero(posicion.health_factor, 4)}</strong>
+              <span className="text-muted-foreground"> · deuda {formatearMontoBase(posicion.debt_base)}</span>
+            </p>
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <p className="truncate font-mono text-xs text-muted-foreground">{cuenta.address}</p>
+        <div className="mt-2">
           {isLoading ? (
-            <span className="text-muted-foreground">Cargando…</span>
+            <span className="text-sm text-muted-foreground">Cargando…</span>
           ) : error ? (
             <Insignia tono="error">{describirError(error).titulo}</Insignia>
           ) : (
-            <>
-              <Insignia tono={texto.tono}>{texto.etiqueta}</Insignia>
-              {estado === "activa" && posicion && (
-                <span>
-                  HF <strong>{formatearNumero(posicion.health_factor, 4)}</strong> · Deuda {formatearMontoBase(posicion.debt_base)}
-                </span>
-              )}
-              {posicion && <span className="text-xs text-muted-foreground">Leída {haceCuanto(posicion.read_at)}</span>}
-            </>
+            <Senales compacto alertas={alertas} dato={TEXTO_FRESCURA[frescuraDato(posicion, cuenta.interval_seconds)]} actividad={actividadCuenta(posicion)} />
           )}
         </div>
+        {posicion && <p className="mt-1 text-xs text-muted-foreground">Leída {haceCuanto(posicion.read_at)}</p>}
       </Link>
     </li>
   );
 }
 
-function AgregarCuenta({ org }: { org: string }) {
+function AgregarCuenta({ org, abierto }: { org: string; abierto: boolean }) {
   const navigate = useNavigate();
   const [direccion, setDireccion] = useState("");
   const [etiqueta, setEtiqueta] = useState("");
@@ -74,8 +75,9 @@ function AgregarCuenta({ org }: { org: string }) {
   };
 
   return (
-    <Tarjeta titulo="Observar una dirección">
-      <form onSubmit={enviar} className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end" noValidate>
+    <details open={abierto} className="rounded-lg border border-border bg-card p-4">
+      <summary className="cursor-pointer text-base font-semibold">Observar una dirección</summary>
+      <form onSubmit={enviar} className="mt-3 grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end" noValidate>
         <label className="text-sm">
           Dirección
           <input
@@ -103,31 +105,32 @@ function AgregarCuenta({ org }: { org: string }) {
           Nombre (opcional)
           <input value={etiqueta} onChange={(e) => setEtiqueta(e.target.value)} maxLength={200} className="mt-1 w-full rounded border border-border bg-background px-3 py-2" />
         </label>
-        <button type="submit" disabled={crear.isPending} className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+        <Boton type="submit" variante="primario" disabled={crear.isPending}>
           {crear.isPending ? "Agregando…" : "Agregar"}
-        </button>
+        </Boton>
       </form>
       {aviso && (
-        <p id="aviso-direccion" role="alert" className="mt-2 text-sm text-risk-high">
+        <p id="aviso-direccion" role="alert" className="mt-2 text-sm text-risk-text-high">
           {aviso}
         </p>
       )}
       {crear.error && <div className="mt-3"><ErrorVista error={crear.error} /></div>}
-      <p className="mt-3 text-xs text-muted-foreground">
-        Solo leo la posición: ChainSignal no firma ni mueve fondos y no necesita acceso a la wallet.
-      </p>
-    </Tarjeta>
+      <p className="mt-3 text-xs text-muted-foreground">Solo leo la posición: no firmo, no muevo fondos y no necesito acceso a la wallet.</p>
+    </details>
   );
 }
 
 export default function Posiciones() {
   const { org, puede } = useOrgActual();
   const { data: cuentas, error, isLoading, refetch } = useCuentas(org);
+  const incidentes = useIncidentes(org, "active");
+  const porCuenta = (id: string) => (incidentes.data ?? []).filter((i) => i.account_id === id);
+  // Primero las cuentas con alertas abiertas: son las que necesitan atención.
+  const ordenadas = [...(cuentas ?? [])].sort((a, b) => Number(porCuenta(b.id).length > 0) - Number(porCuenta(a.id).length > 0));
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Posiciones</h1>
-      {puede("operator") && <AgregarCuenta org={org} />}
+      <Titulo subtitulo="Aave V3 en Ethereum mainnet. Las alertas salen de tus políticas; el estado del dato, de la última lectura.">Posiciones</Titulo>
       {isLoading ? (
         <Cargando />
       ) : error ? (
@@ -138,11 +141,12 @@ export default function Posiciones() {
         </Vacio>
       ) : (
         <ul className="space-y-2" aria-label="Cuentas observadas">
-          {cuentas.map((c) => (
-            <FilaCuenta key={c.id} org={org} cuenta={c} />
+          {ordenadas.map((c) => (
+            <FilaCuenta key={c.id} org={org} cuenta={c} incidentes={porCuenta(c.id)} />
           ))}
         </ul>
       )}
+      {puede("operator") && <AgregarCuenta org={org} abierto={!cuentas?.length} />}
     </div>
   );
 }

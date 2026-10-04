@@ -1,14 +1,22 @@
 // Explicación del incidente: por defecto la plantilla determinista. Si una
 // persona operadora la genera y el modelo está habilitado, muestro la del
 // modelo solo si pasó la validación; si no, la API devuelve la plantilla y el
-// motivo. Las referencias apuntan al snapshot, la versión de la regla y la
-// evidencia que respaldan cada enunciado.
+// motivo.
+//
+// Cada enunciado cita referencias internas (snapshot:N, rule_version:N,
+// evidence:N). Las convierto en enlaces legibles hacia la evidencia de este
+// mismo incidente, que ya llegó autorizada para esta organización. Una
+// referencia que no está en el incidente no se enlaza. Las referencias
+// originales quedan en "Procedencia".
 
+import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { claves, useExplicacion } from "@/lib/consultas";
 import { useOrgActual } from "@/lib/sesion";
-import { Cargando, ErrorVista, Insignia, Tarjeta } from "@/components/Estados";
+import { enlaceDeReferencia } from "@/lib/referencias";
+import type { IncidenteDetalle } from "@/lib/tipos";
+import { Boton, Cargando, DetalleTecnico, ErrorVista, Insignia, Tarjeta } from "@/components/Estados";
 
 const MOTIVOS: Record<string, string> = {
   model_disabled: "el modelo no está habilitado",
@@ -21,14 +29,38 @@ const MOTIVOS: Record<string, string> = {
   validation_failed: "la salida del modelo no pasó la validación",
 };
 
-export function ExplicacionIncidente({ incidente }: { incidente: string }) {
+function Referencias({ refs, incidente, org }: { refs: string[]; incidente: IncidenteDetalle; org: string }) {
+  return (
+    <span className="text-xs text-muted-foreground">
+      {" ("}
+      {refs.map((ref, i) => {
+        const e = enlaceDeReferencia(ref, incidente, org);
+        const separador = i < refs.length - 1 ? ", " : "";
+        if (!e.href) return <span key={ref}>{e.texto}{separador}</span>;
+        return (
+          <span key={ref}>
+            {e.interno ? (
+              <a href={e.href} className="text-primary underline-offset-4 hover:underline">{e.texto}</a>
+            ) : (
+              <Link to={e.href} className="text-primary underline-offset-4 hover:underline">{e.texto}</Link>
+            )}
+            {separador}
+          </span>
+        );
+      })}
+      {")"}
+    </span>
+  );
+}
+
+export function ExplicacionIncidente({ incidente }: { incidente: IncidenteDetalle }) {
   const { org, puede } = useOrgActual();
-  const { data, error, isLoading, refetch } = useExplicacion(org, incidente);
+  const { data, error, isLoading, refetch } = useExplicacion(org, incidente.id);
   const cliente = useQueryClient();
   // Muestro lo que devolvió la generación; no vuelvo a pedir la última guardada.
   const generar = useMutation({
-    mutationFn: () => api.generarExplicacion(org, incidente),
-    onSuccess: (nueva) => cliente.setQueryData(claves.explicacion(org, incidente), nueva),
+    mutationFn: () => api.generarExplicacion(org, incidente.id),
+    onSuccess: (nueva) => cliente.setQueryData(claves.explicacion(org, incidente.id), nueva),
   });
 
   return (
@@ -36,14 +68,9 @@ export function ExplicacionIncidente({ incidente }: { incidente: string }) {
       titulo="Explicación"
       accion={
         puede("operator") && (
-          <button
-            type="button"
-            onClick={() => generar.mutate()}
-            disabled={generar.isPending}
-            className="rounded border border-border px-3 py-1 text-sm hover:border-primary disabled:opacity-50"
-          >
+          <Boton onClick={() => generar.mutate()} disabled={generar.isPending}>
             {generar.isPending ? "Generando…" : "Generar explicación"}
-          </button>
+          </Boton>
         )
       }
     >
@@ -63,7 +90,8 @@ export function ExplicacionIncidente({ incidente }: { incidente: string }) {
           <ul className="space-y-1">
             {data.explanation.statements.map((e, i) => (
               <li key={i}>
-                {e.text} <span className="font-mono text-xs text-muted-foreground">[{e.refs.join(", ")}]</span>
+                {e.text}
+                <Referencias refs={e.refs} incidente={incidente} org={org} />
               </li>
             ))}
           </ul>
@@ -74,6 +102,16 @@ export function ExplicacionIncidente({ incidente }: { incidente: string }) {
               ))}
             </ul>
           )}
+          <DetalleTecnico titulo="Procedencia">
+            <ul className="space-y-0.5">
+              {data.explanation.statements.map((e, i) => (
+                <li key={i}>
+                  enunciado {i + 1}: {e.refs.join(", ")}
+                </li>
+              ))}
+              {data.validation_errors.length > 0 && <li>validación: {data.validation_errors.join("; ")}</li>}
+            </ul>
+          </DetalleTecnico>
         </div>
       )}
       {generar.error && <div className="mt-3"><ErrorVista error={generar.error} /></div>}

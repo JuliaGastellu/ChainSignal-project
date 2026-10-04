@@ -28,9 +28,14 @@ class Settings(BaseSettings):
     WORKER_MAX_ATTEMPTS: int = int(os.getenv("WORKER_MAX_ATTEMPTS", "5"))
     # Apagado por defecto: en este entorno no envío mensajes reales a terceros.
     NOTIFICATIONS_WEBHOOKS_ENABLED: bool = os.getenv("NOTIFICATIONS_WEBHOOKS_ENABLED", "false").lower() == "true"
+    # Solo fuera de producción: destinos de prueba "host:puerto" que pueden ser
+    # privados y una CA propia, para validar entregas en un entorno controlado.
+    WEBHOOK_TEST_ALLOWED_TARGETS: str = os.getenv("WEBHOOK_TEST_ALLOWED_TARGETS", "")
+    WEBHOOK_CA_BUNDLE: str = os.getenv("WEBHOOK_CA_BUNDLE", "")
     MAX_EVENT_STREAMS_PER_ORG: int = int(os.getenv("MAX_EVENT_STREAMS_PER_ORG", "10"))
     # Experiencia comercial (E06).
     SIGNUP_ENABLED: bool = os.getenv("SIGNUP_ENABLED", "false").lower() == "true"
+    SIGNUP_RATE_LIMIT_PER_HOUR: int = int(os.getenv("SIGNUP_RATE_LIMIT_PER_HOUR", "5"))
     DEMO_ENABLED: bool = os.getenv("DEMO_ENABLED", "true").lower() == "true"
     DEMO_TTL_HOURS: float = float(os.getenv("DEMO_TTL_HOURS", "24"))
     # Solo fuera de producción: reproduzco una lectura grabada (tests/datos/...)
@@ -125,6 +130,8 @@ class Settings(BaseSettings):
 
     def _validar_produccion(self) -> None:
         """Lo mínimo para operar el piloto sin sorpresas (E08)."""
+        if self.WEBHOOK_TEST_ALLOWED_TARGETS or self.WEBHOOK_CA_BUNDLE:
+            raise RuntimeError("WEBHOOK_TEST_ALLOWED_TARGETS y WEBHOOK_CA_BUNDLE son solo para pruebas; no se permiten en producción.")
         if not self.DATABASE_URL.startswith("postgresql"):
             raise RuntimeError("En producción DATABASE_URL es obligatoria y debe apuntar a PostgreSQL.")
         if self.DB_AUTO_MIGRATE:

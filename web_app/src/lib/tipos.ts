@@ -6,23 +6,52 @@ export type EstadoCalidad = "FRESH" | "STALE" | "PARTIAL" | "UNAVAILABLE";
 export type Severidad = "low" | "medium" | "high" | "critical";
 export type EstadoIncidente = "open" | "acknowledged" | "resolved";
 
+export interface ItemAtencion {
+  kind: "incident" | "data";
+  incident_id?: string;
+  account_id: string;
+  account_label: string | null;
+  account_address: string | null;
+  rule_type?: "health_factor_below" | "debt_change" | "stale_data";
+  severity?: Severidad;
+  status?: EstadoIncidente;
+  observed?: Record<string, unknown>;
+  data_quality: string | null;
+  stale?: boolean;
+  opened_at?: number;
+  last_evaluated_at: number | null;
+}
+
+export type MotivoLectura = "unavailable" | "partial" | "stale" | "outdated" | "no_read";
+export type MotivoCanal = "webhooks_disabled" | "channel_disabled" | "last_delivery_failed" | "not_tested" | "none" | "simulated_only";
+
 export interface Resumen {
   organization: { id: string; name: string; is_demo: boolean; expires_at: number | null };
+  attention: ItemAtencion[];
+  readiness: {
+    account_observed: boolean;
+    valid_read: boolean;
+    policy_enabled: boolean;
+    external_channel_verified: boolean;
+    ready: boolean;
+    simulated: boolean;
+    /** Si alguna vez se completó cada paso; no dice que el circuito funcione ahora. */
+    configured: boolean;
+    /** Por qué una condición vigente no se cumple (null si se cumple). */
+    issues: {
+      valid_read: MotivoLectura | null;
+      policy_enabled: "paused" | "none" | null;
+      external_channel_verified: MotivoCanal | null;
+    };
+  };
+  practice: { incident_reviewed: boolean };
   accounts: number;
   accounts_by_data_quality: Record<string, number>;
   active_incidents: number;
   active_incidents_by_severity: Partial<Record<Severidad, number>>;
   enabled_policies: number;
-  channels: number;
-  verified_channels: number;
+  channels: { total: number; simulated: number; external: number; external_verified: number; webhooks_enabled: boolean };
   last_evaluation_at: number | null;
-  checklist: {
-    account_added: boolean;
-    first_snapshot: boolean;
-    policy_created: boolean;
-    channel_verified: boolean;
-    incident_reviewed: boolean;
-  };
 }
 
 export interface Cuenta {
@@ -118,7 +147,16 @@ export interface Evidencia {
 export interface IncidenteDetalle extends Incidente {
   evidence: Evidencia[];
   alerts: { id: string; kind: string; severity: Severidad; created_at: number }[];
-  deliveries: { alert_id: string; channel_id: string; status: string; attempts: number; sent_at: number | null; last_error: string | null }[];
+  deliveries: {
+    alert_id: string;
+    channel_id: string;
+    channel_kind: "sandbox" | "webhook" | null;
+    status: string;
+    outcome: ResultadoEntrega;
+    attempts: number;
+    sent_at: number | null;
+    last_error: string | null;
+  }[];
 }
 
 export type EstadoSuscripcion = "trialing" | "active" | "past_due" | "canceled" | "expired" | "demo" | "none";
@@ -168,14 +206,59 @@ export interface Politica {
   updated_at: number;
 }
 
+// Lo que puedo afirmar de una entrega: simulada (sandbox), aceptada por el destino
+// externo (HTTP 2xx), fallida o pendiente. Nunca "recibida por una persona".
+export type ResultadoEntrega = "simulated" | "accepted_by_destination" | "failed" | "pending";
+
 export interface Canal {
   id: string;
   kind: "sandbox" | "webhook";
   name: string;
-  config: Record<string, unknown>;
+  config: { host?: string };
   enabled: boolean;
   verified_at: number | null;
   created_at: number;
+  last_test: { status: string; outcome: ResultadoEntrega; error: string | null; at: number } | null;
+  signing_secret?: string; // solo en la respuesta de creación de un webhook
+}
+
+export interface ListaCanales {
+  channels: Canal[];
+  webhooks_enabled: boolean;
+}
+
+export interface PruebaCanal {
+  outbox_id: number;
+  status: string;
+  kind: "sandbox" | "webhook";
+  outcome: ResultadoEntrega;
+  error: string | null;
+}
+
+export interface VistaPreviaPolitica {
+  type: string;
+  severity: Severidad;
+  escalate_after_seconds: number;
+  opens: Record<string, unknown> & { when: string };
+  clears: Record<string, unknown> & { when: string };
+}
+
+export interface VersionPolitica {
+  version: number;
+  rule: Record<string, unknown>;
+  created_at: number;
+  created_by_user_id: string | null;
+}
+
+export interface Invitacion {
+  id: string;
+  email: string;
+  role: Rol;
+  created_at: number;
+  expires_at: number;
+  accepted_at: number | null;
+  revoked_at: number | null;
+  token?: string; // solo en la respuesta de creación
 }
 
 export interface Miembro {

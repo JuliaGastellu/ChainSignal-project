@@ -72,7 +72,7 @@ Uso P0 para bloqueos antes de exponer operaciones con fondos; P1 para condicione
 | A23 | P1 | Tracking, QueueManager, LearningStore y EventBus | Estado local y SSE sin replay. Persisto eventos, cursor y límites por organización |
 | A24 | P1 | infra/db.py | Producción puede usar SQLite temporal; create_all no migra. Exijo Postgres y migraciones con restore |
 | A25 | P1 | Dockerfile, Compose y render.yaml | CMD api.server inexistente; web legacy con --reload; Render solo API. Diseño despliegue completo |
-| A26 | P1 | requirements; WDK latest; OpenClaw no-op | Instalación no reproducible y dependencias sin valor comprobado. Declaro imports directos y fijo versiones probadas |
+| A26 | P1 | requirements; WDK latest; orquestación externa no-op | Instalación no reproducible y dependencias sin valor comprobado. Declaro imports directos y fijo versiones probadas |
 | A27 | P1 | Vitest, lint, tsc y test_x402 | Prueba trivial, hook condicional, tipos inválidos y tests premium frente a report gratuito. CI y pruebas de comportamiento |
 | A28 | P1 | git ls-files de logs/cache/storage | Versiono estado operativo; ignore no lo desversiona. Inventario, preservación y bajas revisables |
 | A29 | P1 | Documentación y manifiestos | No encuentro LICENSE raíz ni política de seguridad; existía crédito de herramienta en plan. Documento en mi voz y dejo licencia como decisión explícita |

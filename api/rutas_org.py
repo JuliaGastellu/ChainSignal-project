@@ -117,7 +117,7 @@ def login(body: LoginBody, request: Request, response: Response):
     return _sesion_publica(sesion, csrf)
 
 
-_limite_alta = LimiteSimple(maximo=5, ventana_segundos=3600)
+_limite_alta = LimiteSimple(maximo=settings.SIGNUP_RATE_LIMIT_PER_HOUR, ventana_segundos=3600)
 _limite_demo = LimiteSimple(maximo=20, ventana_segundos=3600)
 
 
@@ -185,6 +185,22 @@ def crear_demo(request: Request, response: Response):
     datos = crear()
     escribir_cookies_de_sesion(response, datos["token"], datos["csrf"])
     return {"organization_id": datos["organization_id"], "expires_at": datos["expires_at"], "csrf_token": datos["csrf"]}
+
+
+@demo.post("/practice", status_code=201)
+def crear_practica(request: Request, sesion: SesionActiva = Depends(requiere_sesion)):
+    """Organización de práctica con datos sintéticos para la persona con sesión."""
+    if not settings.DEMO_ENABLED:
+        raise NoEncontradoRuta("Practice is not enabled.")
+    verificar_origen(request)
+    from api.sesion import verificar_csrf
+
+    verificar_csrf(request, sesion)
+    if not _limite_demo.permitir(f"practica:{sesion.user_id}"):
+        raise LimiteExcedido("Too many practice organizations; try again later.")
+    from monitoreo.demo import crear_practica as crear
+
+    return crear(sesion)
 
 
 invitaciones = APIRouter(tags=["invitations"])
@@ -488,7 +504,9 @@ def _explicar(funcion):
 
 @orgs.get("/channels")
 def listar_canales(ctx: ContextoOrg = Depends(contexto_org("viewer"))):
-    return {"channels": servicio_notificaciones().listar_canales(ctx)}
+    # Digo si los webhooks están habilitados en esta instancia: la interfaz
+    # explica el siguiente paso en lugar de ofrecer algo que va a fallar.
+    return {"channels": servicio_notificaciones().listar_canales(ctx), "webhooks_enabled": settings.NOTIFICATIONS_WEBHOOKS_ENABLED}
 
 
 @orgs.post("/channels", status_code=201)
@@ -514,6 +532,19 @@ def listar_politicas(limit: int = Query(50), offset: int = Query(0), ctx: Contex
 @orgs.post("/policies", status_code=201)
 def crear_politica(body: PoliticaBody, ctx: ContextoOrg = Depends(contexto_org("operator"))):
     return servicio_recursos().crear_politica(ctx, body.name, body.rule, body.account_id, body.enabled)
+
+
+class VistaPreviaBody(_Estricto):
+    rule: Dict[str, Any]
+
+
+@orgs.post("/policies/preview")
+def vista_previa_politica(body: VistaPreviaBody, ctx: ContextoOrg = Depends(contexto_org("operator"))):
+    """Normalizo la regla como al guardarla y describo cuándo abre y cuándo despeja. No guarda nada."""
+    from identidad.recursos import validar_regla
+    from monitoreo.reglas import describir_regla
+
+    return describir_regla(validar_regla(body.rule))
 
 
 @orgs.patch("/policies/{policy_id}")

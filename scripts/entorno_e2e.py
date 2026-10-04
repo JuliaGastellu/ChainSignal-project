@@ -32,6 +32,8 @@ def entorno(directorio: Path, origen_web: str) -> dict:
         "DATABASE_URL": f"sqlite:///{(directorio / 'e2e.sqlite3').as_posix()}",
         "AAVE_REPLAY_FIXTURE": str(FIXTURE),
         "SIGNUP_ENABLED": "true",
+        # Los E2E crean varias organizaciones desde 127.0.0.1 en pocos minutos.
+        "SIGNUP_RATE_LIMIT_PER_HOUR": "100",
         "DEMO_ENABLED": "true",
         "NOTIFICATIONS_WEBHOOKS_ENABLED": "false",
         "CORS_ALLOWED_ORIGINS": origen_web,
@@ -46,10 +48,28 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--puerto", type=int, default=8001)
     parser.add_argument("--origen-web", default="http://127.0.0.1:4173")
+    parser.add_argument("--puerto-receptor", type=int, default=9443)
     args = parser.parse_args()
 
     directorio = Path(tempfile.mkdtemp(prefix="chainsignal-e2e-"))
     variables = entorno(directorio, args.origen_web)
+    # Receptor HTTPS local para validar webhooks externos sin salir a internet.
+    # Si no hay openssl para el certificado, los webhooks quedan deshabilitados.
+    sys.path.insert(0, str(RAIZ))
+    from operacion.receptor_prueba import generar_certificado, servir
+
+    certificado = generar_certificado(directorio)
+    if certificado:
+        registro = directorio / "webhooks-recibidos.jsonl"
+        servir(args.puerto_receptor, certificado[0], certificado[1], registro)
+        variables.update({
+            "NOTIFICATIONS_WEBHOOKS_ENABLED": "true",
+            "WEBHOOK_TEST_ALLOWED_TARGETS": f"localhost:{args.puerto_receptor}",
+            "WEBHOOK_CA_BUNDLE": str(certificado[0]),
+        })
+        print(f"Receptor de webhooks de prueba en https://localhost:{args.puerto_receptor} (registro: {registro})", flush=True)
+    else:
+        print("Sin openssl: webhooks deshabilitados en este entorno.", flush=True)
     # Migro antes de arrancar los procesos para que no compitan por crear el esquema.
     subprocess.run([sys.executable, "-c", "from infra.db import init_db, engine; init_db(engine)"],
                    cwd=directorio, env=variables, check=True)

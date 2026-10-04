@@ -37,7 +37,7 @@ describe("plan de la organización", () => {
     expect(await screen.findByText("Prueba")).toBeInTheDocument();
     expect(screen.getByText("3 de 10")).toBeInTheDocument();
     expect(screen.getByText(/Precio de piloto en validación, no tarifa definitiva/)).toBeInTheDocument();
-    expect(screen.getByText(/No pedimos tarjeta ni cobramos de forma automática/)).toBeInTheDocument();
+    expect(screen.getByText(/No pido tarjeta ni cobro de forma automática/)).toBeInTheDocument();
   });
 
   it("cancelar pide confirmación y muestra la cancelación programada", async () => {

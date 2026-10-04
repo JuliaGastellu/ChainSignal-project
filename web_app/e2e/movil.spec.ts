@@ -1,23 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { capturar, entrarADemo } from "./ayudantes";
-
-// Elementos que se salen del ancho de la pantalla, sin contar los que viven dentro
-// de un contenedor con scroll horizontal propio (la barra de secciones, tablas).
-async function desbordes(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
-    const ancho = document.documentElement.clientWidth;
-    const dentroDeScroll = (el: Element | null): boolean => {
-      for (let p = el?.parentElement; p; p = p.parentElement) {
-        const ox = getComputedStyle(p).overflowX;
-        if (ox === "auto" || ox === "scroll" || ox === "hidden") return true;
-      }
-      return false;
-    };
-    return [...document.querySelectorAll("body *")]
-      .filter((el) => el.getBoundingClientRect().right > ancho + 1 && !dentroDeScroll(el))
-      .map((el) => `${el.tagName.toLowerCase()}: ${(el.textContent ?? "").slice(0, 40)}`);
-  });
-}
+import { expect, test } from "@playwright/test";
+import { capturar, desbordes, entrarADemo } from "./ayudantes";
 
 test("en un viewport móvil no hay scroll horizontal y la navegación es usable", async ({ page }) => {
   const org = await entrarADemo(page);

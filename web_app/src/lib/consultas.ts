@@ -41,6 +41,8 @@ export const claves = {
   canales: (org: string) => ["org", org, "canales"] as const,
   miembros: (org: string) => ["org", org, "miembros"] as const,
   suscripcion: (org: string) => ["org", org, "suscripcion"] as const,
+  invitaciones: (org: string) => ["org", org, "invitaciones"] as const,
+  versiones: (org: string, id: string) => ["org", org, "versiones", id] as const,
 };
 
 export const useResumen = (org: string) =>
@@ -55,6 +57,10 @@ export const useSuscripcion = (org: string) =>
   useQuery({ queryKey: claves.suscripcion(org), queryFn: () => api.suscripcion(org), enabled: Boolean(org) });
 export const usePoliticas = (org: string) => useQuery({ queryKey: claves.politicas(org), queryFn: () => api.politicas(org) });
 export const useCanales = (org: string) => useQuery({ queryKey: claves.canales(org), queryFn: () => api.canales(org) });
+export const useInvitaciones = (org: string, habilitado: boolean) =>
+  useQuery({ queryKey: claves.invitaciones(org), queryFn: () => api.invitaciones(org), enabled: habilitado });
+export const useVersiones = (org: string, id: string, habilitado: boolean) =>
+  useQuery({ queryKey: claves.versiones(org, id), queryFn: () => api.versionesPolitica(org, id), enabled: habilitado });
 export const useMiembros = (org: string) => useQuery({ queryKey: claves.miembros(org), queryFn: () => api.miembros(org) });
 
 // "Sin snapshot todavía" (404) es un estado de la cuenta, no un error: lo devuelvo como null.

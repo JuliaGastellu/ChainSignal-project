@@ -11,7 +11,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, JuliaGastellu]
   pull_request:
 
 permissions:

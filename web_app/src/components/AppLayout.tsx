@@ -19,11 +19,13 @@ const SECCIONES = [
   { ruta: "configuracion", texto: "Configuración" },
 ];
 
+// Describe la conexión de esta pantalla con el servicio de ChainSignal, no la
+// frescura de los datos de mercado: eso lo dice cada cuenta ("Dato: ...").
 const CONEXION: Record<EstadoConexion, { texto: string; clase: string }> = {
-  conectando: { texto: "Conectando…", clase: "bg-muted-foreground" },
-  conectado: { texto: "En vivo", clase: "bg-risk-low" },
-  reconectando: { texto: "Reconectando…", clase: "bg-risk-medium" },
-  detenido: { texto: "Sin actualizaciones en vivo", clase: "bg-risk-high" },
+  conectando: { texto: "Servicio: conectando…", clase: "bg-muted-foreground" },
+  conectado: { texto: "Servicio: en vivo", clase: "bg-risk-low" },
+  reconectando: { texto: "Servicio: reconectando…", clase: "bg-risk-medium" },
+  detenido: { texto: "Servicio: sin actualizaciones en vivo", clase: "bg-risk-high" },
 };
 
 export function AppLayout() {
@@ -64,7 +66,7 @@ export function AppLayout() {
         Saltar al contenido
       </a>
       <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 sm:py-3">
           <span className="font-semibold">ChainSignal</span>
           {sesion.memberships.length > 1 ? (
             <label className="flex items-center gap-2 text-sm">
@@ -84,10 +86,17 @@ export function AppLayout() {
           ) : (
             <span className="text-sm text-muted-foreground">{membresia.organization_name}</span>
           )}
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
-            <span aria-hidden className={cn("inline-block h-2 w-2 rounded-full", CONEXION[conexion].clase)} />
-            {CONEXION[conexion].texto}
-          </span>
+          <details className="relative text-xs text-muted-foreground">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded" aria-describedby="explicacion-conexion">
+              <span aria-hidden className={cn("inline-block h-2 w-2 rounded-full", CONEXION[conexion].clase)} />
+              <span role="status" aria-live="polite">{CONEXION[conexion].texto}</span>
+              <span aria-hidden className="text-[10px]">ⓘ</span>
+            </summary>
+            <p id="explicacion-conexion" className="absolute left-0 z-20 mt-2 w-64 rounded border border-border bg-card p-3 text-foreground shadow-lg">
+              Indica si esta pantalla recibe actualizaciones del servicio de ChainSignal en tiempo real. No dice nada sobre la frescura de los datos de
+              mercado: eso se ve en cada cuenta, como "Dato actualizado" o "Dato atrasado".
+            </p>
+          </details>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="hidden text-muted-foreground sm:inline">{sesion.user.email}</span>
             <button type="button" onClick={cerrarSesion} className="text-primary underline-offset-4 hover:underline">
@@ -95,15 +104,15 @@ export function AppLayout() {
             </button>
           </div>
         </div>
-        <nav aria-label="Secciones" className="mx-auto max-w-6xl overflow-x-auto px-4">
-          <ul className="flex gap-1">
+        <nav aria-label="Secciones" className="mx-auto max-w-6xl overflow-x-auto px-2 sm:px-4">
+          <ul className="flex sm:gap-1">
             {SECCIONES.map((s) => (
               <li key={s.ruta}>
                 <NavLink
                   to={`/app/${org}/${s.ruta}`}
                   className={({ isActive }) =>
                     cn(
-                      "inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm",
+                      "inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-1.5 py-2 text-[13px] sm:gap-2 sm:px-3 sm:text-sm",
                       isActive ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
                     )
                   }
@@ -121,8 +130,9 @@ export function AppLayout() {
         </nav>
       </header>
       {esDemo && (
-        <div className="border-b border-risk-medium/40 bg-risk-medium/10 px-4 py-2 text-center text-sm">
-          Estás en una demo con datos sintéticos, aislada de cualquier cuenta real. Vence el {formatearFecha(resumen.data?.organization.expires_at)}
+        <div className="border-b border-risk-medium/40 bg-risk-medium/10 px-4 py-2 text-center text-xs sm:text-sm">
+          Datos sintéticos: el recorrido y los canales son simulados y están aislados de las cuentas reales.{" "}
+          <span className="whitespace-nowrap">Vence el {formatearFecha(resumen.data?.organization.expires_at)}</span>
         </div>
       )}
       <main id="contenido" className="mx-auto max-w-6xl px-4 py-6">

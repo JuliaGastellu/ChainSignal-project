@@ -4,8 +4,10 @@ import { defineConfig, devices } from "@playwright/test";
 // lectura de Aave V3 reproducida desde una fixture (scripts/entorno_e2e.py), y
 // la interfaz compilada servida por `vite preview`. Nada apunta a producción.
 const python = process.env.CHAINSIGNAL_PYTHON ?? "python";
-const PUERTO_API = 8001;
-const PUERTO_WEB = 4173;
+// Puertos configurables para no chocar con otro entorno levantado en la misma máquina.
+const PUERTO_API = Number(process.env.CHAINSIGNAL_E2E_API_PORT ?? 8001);
+const PUERTO_WEB = Number(process.env.CHAINSIGNAL_E2E_WEB_PORT ?? 4173);
+const PUERTO_RECEPTOR = Number(process.env.CHAINSIGNAL_E2E_RECEPTOR_PORT ?? 9443);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -29,7 +31,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `"${python}" ../scripts/entorno_e2e.py --puerto ${PUERTO_API} --origen-web http://127.0.0.1:${PUERTO_WEB}`,
+      command: `"${python}" ../scripts/entorno_e2e.py --puerto ${PUERTO_API} --origen-web http://127.0.0.1:${PUERTO_WEB} --puerto-receptor ${PUERTO_RECEPTOR}`,
       url: `http://127.0.0.1:${PUERTO_API}/health`,
       timeout: 120_000,
       reuseExistingServer: false,

@@ -8,6 +8,7 @@ import { useSesion } from "@/lib/sesion";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
+import Invitacion from "./pages/Invitacion";
 import NotFound from "./pages/NotFound";
 import Resumen from "./pages/app/Resumen";
 import Posiciones from "./pages/app/Posiciones";
@@ -70,6 +71,7 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Registro />} />
+          <Route path="/invitacion" element={<Invitacion />} />
           <Route path="/app" element={<RequireSession><InicioApp /></RequireSession>} />
           <Route path="/app/:org" element={<RequireSession><AppLayout /></RequireSession>}>
             <Route index element={<Navigate to="resumen" replace />} />

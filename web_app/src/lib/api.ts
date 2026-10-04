@@ -3,7 +3,9 @@
 // en la cookie legible cs_csrf. No hay ninguna clave global en el bundle.
 // Una respuesta no OK nunca se trata como éxito: siempre termina en ApiError.
 
-import type { Canal, Cuenta, Explicacion, Suscripcion, IncidenteDetalle, Incidente, Miembro, Politica, Posicion, Resumen } from "./tipos";
+import type {
+  Canal, Invitacion, ListaCanales, PruebaCanal, VersionPolitica, VistaPreviaPolitica,
+  Cuenta, Explicacion, Suscripcion, IncidenteDetalle, Incidente, Miembro, Politica, Posicion, Resumen } from "./tipos";
 
 const baseConfigurada = (import.meta.env.VITE_API_BASE as string | undefined)?.trim();
 
@@ -116,10 +118,28 @@ export const api = {
   politicas: (org: string) => apiJson<{ policies: Politica[] }>(`/orgs/${org}/policies`).then((r) => r.policies),
   crearPolitica: (org: string, name: string, rule: Record<string, unknown>) =>
     apiJson<Politica>(`/orgs/${org}/policies`, { method: "POST", ...json({ name, rule }) }),
+  actualizarPolitica: (org: string, id: string, cambios: { name?: string; rule?: Record<string, unknown>; enabled?: boolean }) =>
+    apiJson<Politica>(`/orgs/${org}/policies/${id}`, { method: "PATCH", ...json(cambios) }),
+  versionesPolitica: (org: string, id: string) =>
+    apiJson<{ versions: VersionPolitica[] }>(`/orgs/${org}/policies/${id}/versions`).then((r) => r.versions),
+  vistaPreviaPolitica: (org: string, rule: Record<string, unknown>) =>
+    apiJson<VistaPreviaPolitica>(`/orgs/${org}/policies/preview`, { method: "POST", ...json({ rule }) }),
 
-  canales: (org: string) => apiJson<{ channels: Canal[] }>(`/orgs/${org}/channels`).then((r) => r.channels),
-  crearCanal: (org: string, name: string) => apiJson<Canal>(`/orgs/${org}/channels`, { method: "POST", ...json({ kind: "sandbox", name }) }),
-  probarCanal: (org: string, id: string) => apiJson<{ status: string }>(`/orgs/${org}/channels/${id}/test`, { method: "POST" }),
+  canales: (org: string) => apiJson<ListaCanales>(`/orgs/${org}/channels`),
+  crearCanal: (org: string, kind: "sandbox" | "webhook", name: string, config: Record<string, unknown> = {}) =>
+    apiJson<Canal>(`/orgs/${org}/channels`, { method: "POST", ...json({ kind, name, config }) }),
+  probarCanal: (org: string, id: string) => apiJson<PruebaCanal>(`/orgs/${org}/channels/${id}/test`, { method: "POST" }),
+
+  invitaciones: (org: string) => apiJson<{ invitations: Invitacion[] }>(`/orgs/${org}/invitations`).then((r) => r.invitations),
+  invitar: (org: string, email: string, role: string) =>
+    apiJson<Invitacion>(`/orgs/${org}/invitations`, { method: "POST", ...json({ email, role }) }),
+  revocarInvitacion: (org: string, id: string) => apiJson<void>(`/orgs/${org}/invitations/${id}`, { method: "DELETE" }),
+  aceptarInvitacion: (token: string, password?: string) =>
+    apiJson<{ organization_id: string; new_user: boolean }>("/invitations/accept", { method: "POST", ...json({ token, password: password || null }) }),
+  cambiarRol: (org: string, membresia: string, role: string) =>
+    apiJson<{ role: string }>(`/orgs/${org}/members/${membresia}`, { method: "PATCH", ...json({ role }) }),
+  quitarMiembro: (org: string, membresia: string) => apiJson<void>(`/orgs/${org}/members/${membresia}`, { method: "DELETE" }),
+  practica: () => apiJson<{ organization_id: string; expires_at: number; created: boolean }>("/practice", { method: "POST" }),
 
   suscripcion: (org: string) => apiJson<Suscripcion>(`/orgs/${org}/subscription`),
   cancelarSuscripcion: (org: string) => apiJson<Suscripcion>(`/orgs/${org}/subscription/cancel`, { method: "POST" }),

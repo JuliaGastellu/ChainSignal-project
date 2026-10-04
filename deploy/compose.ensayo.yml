@@ -1,32 +1,70 @@
-# Ensayo local del piloto (E08), aislado: se suma a compose.piloto.yml.
+# Ensayo local del piloto, aislado: se suma a compose.piloto.yml.
 #
 #   python -m operacion.ensayo_staging
 #
 # Diferencias con producción, todas a propósito:
-# - APP_ENV=staging y http en 127.0.0.1 (sin TLS ni CORS https);
+# - APP_ENV=staging; el servicio `tls` hace de balanceador y termina TLS en
+#   https://localhost:8443 con un certificado autofirmado de un día que genera
+#   el ensayo (ENSAYO_CERTS). La cookie de sesión es Secure, como en producción;
+# - el webhook externo apunta a `receptor`, un receptor HTTPS dentro de la red
+#   del compose: WEBHOOK_TEST_ALLOWED_TARGETS y WEBHOOK_CA_BUNDLE solo existen
+#   acá y la API los rechaza con APP_ENV=production. Nada sale a internet;
 # - la lectura de Aave V3 se reproduce desde la fixture grabada: no hay RPC real;
 # - lease y reintentos cortos para que el ensayo dure minutos.
 # DB_AUTO_MIGRATE sigue en false: la migración es el paso aparte, como en producción.
 
+x-webhook-prueba: &webhook-prueba
+  NOTIFICATIONS_WEBHOOKS_ENABLED: "true"
+  WEBHOOK_TEST_ALLOWED_TARGETS: receptor:9443
+  WEBHOOK_CA_BUNDLE: /certs/receptor-cert.pem
+
 services:
   api:
     environment:
+      <<: *webhook-prueba
       APP_ENV: staging
-      CORS_ALLOWED_ORIGINS: http://127.0.0.1:8088
-      SESSION_COOKIE_SECURE: "false"
+      CORS_ALLOWED_ORIGINS: https://localhost:8443
+      SESSION_COOKIE_SECURE: "true"
       SIGNUP_ENABLED: "true"
       AAVE_REPLAY_FIXTURE: ${ENSAYO_FIXTURE-/app/tests/datos/aave_v3_prestatario_usdc_26116392.json}
+    volumes:
+      - ${ENSAYO_CERTS:?el ensayo define ENSAYO_CERTS}:/certs:ro
   worker:
     environment:
+      <<: *webhook-prueba
       APP_ENV: staging
       AAVE_REPLAY_FIXTURE: ${ENSAYO_FIXTURE-/app/tests/datos/aave_v3_prestatario_usdc_26116392.json}
       ETHEREUM_RPC_URL: ${ENSAYO_RPC_URL-}
       WORKER_POLL_SECONDS: "1"
       WORKER_LEASE_SECONDS: "15"
       WORKER_MAX_ATTEMPTS: "2"
+    volumes:
+      - ${ENSAYO_CERTS:?el ensayo define ENSAYO_CERTS}:/certs:ro
   migrate:
     environment:
       APP_ENV: staging
   web:
     ports: !override
       - "127.0.0.1:8088:8080"
+
+  # Balanceador de la plataforma: TLS delante de `web`.
+  tls:
+    image: nginx:1.27-alpine
+    depends_on:
+      - web
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./ensayo/tls.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${ENSAYO_CERTS:?el ensayo define ENSAYO_CERTS}:/certs:ro
+
+  # Destino externo controlado: responde 200 (500 en rutas con "/falla") y anota
+  # cada llegada en /tmp/llegadas.jsonl dentro del contenedor.
+  receptor:
+    image: chainsignal-api:${CHAINSIGNAL_VERSION:-local}
+    command: ["python", "-m", "operacion.receptor_prueba", "--host", "0.0.0.0", "--puerto", "9443",
+              "--certificado", "/certs/receptor-cert.pem", "--clave", "/certs/receptor-clave.pem", "--registro", "/tmp/llegadas.jsonl"]
+    environment:
+      CHAINSIGNAL_DISABLE_DOTENV: "1"
+    volumes:
+      - ${ENSAYO_CERTS:?el ensayo define ENSAYO_CERTS}:/certs:ro

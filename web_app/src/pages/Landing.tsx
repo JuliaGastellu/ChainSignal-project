@@ -9,9 +9,9 @@ import { ErrorVista, Insignia } from "@/components/Estados";
 // digo que evite pérdidas ni que tenga certificaciones.
 
 const PUNTOS = [
-  { titulo: "Lectura con evidencia", texto: "Cada snapshot de Aave V3 queda atado a un bloque y su hash, con la calidad del dato a la vista." },
-  { titulo: "Incidentes, no ruido", texto: "Las políticas abren un incidente una sola vez, lo escalan si nadie lo toma y lo cierran con histéresis." },
-  { titulo: "Seguimiento del equipo", texto: "Quién tomó cada incidente, cuándo y con qué nota se resolvió, por organización y con roles." },
+  { titulo: "Ves de dónde sale cada número", texto: "Cada lectura dice de qué bloque de Ethereum viene y si el dato está al día, incompleto o atrasado." },
+  { titulo: "Un aviso por problema", texto: "Una alerta se abre una vez, sube de prioridad si nadie la toma y se cierra cuando la posición se recupera de forma sostenida." },
+  { titulo: "Tu equipo sabe quién se ocupa", texto: "Queda registrado quién tomó cada alerta, cuándo y con qué nota la cerró. Cada persona ve lo que su rol permite." },
 ];
 
 const PREGUNTAS = [
@@ -53,7 +53,7 @@ function EjemploIncidente() {
         <Insignia tono="neutro">Abierto</Insignia>
         <span className="text-sm font-medium">Health factor bajo</span>
       </div>
-      <p className="mt-2 text-sm">Health factor 1,375 por debajo del umbral 1,5.</p>
+      <p className="mt-2 text-sm">Health factor 1,375 por debajo del umbral de alerta 1,5.</p>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-xs text-muted-foreground">Bloque de apertura</dt>
@@ -61,7 +61,7 @@ function EjemploIncidente() {
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Calidad del dato</dt>
-          <dd>Datos actualizados</dd>
+          <dd>Dato actualizado</dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Se cierra</dt>
@@ -131,7 +131,7 @@ function Contacto() {
         <span>Acepto que guarde mi email y mi mensaje para responderte. No los uso para otra cosa ni los comparto.</span>
       </label>
       {error && (
-        <p role="alert" className="text-sm text-risk-high sm:col-span-2">
+        <p role="alert" className="text-sm text-risk-text-high sm:col-span-2">
           {error}
         </p>
       )}
@@ -180,13 +180,12 @@ export default function Landing() {
       <main className="mx-auto max-w-5xl space-y-16 px-4 pb-16 pt-10">
         <section className="grid gap-8 lg:grid-cols-[3fr_2fr] lg:items-start">
           <div>
-            <h1 className="max-w-3xl text-3xl font-semibold leading-tight sm:text-4xl">
-              Monitoreo de posiciones en Aave V3 con evidencia, alertas y seguimiento para tu equipo.
-            </h1>
-            <p className="mt-4 max-w-2xl text-foreground/80">
-              ChainSignal observa direcciones de Ethereum, lee su posición a un bloque concreto y abre incidentes cuando el health factor cae, la deuda
-              cambia o el dato se atrasa. Solo lectura: nunca firma ni mueve fondos.
+            <h1 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">Alertas con evidencia para tus posiciones en Aave</h1>
+            <p className="mt-4 max-w-2xl text-lg text-foreground/85">
+              Si seguís posiciones con deuda en Aave V3, ChainSignal lee cada dirección y te avisa cuando el health factor baja del umbral que elegiste, cuando
+              la deuda cambia o cuando el dato se atrasa. Tu equipo ve qué pasó, con qué datos y quién se ocupó.
             </p>
+            <p className="mt-2 text-sm text-muted-foreground">Ethereum y Aave V3 · solo lectura: nunca firma ni mueve fondos.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <button type="button" onClick={probarDemo} disabled={creando}
                 className="rounded bg-primary px-5 py-2.5 font-medium text-primary-foreground disabled:opacity-50">
@@ -215,6 +214,16 @@ export default function Landing() {
           ))}
         </ul>
 
+        <details className="rounded-lg border border-border bg-card p-4 text-sm">
+          <summary className="cursor-pointer font-medium">Detalles técnicos</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-foreground/85">
+            <li>Leo con getUserAccountData del Pool de Aave V3 a un bloque explícito y guardo el número y el hash de ese bloque como evidencia.</li>
+            <li>Verifico los saldos por activo contra los contratos de cada token en el mismo bloque y marco la lectura como parcial si no coinciden.</li>
+            <li>Una alerta de health factor se despeja recién cuando el valor supera un margen sobre el umbral durante varias evaluaciones seguidas (histéresis).</li>
+            <li>Las notificaciones externas son webhooks https firmados con HMAC; no envío a direcciones privadas ni sigo redirecciones.</li>
+          </ul>
+        </details>
+
         <section aria-labelledby="titulo-alcance" className="grid gap-6 sm:grid-cols-2">
           <div>
             <h2 id="titulo-alcance" className="text-xl font-semibold">Alcance y permisos</h2>
@@ -228,7 +237,7 @@ export default function Landing() {
           <div>
             <h2 className="text-xl font-semibold">Qué datos guardo</h2>
             <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-foreground/80">
-              <li>Las direcciones que observás y los snapshots de sus posiciones.</li>
+              <li>Las direcciones que observás y las lecturas de sus posiciones.</li>
               <li>Tus políticas, incidentes, evidencia y quién hizo qué.</li>
               <li>Eventos de uso sin correos, direcciones ni montos, para medir si el producto sirve.</li>
               <li>Tu email de acceso. No lo uso para marketing.</li>

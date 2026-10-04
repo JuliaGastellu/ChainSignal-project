@@ -3,7 +3,7 @@ import { capturar, irA, crearOrganizacion, entrarADemo } from "./ayudantes";
 
 test("la demo muestra datos sintéticos y permite revisar el incidente", async ({ page }) => {
   await entrarADemo(page);
-  await expect(page.getByText(/Estás en una demo con datos sintéticos/)).toBeVisible();
+  await expect(page.getByText(/Datos sintéticos: el recorrido y los canales son simulados/)).toBeVisible();
   await capturar(page, "08-demo-resumen");
 
   await irA(page, "Posiciones");

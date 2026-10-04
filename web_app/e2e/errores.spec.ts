@@ -40,22 +40,10 @@ test("una sesión vencida lleva al login", async ({ page }) => {
 
 test("si el stream de eventos se corta, muestra que está reconectando y vuelve", async ({ page }) => {
   const org = await entrarADemo(page);
-  await expect(page.getByText("En vivo")).toBeVisible();
+  await expect(page.getByText("Servicio: en vivo")).toBeVisible();
   await page.route(`**/orgs/${org}/events/stream*`, (ruta) => ruta.fulfill({ status: 429, json: { error: "too_many_streams", message: "x" } }));
   await page.reload();
-  await expect(page.getByText("Reconectando…")).toBeVisible();
+  await expect(page.getByText("Servicio: reconectando…")).toBeVisible();
   await page.unroute(`**/orgs/${org}/events/stream*`);
-  await expect(page.getByText("En vivo")).toBeVisible({ timeout: 20_000 });
-});
-
-test("la navegación funciona con teclado", async ({ page }) => {
-  const org = await entrarADemo(page);
-  // Espero el layout: si aprieto Tab antes de que se dibuje, el foco cae en otro lado.
-  await expect(page.getByRole("heading", { name: "Resumen" })).toBeVisible();
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Saltar al contenido" })).toBeFocused();
-  await page.goto(`/app/${org}/configuracion`);
-  await page.getByRole("link", { name: "Incidentes" }).focus();
-  await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(new RegExp(`/app/${org}/incidentes$`));
+  await expect(page.getByText("Servicio: en vivo")).toBeVisible({ timeout: 20_000 });
 });

@@ -67,6 +67,12 @@ export default {
           medium: "hsl(var(--risk-medium))",
           high: "hsl(var(--risk-high))",
         },
+        // Para texto sobre fondos oscuros o tintados (contraste AA).
+        "risk-text": {
+          low: "hsl(var(--risk-low-text))",
+          medium: "hsl(var(--risk-medium-text))",
+          high: "hsl(var(--risk-high-text))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

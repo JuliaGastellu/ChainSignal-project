@@ -10,13 +10,15 @@ import {
   formatearFecha,
   formatearNumero,
   haceCuanto,
+  RESULTADO_ENTREGA,
   SEVERIDADES,
   TIPOS_REGLA,
   TONO_SEVERIDAD,
 } from "@/lib/formato";
+import { traducirErrorEntrega } from "@/lib/traducciones";
 import { useOrgActual } from "@/lib/sesion";
 import type { EstadoCalidad, Evidencia, IncidenteDetalle as Detalle } from "@/lib/tipos";
-import { Cargando, Dato, ErrorVista, Insignia, Tarjeta } from "@/components/Estados";
+import { Cargando, Dato, DetalleTecnico, ErrorVista, Insignia, Tarjeta, Titulo } from "@/components/Estados";
 import { ExplicacionIncidente } from "@/components/ExplicacionIncidente";
 
 const TIPOS_EVIDENCIA: Record<Evidencia["kind"], string> = {
@@ -26,13 +28,6 @@ const TIPOS_EVIDENCIA: Record<Evidencia["kind"], string> = {
   correction: "Corrección",
 };
 
-const ESTADOS_ENTREGA: Record<string, string> = {
-  pending: "Pendiente",
-  sending: "Enviando",
-  sent: "Enviada",
-  failed: "Falló",
-  dead: "Sin entregar: agotó los reintentos",
-};
 
 function Umbral({ incidente }: { incidente: Detalle }) {
   const v = incidente.last_observed ?? {};
@@ -129,7 +124,7 @@ export default function IncidenteDetalle() {
   const persona = (userId: string | null) =>
     userId ? (miembros.data?.find((m) => m.user_id === userId)?.email ?? "Persona fuera de la organización") : null;
   const cuenta = cuentas.data?.find((c) => c.id === incidente.account_id);
-  const canal = (canalId: string) => canales.data?.find((c) => c.id === canalId)?.name ?? "Canal";
+  const canal = (canalId: string) => canales.data?.channels.find((c) => c.id === canalId)?.name ?? "Canal";
   const apertura = incidente.evidence.find((e) => e.kind === "opening");
   const calidad = describirCalidad({
     status: incidente.data_quality as EstadoCalidad,
@@ -146,7 +141,9 @@ export default function IncidenteDetalle() {
         <Link to={`/app/${org}/incidentes`} className="text-sm text-primary underline-offset-4 hover:underline">
           ← Incidentes
         </Link>
-        <h1 className="mt-2 text-xl font-semibold">{TIPOS_REGLA[incidente.rule_type] ?? incidente.rule_type}</h1>
+        <div className="mt-2">
+          <Titulo>{TIPOS_REGLA[incidente.rule_type] ?? incidente.rule_type}</Titulo>
+        </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Insignia tono={TONO_SEVERIDAD[incidente.severity]}>{SEVERIDADES[incidente.severity]}</Insignia>
           <Insignia tono="neutro">{ESTADOS_INCIDENTE[incidente.status]}</Insignia>
@@ -169,7 +166,7 @@ export default function IncidenteDetalle() {
           <Dato etiqueta="Valor observado">
             <Valor incidente={incidente} />
           </Dato>
-          <Dato etiqueta="Umbral">
+          <Dato etiqueta="Umbral de alerta (tu política)">
             <Umbral incidente={incidente} />
           </Dato>
           <Dato etiqueta="Bloque de apertura">
@@ -188,18 +185,23 @@ export default function IncidenteDetalle() {
         )}
       </Tarjeta>
 
-      <ExplicacionIncidente incidente={incidente.id} />
+      <ExplicacionIncidente incidente={incidente} />
 
       <Acciones incidente={incidente} />
 
       <Tarjeta titulo="Historial y evidencia">
         <ol className="space-y-3">
           {incidente.evidence.map((e) => (
-            <li key={e.id} className="border-l-2 border-border pl-3 text-sm">
+            <li key={e.id} id={`evidencia-${e.id}`} tabIndex={-1} className="scroll-mt-4 border-l-2 border-border pl-3 text-sm target:border-primary">
               <p className="font-medium">
                 {TIPOS_EVIDENCIA[e.kind]} · <span className="font-normal text-muted-foreground">{formatearFecha(e.created_at)}</span>
               </p>
               {e.block_number && <p className="text-xs text-muted-foreground">Bloque {e.block_number.toLocaleString("es-AR")}</p>}
+              <DetalleTecnico titulo="Procedencia">
+                evidencia #{e.id}
+                {e.snapshot_id ? ` · snapshot #${e.snapshot_id}` : ""}
+                {e.block_hash ? ` · ${e.block_hash}` : ""} · calidad {e.data_quality}
+              </DetalleTecnico>
               {e.note && <p className="mt-1">{e.note}</p>}
               {e.corrects_evidence_id && <p className="text-xs text-muted-foreground">Corrige la evidencia #{e.corrects_evidence_id}; la original no se modifica.</p>}
               {persona(e.created_by_user_id) && <p className="text-xs text-muted-foreground">Por {persona(e.created_by_user_id)}</p>}
@@ -220,18 +222,24 @@ export default function IncidenteDetalle() {
         {incidente.deliveries.length === 0 ? (
           <p className="text-sm text-muted-foreground">No hay canales activos que recibieran este incidente.</p>
         ) : (
-          <ul className="space-y-1 text-sm">
+          <ul className="space-y-2 text-sm">
             {incidente.deliveries.map((d) => (
-              <li key={`${d.alert_id}-${d.channel_id}`} className="flex flex-wrap gap-x-2">
-                <span className="font-medium">{canal(d.channel_id)}</span>
-                <span>{ESTADOS_ENTREGA[d.status] ?? d.status}</span>
-                <span className="text-muted-foreground">
-                  {d.sent_at ? formatearFecha(d.sent_at) : `${d.attempts} intento${d.attempts === 1 ? "" : "s"}`}
-                </span>
+              <li key={`${d.alert_id}-${d.channel_id}`}>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-medium">{canal(d.channel_id)}</span>
+                  <Insignia tono={RESULTADO_ENTREGA[d.outcome].tono}>{RESULTADO_ENTREGA[d.outcome].etiqueta}</Insignia>
+                  <span className="text-muted-foreground">
+                    {d.sent_at ? formatearFecha(d.sent_at) : `${d.attempts} intento${d.attempts === 1 ? "" : "s"}`}
+                  </span>
+                </div>
+                {d.last_error && <p className="text-xs text-risk-text-high">{traducirErrorEntrega(d.last_error)}</p>}
               </li>
             ))}
           </ul>
         )}
+        <p className="mt-3 text-xs text-muted-foreground">
+          Una entrega aceptada solo dice que el destino recibió la solicitud. No puedo confirmar que una persona la haya leído.
+        </p>
       </Tarjeta>
     </div>
   );

@@ -1,12 +1,17 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { describirError } from "@/lib/formato";
 
 export default function Login() {
   const navigate = useNavigate();
   const cliente = useQueryClient();
+  const [parametros] = useSearchParams();
+  // Solo vuelvo a rutas internas: un "siguiente" externo sería una redirección abierta.
+  const siguiente = parametros.get("siguiente");
+  // Una barra invertida tras la primera barra también apunta a otro dominio en los navegadores.
+  const destino = siguiente && /^\/(?![/\\])/.test(siguiente) ? siguiente : "/app";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +24,7 @@ export default function Login() {
     try {
       const sesion = await api.login(email, password);
       cliente.setQueryData(["sesion"], sesion);
-      navigate("/app", { replace: true });
+      navigate(destino, { replace: true });
     } catch (e) {
       setError(e instanceof ApiError && e.status === 401 ? "Email o contraseña incorrectos." : describirError(e).detalle);
     } finally {
@@ -56,7 +61,7 @@ export default function Login() {
           />
         </label>
         {error && (
-          <p role="alert" className="text-sm text-risk-high">
+          <p role="alert" className="text-sm text-risk-text-high">
             {error}
           </p>
         )}

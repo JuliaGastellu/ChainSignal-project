@@ -83,7 +83,7 @@ Lo corrí completo cuatro veces mientras corregía; las cifras son de la última
 Límites del ensayo:
 
 - **Escala:** la base tenía 90 KB. El RTO medido (21 s) no dice nada sobre una base grande; antes de comprometer 4 h hay que medir con el volumen real.
-- **Seguridad de red:** corrí en http dentro de 127.0.0.1, sin TLS, CORS https ni cookie Secure. Esas exigencias las cubren las pruebas de configuración, no el ensayo.
+- **Seguridad de red:** desde el criterio de salida, el ensayo pasa por un frente TLS local (`deploy/ensayo/tls.conf`, certificado autofirmado de un día) con cookie Secure y CORS https, y verifica HSTS y una entrega de webhook a un receptor HTTPS dentro de la red del compose (paso `https_y_entrega_externa`). No reemplaza el TLS de la plataforma real; lo detallo en [confianza y salida](CONFIANZA_Y_SALIDA.md).
 - **Lecturas:** con la fixture no hay latencia de red. La detección (0,34 s en la última corrida y 1,16 s en otra) no representa un RPC real.
 - **Proveedor caído:** la métrica `not_fresh_24h` no registró nada, porque una lectura fallida no se guarda como snapshot. El error sí aparece en `jobs.errors_24h` y en la calidad de la cuenta.
 

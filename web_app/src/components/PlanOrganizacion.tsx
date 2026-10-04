@@ -54,7 +54,7 @@ export function PlanOrganizacion() {
         </Dato>
       </dl>
       <p className="mt-4 text-sm text-muted-foreground">
-        Cobro asistido: emitimos una factura y activamos el período cuando el pago está confirmado. No pedimos tarjeta ni cobramos de forma automática.
+        Cobro asistido: emito una factura y activo el período cuando el pago está confirmado. No pido tarjeta ni cobro de forma automática.
         {data.plan.guided_onboarding && " Incluye acompañamiento en la configuración."}
       </p>
       {data.confirmed_payments.length > 0 && (
@@ -84,7 +84,7 @@ export function PlanOrganizacion() {
               </p>
               <div className="flex gap-2">
                 <button type="button" onClick={() => cambiar.mutate("cancelar")} disabled={cambiar.isPending}
-                  className="rounded border border-risk-high/60 px-3 py-1.5 text-sm text-risk-high disabled:opacity-50">
+                  className="rounded border border-risk-high/60 px-3 py-1.5 text-sm text-risk-text-high disabled:opacity-50">
                   Confirmar cancelación
                 </button>
                 <button type="button" onClick={() => setConfirmando(false)} className="rounded border border-border px-3 py-1.5 text-sm">

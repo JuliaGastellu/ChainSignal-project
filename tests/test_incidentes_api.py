@@ -75,37 +75,62 @@ def test_otra_organizacion_no_ve_ni_toca_incidentes(con_incidente):
     assert ajeno.get(f"/orgs/{otra_org}/incidents").json()["incidents"] == []
 
 
-def test_canales(cliente_owner, organizacion):
+def test_canales(cliente_owner, organizacion, monkeypatch):
+    from infra.config import settings
+    from monitoreo import webhook_seguro
+
     org_id = organizacion[0]
     operator, _ = sumar_miembro(org_id, cliente_owner, "operator")
     assert operator.post(f"/orgs/{org_id}/channels", json={"kind": "sandbox", "name": "x"}).status_code == 403
+    # Con los webhooks habilitados, valido el destino (y resuelvo con un DNS de prueba que da una IP pública).
+    monkeypatch.setattr(settings, "NOTIFICATIONS_WEBHOOKS_ENABLED", True)
+    monkeypatch.setattr(webhook_seguro.socket, "getaddrinfo",
+                        lambda host, puerto, type=None: [(2, 1, 6, "", ("93.184.216.34", puerto))])
     assert cliente_owner.post(f"/orgs/{org_id}/channels", json={"kind": "webhook", "name": "w", "config": {"url": "http://inseguro.test/x"}}).status_code == 422
     webhook = cliente_owner.post(f"/orgs/{org_id}/channels", json={"kind": "webhook", "name": "w", "config": {"url": "https://hooks.ejemplo.test/t/SECRETO"}}).json()
     assert webhook["config"] == {"host": "hooks.ejemplo.test"} and "SECRETO" not in str(cliente_owner.get(f"/orgs/{org_id}/channels").json())
 
     sandbox = cliente_owner.post(f"/orgs/{org_id}/channels", json={"kind": "sandbox", "name": "Canal de prueba"}).json()
     prueba = operator.post(f"/orgs/{org_id}/channels/{sandbox['id']}/test")
-    # El sandbox no sale del sistema: la prueba se entrega en el momento y verifica el canal.
-    assert prueba.status_code == 202 and prueba.json()["status"] == "sent"
+    # El sandbox no sale del sistema: la prueba registra una simulación en el momento.
+    assert prueba.status_code == 202 and prueba.json()["status"] == "sent" and prueba.json()["outcome"] == "simulated"
     entregas = cliente_owner.get(f"/orgs/{org_id}/channels/{sandbox['id']}/deliveries").json()["deliveries"]
-    assert entregas[0]["status"] == "sent" and entregas[0]["payload_type"] == "channel.test"
+    assert entregas[0]["status"] == "sent" and entregas[0]["outcome"] == "simulated" and entregas[0]["payload_type"] == "channel.test"
     canales = {c["id"]: c for c in cliente_owner.get(f"/orgs/{org_id}/channels").json()["channels"]}
     assert canales[sandbox["id"]]["verified_at"] is not None and canales[webhook["id"]]["verified_at"] is None
 
 
-def test_webhook_deshabilitado_no_envia(cliente_owner, organizacion):
+def test_webhook_deshabilitado_no_envia(cliente_owner, organizacion, monkeypatch):
+    from infra.config import settings
+    from monitoreo import webhook_seguro
     from monitoreo.notificaciones import ServicioNotificaciones
 
     org_id = organizacion[0]
+    monkeypatch.setattr(settings, "NOTIFICATIONS_WEBHOOKS_ENABLED", True)
+    monkeypatch.setattr(webhook_seguro.socket, "getaddrinfo",
+                        lambda host, puerto, type=None: [(2, 1, 6, "", ("93.184.216.34", puerto))])
     canal = cliente_owner.post(f"/orgs/{org_id}/channels", json={"kind": "webhook", "name": "w", "config": {"url": "https://hooks.ejemplo.test/x"}}).json()
-    cliente_owner.post(f"/orgs/{org_id}/channels/{canal['id']}/test")
+    # Después alguien apaga los webhooks en la instancia: la prueba lo dice y no simula en su lugar.
+    monkeypatch.setattr(settings, "NOTIFICATIONS_WEBHOOKS_ENABLED", False)
+    respuesta = cliente_owner.post(f"/orgs/{org_id}/channels/{canal['id']}/test")
+    assert respuesta.status_code == 409 and respuesta.json()["error"] == "webhooks_disabled"
+    # Una alerta pendiente hacia ese canal falla con el mismo motivo en el despacho.
+    from infra.db import engine, get_session_factory
+    from infra.db_models import OutboxRecord
+    import time as reloj
+
+    with get_session_factory(engine)() as s:
+        s.add(OutboxRecord(organization_id=org_id, channel_id=canal["id"], alert_id=None, idempotency_key=f"x:{canal['id']}",
+                           payload={"type": "incident.opened"}, status="pending", attempts=0, max_attempts=3,
+                           available_at=reloj.time(), created_at=reloj.time()))
+        s.commit()
     servicio = ServicioNotificaciones()
     estados = []
     while (estado := servicio.entregar_uno("w-api")) is not None:
         estados.append(estado)
     assert "failed" in estados
     entrega = cliente_owner.get(f"/orgs/{org_id}/channels/{canal['id']}/deliveries").json()["deliveries"][0]
-    assert entrega["status"] == "failed" and "disabled" in entrega["last_error"]
+    assert entrega["status"] == "failed" and entrega["last_error"] == "webhooks_disabled" and entrega["outcome"] == "failed"
 
 
 def test_limite_de_streams_por_organizacion(cliente_owner, organizacion, monkeypatch):

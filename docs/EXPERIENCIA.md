@@ -12,12 +12,12 @@ Reemplacé la interfaz fragmentada (Index y OperationsCenter, con paneles de age
 | `/registro` | Alta de organización y persona owner (`POST /auth/signup`, solo con `SIGNUP_ENABLED=true`). |
 | `/login` | Inicio de sesión. |
 | `/app` | Redirige a la primera organización de la persona. |
-| `/app/:org/resumen` | Checklist de activación (dirección, primer snapshot, política, canal probado, incidente revisado), incidentes activos por severidad, cuentas por calidad de dato y última evaluación. |
+| `/app/:org/resumen` | Qué necesita atención (incidentes por severidad y cuentas sin datos, con motivo, frescura y enlace), monitoreo preparado (4 condiciones), práctica opcional y contadores. Detalle en [confianza y salida](CONFIANZA_Y_SALIDA.md). |
 | `/app/:org/posiciones` | Alta de dirección con red (solo Ethereum mainnet) y lista de cuentas con su estado. |
 | `/app/:org/posiciones/:cuenta` | Health factor, umbral de alerta, colateral, deuda, bloque y hash, frescura, calidad, activos y límites de la lectura. Botones para obtener el snapshot y evaluar ahora. |
 | `/app/:org/incidentes` | Activos y resueltos. |
 | `/app/:org/incidentes/:id` | Condición, valor observado, umbral con histéresis, bloque de apertura, calidad, responsable, versión de la política, historial de evidencia y entregas. Tomar y resolver con nota. |
-| `/app/:org/configuracion` | Políticas versionadas (health factor, cambio de deuda, dato atrasado), canales sandbox con prueba y personas con su rol. |
+| `/app/:org/configuracion` | Políticas versionadas con vista previa, pausa y reactivación; webhook externo y canal simulado con prueba; personas, roles e invitaciones; plan. |
 
 Los controles dependen del rol (viewer, operator, owner), pero la API vuelve a autorizar cada pedido. Una persona de solo lectura ve el incidente y no ve las acciones.
 

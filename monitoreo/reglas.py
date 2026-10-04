@@ -150,3 +150,25 @@ def evaluar(regla: Dict[str, Any], obs: Observacion, linea_base: Optional[int]) 
 def subir_severidad(severidad: str) -> str:
     indice = SEVERIDADES.index(severidad)
     return SEVERIDADES[min(indice + 1, len(SEVERIDADES) - 1)]
+
+
+def describir_regla(regla: Dict[str, Any]) -> Dict[str, Any]:
+    """Cuándo abre, cuándo se despeja y cuándo escala una regla ya normalizada.
+
+    Lo uso para mostrarle a una persona el efecto de una política antes de
+    guardarla, con los mismos valores que va a usar el evaluador.
+    """
+    tipo = regla["type"]
+    base = {"type": tipo, "severity": regla["severity"], "escalate_after_seconds": regla["escalate_after_seconds"]}
+    if tipo == "health_factor_below":
+        return {**base,
+                "opens": {"when": "health_factor_below", "threshold": regla["threshold"], "requires_fresh_data": True},
+                "clears": {"when": "health_factor_at_or_above", "value": regla["clear_above"],
+                           "consecutive_evaluations": regla["clear_after"], "also_when": "no_debt"}}
+    if tipo == "debt_change":
+        return {**base,
+                "opens": {"when": "debt_change_at_least_pct", "change_pct": regla["change_pct"], "requires_fresh_data": True},
+                "clears": {"when": "resolved_by_a_person"}}
+    return {**base,
+            "opens": {"when": "no_fresh_read_for_seconds", "max_age_seconds": regla["max_age_seconds"]},
+            "clears": {"when": "first_fresh_read"}}

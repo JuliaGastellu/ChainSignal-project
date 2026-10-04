@@ -228,12 +228,17 @@ class ServicioIncidentes:
             alertas = s.execute(select(AlertRecord).where(AlertRecord.incident_id == incidente.id)
                                 .order_by(AlertRecord.created_at)).scalars().all()
             entregas = s.execute(select(OutboxRecord).where(OutboxRecord.alert_id.in_([a.id for a in alertas] or [""]))).scalars().all()
+            from monitoreo.notificaciones import resultado_de_entrega
+
+            tipos = dict(s.execute(select(NotificationChannelRecord.id, NotificationChannelRecord.kind).where(
+                NotificationChannelRecord.organization_id == ctx.organization_id)).all())
             return {
                 **incidente_a_dict(incidente),
                 "evidence": [_evidencia_a_dict(e) for e in evidencias],
                 "alerts": [{"id": a.id, "kind": a.kind, "severity": a.severity, "created_at": a.created_at} for a in alertas],
-                "deliveries": [{"alert_id": o.alert_id, "channel_id": o.channel_id, "status": o.status, "attempts": o.attempts,
-                                "sent_at": o.sent_at, "last_error": o.last_error} for o in entregas],
+                "deliveries": [{"alert_id": o.alert_id, "channel_id": o.channel_id, "channel_kind": tipos.get(o.channel_id),
+                                "status": o.status, "outcome": resultado_de_entrega(tipos.get(o.channel_id, ""), o.status),
+                                "attempts": o.attempts, "sent_at": o.sent_at, "last_error": o.last_error} for o in entregas],
             }
 
     def reconocer(self, ctx: ContextoOrg, incident_id: str) -> Dict[str, Any]:
