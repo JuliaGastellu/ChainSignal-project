@@ -1,0 +1,28 @@
+# Falsos positivos revisados el 2026-10-04 (E08): las 24 coincidencias de generic-api-key
+# son direcciones públicas de contratos ERC-20 (formato 0x + 40 hex) en variables token_out y
+# token_address de commits de marzo de 2026. Ignoro solo estas ocurrencias exactas por huella;
+# la regla sigue activa para todo lo demás. Una clave privada (64 hex) no coincide con este formato.
+0e06346a239144a0cc14d3998a3d6fd1586e9631:strategy/estrategia_proteccion_wallet.py:generic-api-key:46
+31ae56c6baf14d4a9e9e32c14c63f1630320b287:AUDIT_REPORT.md:generic-api-key:224
+4595f86317c7bf634d77fec2c46b2e050b4e62d0:HACKATON_DELIVERABLES.md:generic-api-key:188
+59e57d3d7c51ce2779b7463cd5f1a17be23b6d5d:HACKATON_DELIVERABLES.md:generic-api-key:188
+6f1af34446cc3dddb5969e5c178b5af9516c5e6f:RESUMEN_FASE3_EJECUCION.md:generic-api-key:67
+6f1af34446cc3dddb5969e5c178b5af9516c5e6f:RESUMEN_FASE3_EJECUCION.md:generic-api-key:78
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:AUDIT_CHECKLIST.md:generic-api-key:40
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:AUDIT_DETALLADO.md:generic-api-key:282
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:AUDIT_FASE1_OBSOLESCENCIA.md:generic-api-key:201
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:AUDIT_FASE1_OBSOLESCENCIA.md:generic-api-key:206
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:AUDIT_PHASE1_HALLAZGOS.md:generic-api-key:33
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:AUDIT_PHASE1_HALLAZGOS.md:generic-api-key:44
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:AUDIT_RESUMEN_EJECUTIVO.md:generic-api-key:49
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:PHASE2_LIMPIEZA_PLAN.md:generic-api-key:78
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:PHASE2_LIMPIEZA_PLAN.md:generic-api-key:81
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:PLAN_FASE2_LIMPIEZA.md:generic-api-key:132
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:PLAN_FASE2_LIMPIEZA.md:generic-api-key:138
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:PLAN_FASE2_LIMPIEZA.md:generic-api-key:162
+d83ca1f252cb85c25399fa21d73c84b2504a29ff:PLAN_FASE2_LIMPIEZA.md:generic-api-key:172
+d950fd869f6f4138b1e3dd3f46e30c34b2c5a397:agents/agente_chainsignal.py:generic-api-key:316
+d950fd869f6f4138b1e3dd3f46e30c34b2c5a397:strategy/estrategia_proteccion_wallet.py:generic-api-key:46
+d950fd869f6f4138b1e3dd3f46e30c34b2c5a397:tests/test_wdk_skills.py:generic-api-key:35
+d950fd869f6f4138b1e3dd3f46e30c34b2c5a397:tests/test_wdk_skills.py:generic-api-key:51
+d950fd869f6f4138b1e3dd3f46e30c34b2c5a397:tests/test_wdk_swap.py:generic-api-key:27

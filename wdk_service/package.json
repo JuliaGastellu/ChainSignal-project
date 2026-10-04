@@ -1,6 +1,7 @@
 {
     "name": "chainsignal-wdk-service",
     "version": "1.0.0",
+    "private": true,
     "description": "Microservicio intermedio para integrar Tether WDK con ChainSignal",
     "main": "server.js",
     "scripts": {
@@ -15,15 +16,17 @@
     ],
     "author": "ChainSignal Team",
     "license": "MIT",
+    "engines": {
+        "node": ">=20"
+    },
     "dependencies": {
-        "@tetherto/wdk": "latest",
-        "@tetherto/wdk-wallet-evm": "latest",
-        "@tetherto/wdk-protocol-swap-velora-evm": "latest",
-        "@tetherto/wdk-wallet-evm-erc-4337": "latest",
-        "ethers": "^6.11.1",
-        "express": "^4.19.2",
-        "cors": "^2.8.5",
-        "body-parser": "^1.20.2",
-        "dotenv": "^16.4.5"
+        "@tetherto/wdk-wallet-evm": "1.0.0-beta.9",
+        "@tetherto/wdk-protocol-swap-velora-evm": "1.0.0-beta.4",
+        "@tetherto/wdk-wallet-evm-erc-4337": "1.0.0-beta.5",
+        "ethers": "6.16.0",
+        "express": "4.22.1",
+        "cors": "2.8.6",
+        "body-parser": "1.20.4",
+        "dotenv": "16.6.1"
     }
 }

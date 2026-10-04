@@ -50,13 +50,14 @@ def test_wallet_passive_holder(extractor, clasificador):
     # Simular un holder pasivo: balance alto, pocas tx, mucho tiempo
     datos = DatosWallet(
         direccion=WALLET_MOCK,
-        balance_eth=10.0,
+        chain_id=1,
+        balance_wei=10 * 10**18,
         transacciones=[crear_transaccion(timestamp=1600000000)], # Muy vieja
         transferencias_token=[]
     )
     features = extractor.extraer(datos)
-    # Forzar dias_activo alto para el test ya que extractor usa time.time()
-    features.dias_activo = 500 
+    # Una sola transacción no muestra un lapso; fuerzo los días observados.
+    features.dias_observados = 500
     perfil = clasificador.clasificar(features)
     assert perfil.type == "long_term_holder"
 

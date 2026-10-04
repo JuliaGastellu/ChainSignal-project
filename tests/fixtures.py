@@ -1,11 +1,20 @@
-"""Fixtures de datos mock para los tests unitarios."""
+"""Fixtures de datos sintéticos para los tests unitarios."""
 
-from ingestion_onchain.modelos import DatosWallet, Transaccion, TransferenciaToken
+import hashlib
+from decimal import Decimal
+from typing import Optional
+
+from ingestion_onchain.modelos import DatosWallet, Token, Transaccion, TransferenciaToken
 
 TIMESTAMP_BASE = 1_700_000_000
 TIMESTAMP_RECIENTE = 1_738_000_000
 
 WALLET_MOCK = "0xabc123def456abc123def456abc123def456abc1"
+
+
+def contrato_sintetico(semilla: str) -> str:
+    """Dirección de contrato determinística y sintética para una semilla."""
+    return "0x" + hashlib.sha256(semilla.encode()).hexdigest()[:40]
 
 
 def crear_transaccion(
@@ -16,14 +25,15 @@ def crear_transaccion(
     timestamp: int = TIMESTAMP_BASE,
     es_contrato: bool = False,
     es_error: bool = False,
+    bloque: int = 18_000_000,
 ) -> Transaccion:
     return Transaccion(
         hash=hash_tx,
-        bloque=18_000_000,
+        bloque=bloque,
         timestamp=timestamp,
         origen=origen.lower(),
         destino=destino.lower(),
-        valor_eth=valor_eth,
+        valor_wei=int(Decimal(str(valor_eth)) * 10**18),
         gas_utilizado=21_000,
         es_error=es_error,
         es_contrato=es_contrato,
@@ -35,15 +45,20 @@ def crear_transferencia_token(
     origen: str = WALLET_MOCK,
     destino: str = "0xotrawallet",
     timestamp: int = TIMESTAMP_BASE,
+    contrato: Optional[str] = None,
+    decimales: int = 6,
+    cantidad_raw: int = 100_000_000,
 ) -> TransferenciaToken:
+    # Por defecto, un contrato distinto por símbolo; puedo forzar dos contratos
+    # con el mismo símbolo pasando `contrato`.
     return TransferenciaToken(
         hash="0xhashtoken",
+        bloque=18_000_000,
         timestamp=timestamp,
         origen=origen.lower(),
         destino=destino.lower(),
-        simbolo_token=simbolo,
-        contrato_token="0xcontrato",
-        cantidad=100.0,
+        token=Token(1, contrato or contrato_sintetico(simbolo), decimales, simbolo),
+        cantidad_raw=cantidad_raw,
     )
 
 
@@ -67,7 +82,8 @@ def datos_wallet_activo() -> DatosWallet:
     ]
     return DatosWallet(
         direccion=WALLET_MOCK,
-        balance_eth=1.5,
+        chain_id=1,
+        balance_wei=15 * 10**17,
         transacciones=txs,
         transferencias_token=tokens,
     )
@@ -78,7 +94,8 @@ def datos_wallet_inactivo() -> DatosWallet:
     txs = [crear_transaccion(timestamp=TIMESTAMP_BASE)]
     return DatosWallet(
         direccion=WALLET_MOCK,
-        balance_eth=0.01,
+        chain_id=1,
+        balance_wei=10**16,
         transacciones=txs,
         transferencias_token=[],
     )

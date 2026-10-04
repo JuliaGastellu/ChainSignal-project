@@ -1,3 +1,11 @@
+# SQLite de desarrollo local cuando DATABASE_URL está vacía (infra/db.py).
+# Nunca es un artefacto de despliegue.
+storage/chainsignal.db
+storage/chainsignal.db-journal
+storage/*.db
+storage/*.db-journal
+*.lock
+
 # OS files
 .DS_Store
 .DS_Store?
@@ -107,3 +115,19 @@ temp/
 *.tmp
 *.bak
 *.swp
+# Copias locales de preservación del estado operativo
+ops_backup/
+
+# Estado operativo local. Ya versionado: lo saco del índice con
+# scripts/desversionar_estado_operativo.sh; estas reglas evitan que vuelva.
+backend_log.txt
+cache/
+storage/plans/
+storage/agent_budget.json
+storage/learning_store.json
+contratos_deployados.json
+executions.json
+health.json
+health_check.json
+tracking.json
+watched_wallets.json

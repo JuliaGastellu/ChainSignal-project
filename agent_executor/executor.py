@@ -1,84 +1,92 @@
-import json
-import os
+import asyncio
 import uuid
-from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from loguru import logger
+from sqlalchemy.engine import Engine
 
 from domain.modelos_contrato import InsightContrato
 from infra.config import settings
+from infra.db import engine as default_engine
+from infra.db import get_session_factory, init_db
+from infra.db_models import ExecutionRecord
+from agent_executor.historial import load_execution_history  # noqa: F401  (compatibilidad)
+from infra.modo import exigir_escritura_experimental
 from tools.herramienta_compilar_contrato import compilar_contrato_tool
 from tools.herramienta_generar_contrato import generar_contrato
 from wallet_controller.wallet_agent import WalletAgent
 
-if os.name == "nt":
-    import msvcrt
-else:
-    import fcntl
-
 
 class AgentExecutor:
-    def __init__(self, history_path: str = "executions.json", event_bus: Optional[Any] = None):
-        self.history_path = Path(history_path)
-        self.history_path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.history_path.exists():
-            self.history_path.write_text("[]", encoding="utf-8")
+    """Persisto el historial de ejecución en la base (infra/db.py) en lugar de
+    executions.json, para que un reinicio o una caída no lo corrompan. Los
+    controles de ciclo duplicado y cooldown consultan la base en vez de cargar
+    todo el historial en memoria.
+
+    Todavía no resuelvo locking distribuido, centralización de nonce ni
+    reconciliación completa tras una caída. El control de ciclo duplicado
+    conserva la lógica anterior, ahora respaldada por una consulta.
+    """
+
+    def __init__(self, event_bus: Optional[Any] = None, engine_: Optional[Engine] = None):
+        exigir_escritura_experimental("crear_ejecutor")
+        self._engine = engine_ or default_engine
+        init_db(self._engine)
+        self._Session = get_session_factory(self._engine)
         self.wallet_agent = WalletAgent()
         self.event_bus = event_bus
-
-    @contextmanager
-    def _file_lock(self, mode: str):
-        with open(self.history_path, mode, encoding="utf-8") as handle:
-            if os.name == "nt":
-                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
-            else:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            try:
-                yield handle
-            finally:
-                if os.name == "nt":
-                    handle.flush()
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
-    def _load_history(self) -> List[Dict[str, Any]]:
-        with self._file_lock("r+") as handle:
-            handle.seek(0)
-            raw = handle.read().strip()
-            if not raw:
-                return []
-            data = json.loads(raw)
-            return data if isinstance(data, list) else []
-
-    def _save_history(self, entries: List[Dict[str, Any]]) -> None:
-        temp = self.history_path.with_suffix(".tmp")
-        with open(temp, "w", encoding="utf-8") as handle:
-            json.dump(entries, handle, indent=2)
-        os.replace(temp, self.history_path)
 
     @staticmethod
     def _now_iso() -> str:
         return datetime.now(timezone.utc).isoformat()
 
-    def _is_duplicate(self, history: List[Dict[str, Any]], wallet: str, cycle: int) -> bool:
-        return any(str(h.get("wallet", "")).lower() == wallet.lower() and int(h.get("cycle", -1)) == int(cycle) for h in history)
+    def _is_duplicate(self, wallet: str, cycle: int) -> bool:
+        with self._Session() as session:
+            exists = (
+                session.query(ExecutionRecord.id)
+                .filter(ExecutionRecord.wallet == wallet.lower(), ExecutionRecord.cycle == int(cycle))
+                .first()
+            )
+            return exists is not None
 
-    def _cooldown_ok(self, history: List[Dict[str, Any]]) -> bool:
-        last = next((h for h in reversed(history) if h.get("status") in {"confirmed", "simulated", "failed"}), None)
-        if not last:
+    def _cooldown_ok(self) -> bool:
+        with self._Session() as session:
+            last = (
+                session.query(ExecutionRecord)
+                .filter(ExecutionRecord.status.in_(["confirmed", "submitted", "simulated", "failed"]))
+                .order_by(ExecutionRecord.timestamp.desc())
+                .first()
+            )
+            last_timestamp = last.timestamp if last else None
+        if not last_timestamp:
             return True
         try:
-            last_ts = datetime.fromisoformat(str(last["timestamp"]))
+            last_ts = datetime.fromisoformat(str(last_timestamp))
         except Exception:
             return True
-        return (datetime.now(timezone.utc) - last_ts).total_seconds() >= int(os.getenv("COOLDOWN_SECONDS", str(settings.COOLDOWN_SECONDS)))
+        return (datetime.now(timezone.utc) - last_ts).total_seconds() >= int(
+            settings.COOLDOWN_SECONDS
+        )
 
     def _append(self, record: Dict[str, Any]) -> Dict[str, Any]:
-        history = self._load_history()
-        history.append(record)
-        self._save_history(history)
+        with self._Session() as session:
+            session.add(
+                ExecutionRecord(
+                    id=record["id"],
+                    timestamp=record["timestamp"],
+                    cycle=record["cycle"],
+                    wallet=record["wallet"],
+                    decision=record.get("decision"),
+                    threat_score=record.get("threat_score"),
+                    action_type=record.get("action_type"),
+                    tx_hash=record.get("tx_hash"),
+                    contract_address=record.get("contract_address"),
+                    status=record["status"],
+                    error=record.get("error"),
+                )
+            )
+            session.commit()
         return record
 
     def _get_agent_balance(self) -> float:
@@ -94,6 +102,14 @@ class AgentExecutor:
         return (self._get_agent_balance() - cost_eth) >= 0.001
 
     async def execute(self, decision: Dict[str, Any]) -> Dict[str, Any]:
+        """Ejecuto la acción del experimento testnet y registro su estado.
+
+        Un hash devuelto por el WDK solo significa envío: lo registro como
+        `submitted`, nunca como `confirmed`, porque todavía no espero receipt
+        (A04). Si el WDK no devuelve hash, el estado es `failed`; nunca convierto
+        una falla en éxito simulado.
+        """
+        exigir_escritura_experimental("ejecutar_decision")
         wallet = str(decision.get("wallet", "")).lower()
         cycle = int(decision.get("cycle", 0) or 0)
         action = decision.get("action", {}) or {}
@@ -101,10 +117,9 @@ class AgentExecutor:
         threat_score = float(decision.get("threat_score", 0.0) or 0.0)
         decision_str = str(decision.get("decision", ""))
 
-        history = self._load_history()
-        if self._is_duplicate(history, wallet, cycle):
+        if self._is_duplicate(wallet, cycle):
             return {"status": "skipped", "reason": "duplicate_cycle_wallet"}
-        if not self._cooldown_ok(history):
+        if not self._cooldown_ok():
             return {"status": "skipped", "reason": "cooldown_active"}
 
         if action_type not in {"transfer", "deploy_contract"}:
@@ -114,7 +129,7 @@ class AgentExecutor:
         amount_eth = float(action.get("amount_eth", 0.0) or 0.0)
         if action_type == "transfer" and amount_eth == 0:
             amount_eth = 0.001
-            
+
         if self.event_bus:
             await self.event_bus.publish({
                 "type": "execution_start",
@@ -140,7 +155,7 @@ class AgentExecutor:
 
         try:
             logger.info(f"STARTING execution attempt for {wallet} (Action: {action_type}, Cycle: {cycle})")
-            
+
             if action_type == "transfer":
                 if not self._post_balance_ok(amount_eth):
                     base["status"] = "failed"
@@ -149,9 +164,10 @@ class AgentExecutor:
                     tx_hash = await asyncio.to_thread(self.wallet_agent.ejecutar_transaccion, wallet, int(amount_eth * (10**18)))
                     if tx_hash:
                         base["tx_hash"] = tx_hash
-                        base["status"] = "confirmed"
+                        base["status"] = "submitted"
                     else:
-                        base["status"] = "simulated"
+                        base["status"] = "failed"
+                        base["error"] = "wdk_no_tx_hash"
             else:
                 # deploy_contract
                 cost_estimate = 0.001
@@ -174,17 +190,18 @@ class AgentExecutor:
                         call_hash = await asyncio.to_thread(self.wallet_agent.call_contract, base["contract_address"], compiled.abi, method_name, args=[])
                         if call_hash and not base["tx_hash"]:
                             base["tx_hash"] = call_hash
-                        base["status"] = "confirmed"
+                        base["status"] = "submitted"
                     else:
-                        base["status"] = "simulated"
-            
+                        base["status"] = "failed"
+                        base["error"] = "wdk_deploy_failed"
+
             logger.info(f"FINISHED execution attempt for {wallet}. Status: {base['status']}")
-            
+
             # Emit execution events
             if self.event_bus:
-                if base["status"] in {"confirmed", "simulated"}:
+                if base["status"] == "submitted":
                     await self.event_bus.publish({
-                        "type": "execution_confirmed",
+                        "type": "execution_submitted",
                         "wallet": wallet,
                         "tx_hash": base["tx_hash"],
                         "amount_eth": amount_eth,
@@ -196,7 +213,7 @@ class AgentExecutor:
                         "wallet": wallet,
                         "error": base["error"] or "Unknown error"
                     })
-                
+
                 # Emit balance update
                 new_balance = self._get_agent_balance()
                 await self.event_bus.publish({
@@ -209,12 +226,12 @@ class AgentExecutor:
             logger.error(f"EXCEPTION in execution for {wallet}: {exc}")
             base["status"] = "failed"
             base["error"] = str(exc)
-            
+
             if self.event_bus:
                 await self.event_bus.publish({
                     "type": "execution_failed",
                     "wallet": wallet,
                     "error": str(exc)
                 })
-            
+
             return self._append(base)

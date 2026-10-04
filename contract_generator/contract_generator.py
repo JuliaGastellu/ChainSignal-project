@@ -41,7 +41,7 @@ class GeneradorContratos:
         elif type_val == "treasury_manager":
             return header + self._plantilla_treasury_manager(activity)
         elif type_val is None:
-            # Default template for general monitoring when no specific type is identified
+            # Plantilla por defecto de monitoreo general cuando no identifico un tipo específico
             return header + self._plantilla_generic_monitor(wallet)
         else:
             raise ValueError(f"Unsupported contract type: {type_val}")

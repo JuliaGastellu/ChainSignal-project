@@ -1,14 +1,36 @@
-fastapi>=0.111.0
-uvicorn[standard]>=0.29.0
-openclaw>=0.1.0
-requests>=2.31.0
-python-dotenv>=1.0.0
-loguru>=0.7.2
-pydantic>=2.7.0
-pytest>=8.2.0
-jinja2
-httpx
-python-multipart
-web3>=6.0.0
-eth-account>=0.8.0
-py-solc-x>=2.0.2
+# Dependencias directas de ejecución de la API (Python 3.11).
+#
+# Fijo versiones exactas probadas en una instalación limpia; no actualizo por
+# defecto. Las dependencias transitivas quedan fijadas en constraints.txt:
+#   pip install -r requirements.txt -c constraints.txt
+#
+# Cada paquete figura aquí porque lo importo directamente.
+
+# API HTTP
+fastapi==0.135.1
+uvicorn[standard]==0.41.0
+pydantic==2.12.5
+pydantic-settings==2.14.2   # infra/config.py (2.14.2 corrige GHSA-4xgf-cpjx-pc3j)
+python-dotenv==1.2.2        # infra/config.py, wallet_controller/wallet_agent.py
+loguru==0.7.3
+jinja2==3.1.6               # web_app/app.py (interfaz heredada servida por Compose)
+
+# Clientes HTTP
+requests==2.33.0            # RPC, explicaciones y ensayo (2.33.0 corrige PYSEC-2026-2275)
+httpx==0.28.1               # wallet_controller/wallet_agent.py y TestClient
+
+# Web3
+web3==7.14.1
+eth-account==0.13.7
+eth-abi==6.0.0              # protocolos/abi.py (codifico eth_call a Aave V3)
+eth-utils==6.0.0            # protocolos/abi.py (selectores keccak, checksum)
+py-solc-x==2.0.5            # contract_generator/compiler.py (experimento heredado)
+
+# Estado durable: Postgres en Compose, SQLite temporal solo en desarrollo local
+sqlalchemy==2.0.54
+psycopg2-binary==2.9.13
+alembic==1.20.0           # migraciones versionadas (migrations/)
+
+# Redacción opcional con LLM (agent_reasoning/reasoning_engine.py). Sin
+# OPENAI_API_KEY el motor usa su explicación determinística.
+openai==2.54.0

@@ -1,0 +1,165 @@
+# CI de ChainSignal (E08). No despliega nada: verifica.
+#
+# - Instalación reproducible: versiones fijadas (requirements + constraints, package-lock).
+# - Backend: pruebas unitarias y de integración local, con PostgreSQL 16 para
+#   concurrencia, y migraciones de ida y vuelta contra PostgreSQL.
+# - Frontend: tipos, lint, Vitest, build y E2E con Playwright.
+# - Seguridad: escaneo de secretos en el historial y auditoría de dependencias.
+# Ningún job recibe secretos: las pruebas usan datos sintéticos y fixtures.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  CHAINSIGNAL_DISABLE_DOTENV: "1"
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cs_test
+          POSTGRES_PASSWORD: cs_test
+          POSTGRES_DB: cs_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cs_test -d cs_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CHAINSIGNAL_TEST_POSTGRES_URL: postgresql+psycopg2://cs_test:cs_test@127.0.0.1:5432/cs_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            constraints.txt
+      - name: Instalar dependencias fijadas
+        run: python -m pip install -r requirements-dev.txt -c constraints.txt
+      - name: Migraciones de ida y vuelta en PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg2://cs_test:cs_test@127.0.0.1:5432/cs_test
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+          alembic check
+      - name: Pruebas (unitarias, integración local y concurrencia en PostgreSQL)
+        run: python -m pytest -p no:cacheprovider
+      - name: Evaluación de explicaciones (50 casos)
+        run: python -m evaluacion_explicaciones.correr
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web_app/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
+      - run: python -m pip install -r requirements.txt -c constraints.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web_app/package-lock.json
+      - working-directory: web_app
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: E2E sobre entorno aislado (SQLite temporal, fixture grabada)
+        working-directory: web_app
+        env:
+          CHAINSIGNAL_PYTHON: python
+        run: npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trazas
+          path: web_app/test-results
+          retention-days: 7
+
+  imagenes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imágenes del piloto (sin publicarlas)
+        run: |
+          docker build -t chainsignal-api:ci .
+          docker build -t chainsignal-web:ci web_app
+      - name: La imagen no lleva archivos de entorno ni estado local
+        run: |
+          docker run --rm --entrypoint sh chainsignal-api:ci -c 'test ! -e /app/.env && test ! -d /app/storage && test "$(id -u)" != "0"'
+
+  secretos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Escaneo de secretos en todo el historial (salida redactada)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --redact --no-banner --exit-code 1
+
+  dependencias:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Auditoría de dependencias Python
+        run: |
+          python -m pip install pip-audit==2.9.0
+          pip-audit -r requirements.txt --strict
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Auditoría de dependencias de la interfaz (solo producción)
+        working-directory: web_app
+        run: npm audit --omit=dev --audit-level=high

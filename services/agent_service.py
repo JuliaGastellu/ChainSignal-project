@@ -1,6 +1,14 @@
+"""Servicio de análisis de wallets: solo lectura.
+
+Recorro ingestión, features, perfil, scores, señales, estrategia y decisión, y
+devuelvo una recomendación. Este servicio no firma, no transfiere, no hace swap,
+no despliega contratos ni consume presupuesto: no tiene referencias a WDK,
+WalletAgent, ejecutores ni presupuesto. La ejecución heredada vive en
+experiments/testnet_ejecucion.py y solo corre en el experimento testnet.
+"""
+
 import asyncio
 import json
-import os
 from datetime import datetime
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
@@ -8,25 +16,28 @@ from loguru import logger
 
 from agente_ia.agente import AgenteAnalisis
 from decision_engine.engine import DecisionEngine
-from domain.modelos_agente import DecisionAgente
 from generacion_features.extractor import ExtractorFeatures
 from infra.config import settings
-from ingestion_onchain.cliente_etherscan import ClienteEtherscan
+from ingestion_onchain.resultados import CalidadDatos
 from perfil_wallet.behavioral_scoring import BehavioralScorer
 from perfil_wallet.clasificador import ClasificadorWallet
-from services.servicio_wdk import ServicioWDK
-from services.agent_budget_service import AgentBudgetService
 from services.intelligence_layer import WalletIntelService, BlockIntelService, ProtocolIntelService
 from services.signal_detector import SignalDetector
 from services.strategy_engine import StrategyEngine
-from services.learning_store import LearningStore
+from services.historial_evaluaciones import HistorialEvaluaciones
 from strategy.estrategia_proteccion_wallet import EstrategiaProteccionWallet
-from tools.herramienta_compilar_contrato import compilar_contrato_tool
-from tools.herramienta_generar_contrato import generar_contrato
 
-from execution_guard.guard import ExecutionGuard
-from execution_guard.lock_manager import WalletLockManager
-from execution_guard.runner import ExecutionRunner
+
+# Estos tres códigos de decisión son TERMINALES. Ninguna señal de estrategia,
+# sesgo de historial, fallback ni modo demo puede volverlos ejecutables. Los
+# consulto en _apply_strategy_overlay, _run_stream y _run_loop como defensa en
+# profundidad.
+TERMINAL_DECISIONS = {"INSUFFICIENT_DATA", "MONITOR", "BLOCK"}
+ACTIONABLE_DECISIONS = {"EXECUTE_ADVANCED", "EXECUTE_BASIC"}
+
+# Alcance que declaro en cada respuesta de análisis: observo la wallet objetivo
+# y no existe una wallet ejecutora en el runtime comercial.
+READ_ONLY_SCOPE = {"target_wallet": "read_only", "agent_wallet": "disabled"}
 
 
 class AgentMetrics:
@@ -55,28 +66,74 @@ class AgentMetrics:
         }
 
 
+class DatosNoDisponibles(Exception):
+    """No tengo datos utilizables de la wallet: nunca la trato como cuenta sana."""
+
+    def __init__(self, calidad: CalidadDatos):
+        super().__init__(calidad.motivo.value)
+        self.calidad = calidad
+
+
+def _calidad_de(metrics: Any) -> Optional[CalidadDatos]:
+    return getattr(metrics, "calidad_datos", None)
+
+
 class AgentService:
     def __init__(self):
-        self.cliente = ClienteEtherscan()
+        self._ingesta = None
         self.extractor = ExtractorFeatures()
         self.clasificador = ClasificadorWallet()
         self.scorer = BehavioralScorer()
         self.engine = DecisionEngine()
-        self.guard = ExecutionGuard()
-        self.lock_manager = WalletLockManager()
-        self.wdk = ServicioWDK()
-        self.budget = AgentBudgetService()
         self.wallet_intel = WalletIntelService()
         self.block_intel = BlockIntelService()
         self.protocol_intel = ProtocolIntelService()
         self.signal_detector = SignalDetector()
         self.strategy_engine = StrategyEngine()
-        self.learning = LearningStore()
+        self.historial = HistorialEvaluaciones()
         self.metrics = AgentMetrics()
         self._semaphore = asyncio.Semaphore(3)
         self._active_stream_wallets: set[str] = set()
         self._active_stream_wallets_lock = asyncio.Lock()
         self._agente_ia: Optional[AgenteAnalisis] = None
+
+    @property
+    def ingesta(self):
+        """Construyo la ingesta al primer uso: la red y los proveedores salen de infra/red.py."""
+        if self._ingesta is None:
+            from ingestion_onchain.ingesta import construir_servicio_ingesta
+
+            self._ingesta = construir_servicio_ingesta()
+        return self._ingesta
+
+    @staticmethod
+    def _aplicar_calidad(decision: Dict[str, Any], metrics: Any) -> Dict[str, Any]:
+        """Sin datos FRESH y completos para la ventana, no queda ninguna decisión accionable."""
+        calidad = _calidad_de(metrics)
+        if decision.get("decision") in ACTIONABLE_DECISIONS and (calidad is None or not calidad.permite_recomendacion_accionable):
+            estado = calidad.calidad.value if calidad is not None else "UNKNOWN"
+            decision["decision"] = "MONITOR"
+            decision["recommended_action"] = "monitor"
+            decision["reasoning"] = f"Data quality is {estado}; no actionable recommendation without fresh, complete data."
+            decision["data_quality_gate"] = estado
+        return decision
+
+    def _reporte_no_disponible(self, wallet_addr: str, calidad: CalidadDatos) -> Dict[str, Any]:
+        return {
+            "wallet": wallet_addr,
+            "timestamp": datetime.now().isoformat(),
+            "data_quality": calidad.a_dict(),
+            "executive_summary": None,
+            "profile": None,
+            "scores": None,
+            "metrics": None,
+            "agent_decision": {
+                "decision": "DATA_UNAVAILABLE",
+                "reasoning": f"On-chain data unavailable ({calidad.motivo.value}). This is not evidence that the account is healthy.",
+                "recommended_action": "retry_later",
+            },
+            "agent_metrics": self.metrics.to_dict(),
+        }
 
     async def _acquire_semaphore(self, timeout_s: float = 3.0) -> bool:
         try:
@@ -92,16 +149,16 @@ class AgentService:
 
     async def run_pipeline_stream(self, wallet: str) -> AsyncGenerator[str, None]:
         context_payload = {
-            "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
-            "action_scope": {"target_wallet": "read_only", "agent_wallet": "execution_enabled"},
+            "agent_wallet": None,
+            "action_scope": dict(READ_ONLY_SCOPE),
             "decision_context": {
                 "target_wallet": wallet.lower(),
-                "executor_wallet": settings.X402_PAYMENT_RECIPIENT,
-                "funds_source": "agent_budget",
+                "executor_wallet": None,
+                "funds_source": None,
             },
         }
         async for event in self._run_stream(wallet, source="api"):
-            event["agent_wallet"] = settings.X402_PAYMENT_RECIPIENT
+            event["agent_wallet"] = None
             event["action_scope"] = context_payload["action_scope"]
             if isinstance(event.get("data"), dict):
                 event["data"] = {**context_payload, **event["data"]}
@@ -111,9 +168,6 @@ class AgentService:
 
     async def run_pipeline_core(self, wallet: str) -> Dict[str, Any]:
         return await self._run_report(wallet)
-
-    async def run_pipeline_loop(self, wallet: str) -> Dict[str, Any]:
-        return await self._run_loop(wallet)
 
     async def _run_stream(self, wallet: str, source: str) -> AsyncGenerator[Dict[str, Any], None]:
         wallet_addr = wallet.lower()
@@ -139,6 +193,9 @@ class AgentService:
                     self._active_stream_wallets.add(wallet_addr)
 
             if already_running:
+                # Libero el semáforo: antes este camino lo retenía y tres
+                # consultas duplicadas dejaban el servicio ocupado para siempre.
+                self._semaphore.release()
                 yield {
                     "paso": "decision_final",
                     "estado": "completed",
@@ -171,18 +228,34 @@ class AgentService:
                             "recommended_action": "monitor",
                             "execution": False,
                             "motivo": "invalid_wallet",
-                            "simulation_mode": os.getenv("APP_ENV", "local") != "production",
+                            "read_only": True,
                         },
                         "source": source,
                     }
                     return
 
-                yield {"paso": "analyzing_wallet", "estado": "starting", "detalle": "Fetching data from Etherscan...", "source": source}
-                metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
+                yield {"paso": "analyzing_wallet", "estado": "starting", "detalle": "Fetching on-chain data...", "source": source}
+                try:
+                    metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
+                except DatosNoDisponibles as error:
+                    calidad = error.calidad.a_dict()
+                    yield {"paso": "analyzing_wallet", "estado": "error",
+                           "detalle": f"On-chain data unavailable: {error.calidad.motivo.value}", "data": {"data_quality": calidad}, "source": source}
+                    yield {
+                        "paso": "decision_final",
+                        "estado": "completed",
+                        "detalle": "No recommendation: on-chain data is unavailable. This is not evidence of a healthy account.",
+                        "data": {"decision": "DATA_UNAVAILABLE", "recommended_action": "retry_later", "execution": False,
+                                 "motivo": "data_unavailable", "read_only": True, "data_quality": calidad},
+                        "source": source,
+                    }
+                    return
+                calidad_actual = _calidad_de(metrics)
                 yield {
                     "paso": "analyzing_wallet",
                     "estado": "completed",
                     "detalle": f"Analyzed {metrics.total_transacciones} transactions.",
+                    "data": {"data_quality": calidad_actual.a_dict() if calidad_actual else None},
                     "source": source,
                 }
 
@@ -221,15 +294,13 @@ class AgentService:
                 wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
                 protocol_intel = self.protocol_intel.analyze(metrics, profile)
                 signals = self.signal_detector.detect(wallet_intel, protocol_intel)
-                learning_summary = self.learning.summary()
                 strategy_pick = self.strategy_engine.select(
                     signals,
                     {},
                     wallet_intel,
-                    learning_summary=learning_summary,
                     demo_mode=settings.AGENT_DEMO_MODE,
                 )
-                self.learning.record_signal(wallet_addr, signals, strategy_pick["strategy"])
+                self.historial.registrar_senales(wallet_addr, signals, strategy_pick["strategy"])
                 yield {
                     "paso": "signal_detected",
                     "estado": "completed",
@@ -248,6 +319,7 @@ class AgentService:
                 yield {"paso": "evaluating_decision", "estado": "starting", "detalle": "Executing decision engine...", "source": source}
                 decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
                 decision, decision_estrategia = self._apply_strategy_overlay(decision, decision_estrategia, strategy_pick, insight_obj)
+                decision = self._aplicar_calidad(decision, metrics)
                 report_snapshot = self._build_report(wallet_addr, profile, scores_obj, scores_dict, risk_breakdown, metrics, decision, decision_estrategia)
                 decision_code = str(decision.get("decision") or "MONITOR")
                 has_actionable_strategy = bool(
@@ -255,16 +327,20 @@ class AgentService:
                     or decision_estrategia.requires_swap
                     or decision_estrategia.requires_contract
                 )
-                low_confidence_defensive_execution = (
-                    decision_code == "INSUFFICIENT_DATA"
-                    and bool(decision_estrategia.requires_contract)
-                    and int(getattr(insight_obj, "risk_score", 0) or 0) >= 30
+                # Quité la salida `low_confidence_defensive_execution`, que
+                # permitía ejecutar con INSUFFICIENT_DATA. TERMINAL_DECISIONS lo
+                # impide sin importar las banderas de decision_estrategia.
+                # should_execute solo describe si la decisión sería accionable;
+                # este servicio nunca la ejecuta.
+                should_execute = (
+                    decision_code not in TERMINAL_DECISIONS
+                    and decision_code in ACTIONABLE_DECISIONS
+                    and has_actionable_strategy
                 )
-                should_execute = (decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy) or low_confidence_defensive_execution
 
                 agent_intent = "No action required"
                 if should_execute:
-                    agent_intent = "Protect funds due to elevated on-chain risk indicators"
+                    agent_intent = "Recommend protective review due to elevated on-chain risk indicators (no automatic execution)"
                 elif decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
                     agent_intent = "Monitoring only: strategy found no actionable on-chain mitigation."
                 elif decision_code == "INSUFFICIENT_DATA":
@@ -283,7 +359,8 @@ class AgentService:
                         "features": {
                             "profile_type": profile.type,
                             "profile_signals": profile.signals,
-                            "days_active": metrics.dias_activo,
+                            "days_observed": metrics.dias_observados,
+                            "complete_history": metrics.historial_completo,
                             "contract_interactions_pct": metrics.porcentaje_interacciones_contratos,
                         },
                         "risk_factors": risk_breakdown if isinstance(risk_breakdown, list) else [risk_breakdown],
@@ -292,74 +369,33 @@ class AgentService:
                 }
                 yield {"paso": "analysis_snapshot", "estado": "completed", "detalle": "Full analysis snapshot ready.", "data": report_snapshot, "source": source}
 
-                if not should_execute:
-                    detalle_final = decision.get("reasoning", "No action required.")
-                    motivo = "low_confidence" if decision_code == "INSUFFICIENT_DATA" else "decision_final"
-                    execution = False
-                    if decision_code == "INSUFFICIENT_DATA":
-                        detalle_final = "no_execution_due_to_low_confidence"
-                    if decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
-                        detalle_final = "No autonomous execution: strategy did not require transfer/swap/deploy."
-                        motivo = "no_actionable_strategy"
-                    yield {
-                        "paso": "decision_final",
-                        "estado": "completed",
-                        "detalle": detalle_final,
-                        "data": {
-                            "decision": decision_code,
-                            "contract_type": decision.get("contract_type"),
-                            "recommended_action": decision.get("recommended_action"),
-                            "execution": execution,
-                            "motivo": motivo,
-                            "simulation_mode": os.getenv("APP_ENV", "local") != "production",
-                        },
-                        "source": source,
-                    }
-                    return
-
-                effective_balance = self.budget.get_effective_balance_eth(wallet_addr)
-                if effective_balance <= 0:
-                    yield {
-                        "paso": "decision_final",
-                        "estado": "completed",
-                        "detalle": "Simulation mode — no funds at risk",
-                        "data": {
-                            "decision": "SIMULATION_ONLY",
-                            "recommended_action": "fund_agent_budget",
-                            "execution": False,
-                            "simulation_mode": True,
-                            "available_budget_eth": 0.0,
-                        },
-                        "source": source,
-                    }
-                    return
-
-                yield {"paso": "x402_validation", "estado": "starting", "detalle": "Verifying advanced report license (WDK x402)...", "source": source}
-                yield {"paso": "x402_validation", "estado": "completed", "detalle": "x402 license validated via USDC. Accessing advanced mitigations.", "source": source}
-
-                yield {"paso": "strategy_execution", "estado": "starting", "detalle": "Calculating mitigations and tactical reasoning...", "source": source}
-                es_simulacion = os.getenv("APP_ENV", "local") != "production"
-                decision_agente = DecisionAgente(
-                    contexto_analizado=f"Risk Score: {insight_obj.risk_score}, Activity: {insight_obj.activity_score}",
-                    evaluated_strategy=EstrategiaProteccionWallet.__name__,
-                    chosen_actions=decision_estrategia.actions,
-                    reason=decision_estrategia.detail,
-                    is_simulation=es_simulacion,
-                )
-                yield {"paso": "strategy_execution", "estado": "completed", "detalle": decision_estrategia.detail, "data": decision_agente.__dict__, "source": source}
-
-                lock_acquired = await asyncio.to_thread(self.lock_manager.acquire, wallet_addr)
-                if not lock_acquired:
-                    self.metrics.record_execution_blocked()
-                    yield {"paso": "execution_lock", "estado": "error", "detalle": "Wallet is currently being processed by another task.", "source": source}
-                    return
-
-                try:
-                    self.metrics.record_execution_triggered()
-                    async for ev in self._execute_with_esl(wallet_addr, decision_estrategia, decision, insight_obj, source, stream_mode=True):
-                        yield ev
-                finally:
-                    await asyncio.to_thread(self.lock_manager.release, wallet_addr)
+                # Nunca ejecuto desde aquí. Si la decisión habría sido accionable,
+                # lo informo como recomendación sin efecto on-chain.
+                detalle_final = decision.get("reasoning", "No action required.")
+                motivo = "low_confidence" if decision_code == "INSUFFICIENT_DATA" else "decision_final"
+                if decision_code == "INSUFFICIENT_DATA":
+                    detalle_final = "no_execution_due_to_low_confidence"
+                if decision_code in ACTIONABLE_DECISIONS and not has_actionable_strategy:
+                    detalle_final = "No autonomous execution: strategy did not require transfer/swap/deploy."
+                    motivo = "no_actionable_strategy"
+                if should_execute:
+                    detalle_final = "Recommendation only: this runtime is read-only and never executes on-chain actions."
+                    motivo = "read_only_runtime"
+                yield {
+                    "paso": "decision_final",
+                    "estado": "completed",
+                    "detalle": detalle_final,
+                    "data": {
+                        "decision": decision_code,
+                        "contract_type": decision.get("contract_type"),
+                        "recommended_action": decision.get("recommended_action"),
+                        "execution": False,
+                        "motivo": motivo,
+                        "read_only": True,
+                        "suggested_actions": list(decision_estrategia.actions) if should_execute else [],
+                    },
+                    "source": source,
+                }
             finally:
                 async with self._active_stream_wallets_lock:
                     self._active_stream_wallets.discard(wallet_addr)
@@ -394,114 +430,37 @@ class AgentService:
                         "defi": {"value": 0, "interpretation": "No engagement"},
                         "web3_index": {"value": 0, "interpretation": "N/A"},
                     },
-                    "metrics": {"total_transactions": 0, "eth_balance": 0.0, "days_active": 0, "tx_per_day": 0.0, "contract_interactions_pct": 0.0},
+                    "metrics": {"total_transactions": 0, "eth_balance": None, "days_observed": 0, "tx_per_day": 0.0, "contract_interactions_pct": 0.0},
+                    "data_quality": None,
                     "agent_decision": {"decision": "INSUFFICIENT_DATA", "reasoning": "invalid_wallet", "recommended_action": "monitor"},
                     "agent_metrics": self.metrics.to_dict(),
-                    "x402_payment": "validated",
-                }
+                        }
 
-            metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
+            try:
+                metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
+            except DatosNoDisponibles as error:
+                return self._reporte_no_disponible(wallet_addr, error.calidad)
             decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
             wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
             protocol_intel = self.protocol_intel.analyze(metrics, profile)
             signals = self.signal_detector.detect(wallet_intel, protocol_intel)
-            learning_summary = self.learning.summary()
             strategy_pick = self.strategy_engine.select(
                 signals,
                 decision,
                 wallet_intel,
-                learning_summary=learning_summary,
                 demo_mode=settings.AGENT_DEMO_MODE,
             )
             decision, decision_estrategia = self._apply_strategy_overlay(decision, decision_estrategia, strategy_pick, insight_obj)
+            decision = self._aplicar_calidad(decision, metrics)
             decision["signals"] = signals
             return self._build_report(wallet_addr, profile, scores_obj, scores_dict, risk_breakdown, metrics, decision, decision_estrategia)
         finally:
             self._semaphore.release()
 
-    async def _run_loop(self, wallet: str) -> Dict[str, Any]:
-        wallet_addr = wallet.lower()
-        self.metrics.record_run()
-
-        acquired = await self._acquire_semaphore(timeout_s=3.0)
-        if not acquired:
-            return {"status": "skipped", "reason": "system_busy"}
-        try:
-            locked = await asyncio.to_thread(self.lock_manager.is_locked, wallet_addr)
-            if locked:
-                return {"status": "skipped", "reason": "locked"}
-
-            metrics, profile, scores_obj, scores_dict, risk_breakdown, insight_obj = await self._analyze(wallet_addr)
-            decision, decision_estrategia = await self._decide(insight_obj, scores_dict, metrics)
-            wallet_intel = self.wallet_intel.analyze(wallet_addr, metrics, profile, scores_dict)
-            protocol_intel = self.protocol_intel.analyze(metrics, profile)
-            signals = self.signal_detector.detect(wallet_intel, protocol_intel)
-            learning_summary = self.learning.summary()
-            strategy_pick = self.strategy_engine.select(
-                signals,
-                decision,
-                wallet_intel,
-                learning_summary=learning_summary,
-                demo_mode=settings.AGENT_DEMO_MODE,
-            )
-            self.learning.record_signal(wallet_addr, signals, strategy_pick["strategy"])
-            decision, decision_estrategia = self._apply_strategy_overlay(decision, decision_estrategia, strategy_pick, insight_obj)
-            decision_code = str(decision.get("decision") or "MONITOR")
-            has_actionable_strategy = bool(
-                decision_estrategia.requires_funds_movement
-                or decision_estrategia.requires_swap
-                or decision_estrategia.requires_contract
-            )
-            low_confidence_defensive_execution = (
-                decision_code == "INSUFFICIENT_DATA"
-                and bool(decision_estrategia.requires_contract)
-                and int(getattr(insight_obj, "risk_score", 0) or 0) >= 30
-            )
-            effective_balance = self.budget.get_effective_balance_eth(wallet_addr)
-            should_execute = (decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and has_actionable_strategy) or low_confidence_defensive_execution
-            demo_force_first_execution = (
-                settings.AGENT_DEMO_MODE
-                and effective_balance > 0
-                and int(learning_summary.get("success_count", 0) or 0) == 0
-            )
-            if demo_force_first_execution and not should_execute:
-                decision["decision"] = "EXECUTE_BASIC"
-                decision["recommended_action"] = "explore"
-                decision["reasoning"] = "Demo bootstrap: first funded cycle executes a visible micro-transfer."
-                decision_estrategia.requires_execution = True
-                decision_estrategia.requires_funds_movement = True
-                decision_estrategia.requires_swap = False
-                decision_estrategia.requires_contract = False
-                setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), int(settings.DEMO_FORCE_TRANSFER_WEI)))
-                should_execute = True
-            if not should_execute:
-                if decision_code in {"EXECUTE_ADVANCED", "EXECUTE_BASIC"} and not has_actionable_strategy:
-                    return {"status": "no_action", "decision": decision_code, "why_not_acting": "No actionable strategy was generated for this wallet."}
-                return {"status": "no_action", "decision": decision_code, "why_not_acting": decision.get("reasoning")}
-            if effective_balance <= 0:
-                return {"status": "simulation_only", "reason": "no_budget"}
-
-            acquired = await asyncio.to_thread(self.lock_manager.acquire, wallet_addr)
-            if not acquired:
-                self.metrics.record_execution_blocked()
-                return {"status": "skipped", "reason": "locked"}
-
-            try:
-                self.metrics.record_execution_triggered()
-                result = {"status": "unknown"}
-                async for ev in self._execute_with_esl(wallet_addr, decision_estrategia, decision, insight_obj, "loop", stream_mode=False):
-                    if ev.get("paso") == "execution_final_status":
-                        result = ev.get("data", result)
-                    if ev.get("estado") == "error":
-                        return {"status": "error", "message": ev.get("detalle")}
-                return result
-            finally:
-                await asyncio.to_thread(self.lock_manager.release, wallet_addr)
-        finally:
-            self._semaphore.release()
-
     async def _analyze(self, wallet_addr: str) -> Tuple[Any, Any, Any, Dict[str, Any], Dict[str, Any], Any]:
-        datos_crudos = await asyncio.to_thread(self.cliente.obtener_datos_wallet, wallet_addr)
+        datos_crudos = await asyncio.to_thread(self.ingesta.obtener_datos_wallet, wallet_addr)
+        if datos_crudos.calidad is None or not datos_crudos.calidad.utilizable:
+            raise DatosNoDisponibles(datos_crudos.calidad)
         metrics = await asyncio.to_thread(self.extractor.extraer, datos_crudos)
         profile = self.clasificador.clasificar(metrics)
         scores_obj = self.scorer.calcular_scores(metrics)
@@ -531,204 +490,41 @@ class AgentService:
         return decision, decision_estrategia
 
     def _apply_strategy_overlay(self, decision: Dict[str, Any], decision_estrategia: Any, strategy_pick: Dict[str, Any], insight_obj: Any):
-        strategy_name = str(strategy_pick.get("strategy", "EXPLORE"))
+        """Attaches strategy metadata to a decision.
+
+        Antes este método podía convertir BLOCK/MONITOR/INSUFFICIENT_DATA en una
+        transferencia real EXECUTE_BASIC cuando había `force_execute`, y todas
+        las ramas de estrategia lo activaban. Quité ese override: aquí solo
+        anoto una decisión o, como máximo, bajo a MONITOR una decisión
+        "accionable" sin respaldo. Nunca subo una decisión a ejecutable.
+        """
+        strategy_name = str(strategy_pick.get("strategy", "NO_ACTION"))
         decision["strategy"] = strategy_name
         decision["strategy_reason"] = strategy_pick.get("reason")
         decision["strategy_confidence"] = float(strategy_pick.get("confidence", 0.55) or 0.55)
         decision["trigger_signals"] = list(strategy_pick.get("trigger_signals") or ["EXPLORE_TRIGGER"])
-        force_execute = bool(strategy_pick.get("force_execute"))
-        if settings.AGENT_DEMO_MODE:
-            force_execute = True
+
+        # TERMINAL: BLOCK / MONITOR / INSUFFICIENT_DATA can never become executable
+        # here, regardless of strategy_pick.force_execute or AGENT_DEMO_MODE.
+        if decision.get("decision") in TERMINAL_DECISIONS:
+            return decision, decision_estrategia
+
         has_actionable = bool(
             getattr(decision_estrategia, "requires_funds_movement", False)
             or getattr(decision_estrategia, "requires_swap", False)
             or getattr(decision_estrategia, "requires_contract", False)
         )
-        if force_execute and (decision.get("decision") in {"INSUFFICIENT_DATA", "MONITOR", "BLOCK"} or not has_actionable):
-            decision["decision"] = "EXECUTE_BASIC"
-            decision["recommended_action"] = "explore"
-            decision["reasoning"] = f"Strategy fallback applied: {strategy_name}. {strategy_pick.get('reason', '')}".strip()
-            decision_estrategia.requires_execution = True
-            decision_estrategia.requires_funds_movement = True
-            decision_estrategia.requires_swap = False
-            decision_estrategia.requires_contract = False
-            if "Execute explore transfer with risk limits" not in decision_estrategia.actions:
-                decision_estrategia.actions.append("Execute explore transfer with risk limits")
-            explore_transfer_wei = int(settings.DEMO_FORCE_TRANSFER_WEI) if settings.AGENT_DEMO_MODE else int(settings.SWAP_AMOUNT_WEI)
-            setattr(decision_estrategia, "cantidad_transferencia_wei", min(int(settings.SWAP_AMOUNT_WEI), explore_transfer_wei))
-            if int(getattr(insight_obj, "risk_score", 0) or 0) >= 80:
-                decision["recommended_action"] = "protect"
+        if decision.get("decision") in {"EXECUTE_BASIC", "EXECUTE_ADVANCED"} and not has_actionable:
+            # El motor juzgó accionable la wallet, pero la estrategia no encontró
+            # nada concreto. No invento una acción: bajo a MONITOR en lugar de
+            # forzar una transferencia.
+            decision["decision"] = "MONITOR"
+            decision["recommended_action"] = "monitor"
+            decision["reasoning"] = (
+                f"No concrete protective action available for strategy '{strategy_name}'. "
+                "Downgraded to MONITOR rather than forcing an action."
+            )
         return decision, decision_estrategia
-
-    async def _execute_with_esl(
-        self,
-        wallet_addr: str,
-        decision_estrategia: Any,
-        decision: Dict[str, Any],
-        insight_obj: Any,
-        source: str,
-        stream_mode: bool,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        yield {"paso": "execution_safety", "estado": "starting", "detalle": "Initializing Execution Safety Layer (ESL) guards...", "source": source}
-
-        runner = ExecutionRunner(self.wdk)
-        temp_agent = self.wdk._agente
-        def _read_chain_state():
-            agent_wallet_local = temp_agent.create_agent_wallet()
-            addr = agent_wallet_local["address"]
-            nonce = temp_agent.w3.eth.get_transaction_count(addr)
-            balance = temp_agent.get_balance()
-            block = temp_agent.w3.eth.block_number
-            return agent_wallet_local, nonce, balance, block
-
-        agent_wallet, current_nonce, current_balance, current_block = await asyncio.to_thread(_read_chain_state)
-
-        actions_data = self._gather_actions(decision_estrategia, decision, include_deploy=False)
-        plan = self.guard.create_plan(
-            wallet=wallet_addr,
-            actions_data=actions_data,
-            risk_score=insight_obj.risk_score,
-            block_number=current_block,
-            nonce=current_nonce,
-            balance=current_balance,
-        )
-
-        valid, reason = self.guard.validate_plan(
-            plan,
-            {"nonce": current_nonce, "balance": current_balance, "current_risk_score": insight_obj.risk_score, "simulation_success": os.getenv("APP_ENV", "local") != "production"},
-        )
-        if not valid:
-            yield {"paso": "execution_safety", "estado": "error", "detalle": f"Safety Guard Abort: {reason}", "source": source}
-            self.learning.record_outcome(wallet_addr, "aborted", str(decision.get("strategy", "EXPLORE")), 0.0)
-            yield {"paso": "execution_final_status", "data": {"status": "aborted", "reason": reason}}
-            return
-
-        yield {"paso": "execution_safety", "estado": "completed", "detalle": f"Safety checks passed. Fingerprint: {plan.fingerprint[:12]}...", "source": source}
-        yield {"paso": "simulation_passed", "estado": "completed", "detalle": "Execution simulation and ESL checks passed.", "data": {"fingerprint": plan.fingerprint}, "source": source}
-        yield {"paso": "execution_submitted", "estado": "starting", "detalle": f"Submitting {len(plan.actions)} actions to execution runner.", "data": {"actions": len(plan.actions)}, "source": source}
-
-        if plan.actions:
-            async for ev in self._run_runner_stream(runner, plan, source):
-                yield ev
-
-        if decision_estrategia.requires_contract:
-            contract_type = decision.get("contract_type") or getattr(insight_obj, "type", None) or "unknown"
-            yield {"paso": "contract_generation", "estado": "starting", "detalle": f"Creating Solidity code for {contract_type}...", "source": source}
-            source_code = generar_contrato(insight_obj)
-            yield {"paso": "contract_generation", "estado": "completed", "detalle": "Solidity code generated.", "data": {"code": source_code}, "source": source}
-
-            yield {"paso": "contract_compilation", "estado": "starting", "detalle": "Compiling smart contract...", "source": source}
-            compilado = await asyncio.to_thread(compilar_contrato_tool, source_code)
-            yield {"paso": "contract_compilation", "estado": "completed", "detalle": "Compilation successful (ABI/Bytecode ready).", "source": source}
-
-            _, current_nonce_2, current_balance_2, current_block_2 = await asyncio.to_thread(_read_chain_state)
-
-            deploy_actions = [
-                {
-                    "type": "DEPLOY",
-                    "params": {
-                        "compiled_contract": {
-                            "name": compilado.name,
-                            "abi": compilado.abi,
-                            "bytecode": compilado.bytecode,
-                            "source_code": getattr(compilado, "source_code", source_code),
-                        },
-                        "args_constructor": None,
-                    },
-                }
-            ]
-            deploy_plan = self.guard.create_plan(
-                wallet=wallet_addr,
-                actions_data=deploy_actions,
-                risk_score=insight_obj.risk_score,
-                block_number=current_block_2,
-                nonce=current_nonce_2,
-                balance=current_balance_2,
-            )
-            valid2, reason2 = self.guard.validate_plan(
-                deploy_plan,
-                {"nonce": current_nonce_2, "balance": current_balance_2, "current_risk_score": insight_obj.risk_score, "simulation_success": os.getenv("APP_ENV", "local") != "production"},
-            )
-            if not valid2:
-                yield {"paso": "contract_deployment", "estado": "error", "detalle": f"Safety Guard Abort: {reason2}", "source": source}
-                self.learning.record_outcome(wallet_addr, "aborted", str(decision.get("strategy", "EXPLORE")), 0.0)
-                yield {"paso": "execution_final_status", "data": {"status": "aborted", "reason": reason2}}
-                return
-
-            yield {"paso": "contract_deployment", "estado": "starting", "detalle": "Deploying to Sepolia network...", "source": source}
-            success_deploy = await asyncio.to_thread(runner.run, deploy_plan)
-            if not success_deploy:
-                yield {"paso": "contract_deployment", "estado": "error", "detalle": "Contract deployment failed.", "source": source}
-                self.learning.record_outcome(wallet_addr, "failed", str(decision.get("strategy", "EXPLORE")), 0.0)
-                yield {"paso": "execution_final_status", "data": {"status": "failed", "reason": "contract_deployment_failed"}}
-                return
-
-            deploy_action = deploy_plan.actions[0]
-            deployed_address = deploy_action.params.get("deployed_address")
-            tx_hash = deploy_action.tx_hash
-            yield {"paso": "contract_deployment", "estado": "completed", "detalle": f"Deployed at {deployed_address}", "source": source}
-
-            etherscan_url = f"{settings.ETHERSCAN_ADDRESS_BASE_URL.rstrip('/')}/{deployed_address}" if deployed_address else None
-            yield {
-                "paso": "contract_active",
-                "estado": "completed",
-                "detalle": "Contract verified and active.",
-                "data": {"address": deployed_address, "hash": tx_hash, "etherscan": etherscan_url},
-                "source": source,
-            }
-        else:
-            yield {"paso": "contract_active", "estado": "completed", "detalle": "Strategy executed without requiring contracts.", "source": source}
-
-        moved_eth = self._estimate_value_moved_eth(plan)
-        simulated_execution = False
-        if moved_eth <= 0 and settings.AGENT_DEMO_MODE:
-            moved_eth = float(settings.DEMO_SIMULATED_MOVED_ETH)
-            simulated_execution = True
-        if moved_eth > 0:
-            if not simulated_execution:
-                self.budget.consume(wallet_addr, moved_eth)
-        first_tx_hash = next((getattr(a, "tx_hash", None) for a in plan.actions if getattr(a, "tx_hash", None)), None)
-        self.learning.record_outcome(wallet_addr, "success", str(decision.get("strategy", "EXPLORE")), moved_eth, tx_hash=first_tx_hash)
-        yield {
-            "paso": "execution_value",
-            "estado": "completed",
-            "detalle": f"Moved {round(moved_eth, 8)} ETH" if not simulated_execution else f"Simulated execution moved {round(moved_eth, 8)} ETH",
-            "data": {
-                "moved_value_eth": round(moved_eth, 8),
-                "strategy": decision.get("strategy", "EXPLORE"),
-                "strategy_used": decision.get("strategy", "EXPLORE"),
-                "simulated": simulated_execution,
-            },
-            "source": source,
-        }
-        yield {"paso": "execution_verified", "estado": "completed", "detalle": "Execution verified and persisted." if not simulated_execution else "Simulated execution verified for demo mode.", "data": {"moved_eth": moved_eth, "moved_value_eth": moved_eth, "strategy_used": decision.get("strategy", "EXPLORE"), "simulated": simulated_execution}, "source": source}
-
-        yield {"paso": "execution_final_status", "data": {"status": "success", "last_fingerprint": plan.fingerprint, "moved_eth": moved_eth, "moved_value_eth": moved_eth, "strategy_used": decision.get("strategy", "EXPLORE"), "simulated": simulated_execution}}
-
-    async def _run_runner_stream(self, runner: ExecutionRunner, plan: Any, source: str) -> AsyncGenerator[Dict[str, Any], None]:
-        queue: asyncio.Queue = asyncio.Queue()
-        loop = asyncio.get_running_loop()
-
-        def on_step(step_name: str, status: str, data: dict):
-            loop.call_soon_threadsafe(queue.put_nowait, (step_name, status, data))
-
-        task = asyncio.create_task(asyncio.to_thread(runner.run, plan, on_step=on_step))
-
-        while True:
-            if task.done() and queue.empty():
-                break
-            try:
-                step_name, status, data = await asyncio.wait_for(queue.get(), timeout=0.1)
-            except asyncio.TimeoutError:
-                continue
-
-            detalle = str(data.get("detalle") or data.get("message") or "")
-            payload = dict(data)
-            payload.pop("detalle", None)
-            payload.pop("message", None)
-            yield {"paso": step_name, "estado": status, "detalle": detalle, "data": payload or None, "source": source}
-
-        await task
 
     def _build_report(
         self,
@@ -760,7 +556,9 @@ class AgentService:
             "metrics": {
                 "total_transactions": metrics.total_transacciones,
                 "eth_balance": metrics.balance_eth_actual,
-                "days_active": metrics.dias_activo,
+                "days_observed": metrics.dias_observados,
+                "first_observed_activity": metrics.primera_actividad_observada_timestamp or None,
+                "complete_history": metrics.historial_completo,
                 "tx_per_day": metrics.frecuencia_transacciones_por_dia,
                 "contract_interactions_pct": metrics.porcentaje_interacciones_contratos,
             },
@@ -768,29 +566,5 @@ class AgentService:
             "strategy": {"name": decision.get("strategy"), "reason": decision.get("strategy_reason"), "confidence": decision.get("strategy_confidence"), "trigger_signals": decision.get("trigger_signals", [])},
             "signals": decision.get("signals", []),
             "agent_metrics": self.metrics.to_dict(),
-            "x402_payment": "validated",
+            "data_quality": _calidad_de(metrics).a_dict() if _calidad_de(metrics) is not None else None,
         }
-
-    def _gather_actions(self, decision_estrategia: Any, decision: Dict[str, Any], include_deploy: bool) -> List[Dict[str, Any]]:
-        intended_actions: List[Dict[str, Any]] = []
-        strategy_used = str(decision.get("strategy", "EXPLORE"))
-        if decision_estrategia.requires_funds_movement:
-            transfer_wei = int(getattr(decision_estrategia, "cantidad_transferencia_wei", settings.SWAP_AMOUNT_WEI) or settings.SWAP_AMOUNT_WEI)
-            intended_actions.append({"type": "TRANSFER", "params": {"to": settings.SAFE_WALLET_ADDRESS, "value_wei": transfer_wei, "strategy_used": strategy_used}})
-        if decision_estrategia.requires_swap:
-            intended_actions.append({"type": "SWAP", "params": {"token_in": decision_estrategia.token_in, "token_out": decision_estrategia.token_out, "amount_wei": settings.SWAP_AMOUNT_WEI, "strategy_used": strategy_used}})
-        if include_deploy and decision_estrategia.requires_contract:
-            intended_actions.append({"type": "DEPLOY", "params": {"type": decision.get("contract_type", "unknown"), "strategy_used": strategy_used}})
-        return intended_actions
-
-    def _estimate_value_moved_eth(self, plan: Any) -> float:
-        moved_wei = 0
-        for action in getattr(plan, "actions", []):
-            params = getattr(action, "params", {}) or {}
-            if action.type == "TRANSFER":
-                moved_wei += int(params.get("value_wei") or 0)
-            elif action.type == "SWAP":
-                moved_wei += int(params.get("amount_wei") or 0)
-        if moved_wei <= 0:
-            return 0.0
-        return float(moved_wei / 1e18)

@@ -6,3 +6,26 @@ Dockerfile
 .git
 .gitignore
 .env
+.env.*
+!.env.example
+
+# Entornos y artefactos locales que no pertenecen a la imagen
+.venv
+**/__pycache__
+.pytest_cache
+web_app/dist
+
+# Estado operativo local: la imagen arranca sin él
+storage
+cache
+logs
+*.log
+backend_log.txt
+tracking.json
+tracking.json.lock
+watched_wallets.json
+executions.json
+health.json
+health_check.json
+contratos_deployados.json
+ops_backup

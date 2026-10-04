@@ -15,13 +15,13 @@ class EstrategiaProteccionWallet:
         self.cantidad_transferencia_wei = cantidad_transferencia_wei
 
     def evaluar(self, insight: InsightContrato) -> DecisionEstrategia:
-        """Evaluates the insight and determines protection strategy.
+        """Evalúo el insight y determino la estrategia de protección.
 
         Args:
-            insight: The analyzed context of the external wallet.
+            insight: Contexto analizado de la wallet externa.
 
         Returns:
-            DecisionEstrategia with required actions.
+            DecisionEstrategia con las acciones requeridas.
         """
         actions = []
         requires_contract = False
@@ -69,11 +69,14 @@ class EstrategiaProteccionWallet:
             actions.append("Deploy SignalLock contract")
             detail = "Medium risk detected. Deploying temporary passive lock."
         
-        # Strategy 4: Default Monitoring (Ensure insight.type is set)
+        # Strategy 4: Default - safe wallet, no protective action required.
+        #
+        # Antes esta rama siempre ponía requires_contract=True y cualquier
+        # wallet, incluso una segura, quedaba con una "estrategia accionable"
+        # en agent_service.py. Una wallet segura tiene que poder terminar sin
+        # ninguna acción.
         else:
-            requires_contract = True # Always provide a contract in the report for value
-            actions.append("Deploy GeneralMonitor contract")
-            detail = "Safe wallet behavior. Standard monitoring infrastructure suggested."
+            detail = "Safe wallet behavior. No protective action required."
 
         return DecisionEstrategia(
             requires_contract=requires_contract,

@@ -1,0 +1,90 @@
+{
+  "started_at": "2026-10-04T13:49:31-0300",
+  "steps": {
+    "levantar": {
+      "ok": true,
+      "seconds": 33.44,
+      "api_replicas": 2,
+      "migrate": "migrate exited 0",
+      "alembic_version": "0008",
+      "ready": {
+        "status": "ready"
+      }
+    },
+    "flujo": {
+      "ok": true,
+      "seconds": 2.69,
+      "health_factor": "1.225421528368654169",
+      "incident_wait_seconds": 1.05,
+      "detection_latency_seconds": {
+        "count": 1,
+        "p50": 0.34,
+        "p95": 0.34,
+        "max": 0.34
+      },
+      "delivery_latency_seconds": {
+        "count": 2,
+        "p50": 0.026,
+        "p95": 0.041,
+        "max": 0.041
+      },
+      "coverage": {
+        "accounts": 1,
+        "covered": 1,
+        "ratio": 1.0
+      },
+      "workers": {
+        "alive": 1,
+        "known": 1,
+        "last_seen_age_seconds": 0.873
+      }
+    },
+    "replicas": {
+      "ok": true,
+      "seconds": 1.59,
+      "requests_per_replica": {
+        "21ab998bf6ba": 20,
+        "280721f09c3c": 20
+      }
+    },
+    "reinicio": {
+      "ok": true,
+      "seconds": 27.94,
+      "api_ready_after_restart_seconds": 3.12,
+      "lease_seconds": 15,
+      "job_recovered_after_seconds": 15.59,
+      "last_job_done": true,
+      "active_incidents": 1,
+      "jobs": {
+        "done": 2
+      }
+    },
+    "proveedor_caido": {
+      "ok": true,
+      "seconds": 78.28,
+      "unavailable_after_seconds": 70.88,
+      "recovered_after_seconds": 2.06,
+      "provider_not_fresh_24h": {},
+      "job_errors_24h": {
+        "provider_error: ConnectionError": 1
+      },
+      "api_ready_during_outage": true,
+      "incident_still_open": true
+    },
+    "respaldo_y_restauracion": {
+      "ok": true,
+      "seconds": 33.39,
+      "dump": {
+        "seconds": 0.36,
+        "bytes": 90360
+      },
+      "restore_seconds": 1.58,
+      "recovery_seconds_measured": 21.31,
+      "fingerprint_equal": true,
+      "tables_compared": 20,
+      "alembic_version": "0008",
+      "login_after_restore": true
+    }
+  },
+  "finished_at": "2026-10-04T13:52:28-0300"
+}

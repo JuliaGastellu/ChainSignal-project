@@ -22,7 +22,7 @@
     --secondary-foreground: 210 20% 80%;
 
     --muted: 220 14% 14%;
-    --muted-foreground: 215 12% 50%;
+    --muted-foreground: 215 14% 66%;
 
     --accent: 172 66% 50%;
     --accent-foreground: 220 20% 6%;
@@ -64,6 +64,12 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
+  }
+
+  /* Foco visible para quien navega con teclado. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 

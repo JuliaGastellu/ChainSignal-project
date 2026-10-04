@@ -1,79 +1,136 @@
-import json
-import os
 import time
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from web3 import Web3
 
 from infra.config import settings
+from infra.red import SEPOLIA
+from infra.db import engine as default_engine
+from infra.db import get_session_factory, init_db
+from infra.db_models import AgentBudgetRecord, BudgetConsumptionRecord, ProcessedFundingTxRecord
 
 
 class AgentBudgetService:
-    def __init__(self):
-        self._path = Path("storage/agent_budget.json")
-        self._path.parent.mkdir(parents=True, exist_ok=True)
+    """Persisto presupuestos y transacciones de fondeo procesadas en la base
+    (infra/db.py) en lugar de storage/agent_budget.json, para que saldos y
+    deduplicación sobrevivan un reinicio.
+
+    get_effective_balance_eth sigue leyendo solo la fila de la wallet pedida y
+    nunca usa el saldo on-chain total de la wallet compartida del agente.
+    """
+
+    def __init__(self, engine_: Optional[Engine] = None):
+        self._engine = engine_ or default_engine
+        init_db(self._engine)
+        self._Session = get_session_factory(self._engine)
         self.w3 = Web3(Web3.HTTPProvider(settings.SEPOLIA_RPC_URL)) if settings.SEPOLIA_RPC_URL else None
 
-    def _load(self) -> Dict[str, Any]:
-        if not self._path.exists():
-            return {"budgets": {}, "processed_txs": {}}
-        try:
-            with self._path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict) and "budgets" in data:
-                    data.setdefault("processed_txs", {})
-                    return data
-        except Exception:
-            pass
-        return {"budgets": {}, "processed_txs": {}}
-
-    def _save(self, data: Dict[str, Any]) -> None:
-        tmp = self._path.with_suffix(".tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp, self._path)
+    @staticmethod
+    def _record_to_dict(record: AgentBudgetRecord) -> Dict[str, Any]:
+        return {
+            "wallet": record.wallet,
+            "agent_wallet": record.agent_wallet,
+            "balance_eth": record.balance_eth,
+            "spent_eth": record.spent_eth,
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "last_funding_tx": record.last_funding_tx,
+            "last_funding_amount_eth": record.last_funding_amount_eth,
+        }
 
     def get_budget(self, wallet: str) -> Dict[str, Any]:
         key = wallet.lower()
-        data = self._load()
-        item = data["budgets"].get(
-            key,
-            {
-                "wallet": key,
-                "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
-                "balance_eth": 0.0,
-                "spent_eth": 0.0,
-                "created_at": None,
-                "updated_at": None,
-                "last_funding_tx": None,
-                "last_funding_amount_eth": 0.0,
-            },
-        )
-        return item
+        with self._Session() as session:
+            record = session.get(AgentBudgetRecord, key)
+            if record is None:
+                return {
+                    "wallet": key,
+                    "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
+                    "balance_eth": 0.0,
+                    "spent_eth": 0.0,
+                    "created_at": None,
+                    "updated_at": None,
+                    "last_funding_tx": None,
+                    "last_funding_amount_eth": 0.0,
+                }
+            return self._record_to_dict(record)
 
     def get_effective_balance_eth(self, wallet: str) -> float:
-        stored_balance = float(self.get_budget(wallet).get("balance_eth", 0.0))
+        """Returns this wallet's own ledgered budget only.
+
+        Nunca debo caer en el saldo on-chain total de la wallet compartida del
+        agente. La versión anterior devolvía max(saldo_guardado, saldo_onchain)
+        y, como el saldo on-chain es el mismo para todas, cualquier wallet
+        parecía fondeada apenas otro cliente fondeaba la compartida: una fuga
+        entre clientes. Para visibilidad operativa uso
+        get_agent_wallet_onchain_balance_eth(), nunca para habilitar gasto.
+        """
+        return float(self.get_budget(wallet).get("balance_eth", 0.0))
+
+    def get_agent_wallet_onchain_balance_eth(self) -> Optional[float]:
+        """Solo para visibilidad operativa: saldo on-chain total de la wallet
+        compartida del agente. Nunca lo uso como saldo efectivo de una wallet
+        (ver get_effective_balance_eth)."""
         if not self.w3 or not self.w3.is_connected():
-            return stored_balance
+            return None
         try:
             onchain_wei = self.w3.eth.get_balance(settings.X402_PAYMENT_RECIPIENT)
-            onchain_eth = float(self.w3.from_wei(onchain_wei, "ether"))
-            return max(stored_balance, onchain_eth)
+            return float(self.w3.from_wei(onchain_wei, "ether"))
         except Exception:
-            return stored_balance
+            return None
 
-    def consume(self, wallet: str, amount_eth: float) -> None:
+    def consume(self, wallet: str, amount_eth: float, fingerprint: Optional[str] = None) -> None:
+        """Deducts amount_eth from wallet's ledgered budget.
+
+        Si recibo `fingerprint` (el plan al que pertenece el consumo), la
+        llamada es idempotente por fingerprint: un segundo consume() del mismo
+        plan no descuenta dos veces. Lo dejo opcional solo por compatibilidad;
+        los llamados de producción siempre deben pasarlo.
+        """
         if amount_eth <= 0:
             return
         key = wallet.lower()
-        data = self._load()
-        item = self.get_budget(key)
-        item["balance_eth"] = max(0.0, float(item.get("balance_eth", 0.0)) - float(amount_eth))
-        item["spent_eth"] = float(item.get("spent_eth", 0.0)) + float(amount_eth)
-        item["updated_at"] = time.time()
-        data["budgets"][key] = item
-        self._save(data)
+        with self._Session() as session:
+            if fingerprint:
+                already_consumed = session.get(BudgetConsumptionRecord, fingerprint)
+                if already_consumed is not None:
+                    return
+
+            record = session.get(AgentBudgetRecord, key)
+            if record is None:
+                record = AgentBudgetRecord(
+                    wallet=key,
+                    agent_wallet=settings.X402_PAYMENT_RECIPIENT,
+                    balance_eth=0.0,
+                    spent_eth=0.0,
+                    last_funding_amount_eth=0.0,
+                )
+                session.add(record)
+            record.balance_eth = max(0.0, float(record.balance_eth or 0.0) - float(amount_eth))
+            record.spent_eth = float(record.spent_eth or 0.0) + float(amount_eth)
+            record.updated_at = time.time()
+
+            if fingerprint:
+                session.add(
+                    BudgetConsumptionRecord(
+                        fingerprint=fingerprint,
+                        wallet=key,
+                        amount_eth=float(amount_eth),
+                        timestamp=time.time(),
+                    )
+                )
+                try:
+                    session.commit()
+                except IntegrityError:
+                    # Otro consume() concurrente del mismo fingerprint confirmó
+                    # primero: este descuento no debe aplicarse, así que revierto
+                    # todo en lugar de dejar el saldo a medio cambiar.
+                    session.rollback()
+                return
+
+            session.commit()
 
     def verify_and_fund(self, wallet: str, tx_hash: str) -> Dict[str, Any]:
         if not tx_hash or not tx_hash.startswith("0x"):
@@ -82,13 +139,16 @@ class AgentBudgetService:
             return {"ok": False, "message": "RPC unavailable for on-chain verification."}
 
         try:
-            data = self._load()
-            processed = data.get("processed_txs", {}) or {}
-            if tx_hash in processed:
-                key = wallet.lower()
-                item = self.get_budget(key)
-                funded_eth = float(processed[tx_hash].get("funded_eth", 0.0) or 0.0)
-                return {"ok": True, "message": "Funding tx already registered.", "budget": item, "funded_eth": funded_eth}
+            with self._Session() as session:
+                processed = session.get(ProcessedFundingTxRecord, tx_hash)
+                if processed is not None:
+                    item = self.get_budget(wallet)
+                    return {
+                        "ok": True,
+                        "message": "Funding tx already registered.",
+                        "budget": item,
+                        "funded_eth": float(processed.funded_eth),
+                    }
 
             receipt = self.w3.eth.get_transaction_receipt(tx_hash)
             tx = self.w3.eth.get_transaction(tx_hash)
@@ -104,58 +164,76 @@ class AgentBudgetService:
 
             funded_eth = float(self.w3.from_wei(value_wei, "ether"))
             key = wallet.lower()
-            item = self.get_budget(key)
-            item["balance_eth"] = float(item.get("balance_eth", 0.0)) + funded_eth
-            item["created_at"] = item.get("created_at") or time.time()
-            item["updated_at"] = time.time()
-            item["last_funding_tx"] = tx_hash
-            item["last_funding_amount_eth"] = funded_eth
-            data["budgets"][key] = item
-            data["processed_txs"][tx_hash] = {"wallet": key, "funded_eth": funded_eth, "timestamp": time.time()}
-            self._save(data)
+            now = time.time()
+            with self._Session() as session:
+                record = session.get(AgentBudgetRecord, key)
+                if record is None:
+                    record = AgentBudgetRecord(
+                        wallet=key,
+                        agent_wallet=settings.X402_PAYMENT_RECIPIENT,
+                        balance_eth=0.0,
+                        spent_eth=0.0,
+                        created_at=now,
+                        last_funding_amount_eth=0.0,
+                    )
+                    session.add(record)
+                record.balance_eth = float(record.balance_eth or 0.0) + funded_eth
+                if not record.created_at:
+                    record.created_at = now
+                record.updated_at = now
+                record.last_funding_tx = tx_hash
+                record.last_funding_amount_eth = funded_eth
+                session.add(
+                    ProcessedFundingTxRecord(tx_hash=tx_hash, wallet=key, funded_eth=funded_eth, timestamp=now)
+                )
+                session.commit()
+                item = self._record_to_dict(record)
             return {"ok": True, "message": "Agent budget funded.", "budget": item, "funded_eth": funded_eth}
         except Exception as e:
             return {"ok": False, "message": f"Funding verification error: {e}"}
 
-    def get_recent_funding_events(self, limit: int = 20) -> list[Dict[str, Any]]:
-        data = self._load()
-        events: list[Dict[str, Any]] = []
-        for wallet, item in (data.get("budgets", {}) or {}).items():
-            tx_hash = item.get("last_funding_tx")
-            updated_at = item.get("updated_at")
-            amount = float(item.get("last_funding_amount_eth", 0.0) or 0.0)
-            if not tx_hash or not updated_at:
-                continue
-            events.append(
-                {
-                    "wallet": wallet,
-                    "timestamp": updated_at,
-                    "type": "FUNDING",
-                    "status": "SUCCESS",
-                    "tx_hash": tx_hash,
-                    "value_moved_eth": amount,
-                    "reason": f"Funding received: +{amount} ETH",
-                    "strategy": "FUNDING",
-                    "simulated": False,
-                    "explorer": f"{settings.ETHERSCAN_TX_BASE_URL.rstrip('/')}/{tx_hash}",
-                }
+    def get_recent_funding_events(self, limit: int = 20) -> List[Dict[str, Any]]:
+        with self._Session() as session:
+            records = (
+                session.query(AgentBudgetRecord)
+                .filter(AgentBudgetRecord.last_funding_tx.isnot(None))
+                .all()
             )
+            events: List[Dict[str, Any]] = []
+            for item in records:
+                if not item.last_funding_tx or not item.updated_at:
+                    continue
+                amount = float(item.last_funding_amount_eth or 0.0)
+                events.append(
+                    {
+                        "wallet": item.wallet,
+                        "timestamp": item.updated_at,
+                        "type": "FUNDING",
+                        "status": "SUCCESS",
+                        "tx_hash": item.last_funding_tx,
+                        "value_moved_eth": amount,
+                        "reason": f"Funding received: +{amount} ETH",
+                        "strategy": "FUNDING",
+                        "simulated": False,
+                        "explorer": SEPOLIA.url_tx(item.last_funding_tx),
+                    }
+                )
         events_sorted = sorted(events, key=lambda e: float(e.get("timestamp") or 0.0), reverse=True)
         return events_sorted[:limit]
 
     def get_global_state(self) -> Dict[str, Any]:
-        data = self._load()
-        budgets = data.get("budgets", {})
-        total_balance = 0.0
-        total_spent = 0.0
-        funded_wallets = 0
-        for _, item in budgets.items():
-            bal = float(item.get("balance_eth", 0.0))
-            spent = float(item.get("spent_eth", 0.0))
-            total_balance += bal
-            total_spent += spent
-            if bal > 0:
-                funded_wallets += 1
+        with self._Session() as session:
+            records = session.query(AgentBudgetRecord).all()
+            total_balance = 0.0
+            total_spent = 0.0
+            funded_wallets = 0
+            for item in records:
+                bal = float(item.balance_eth or 0.0)
+                spent = float(item.spent_eth or 0.0)
+                total_balance += bal
+                total_spent += spent
+                if bal > 0:
+                    funded_wallets += 1
         return {
             "agent_wallet": settings.X402_PAYMENT_RECIPIENT,
             "funded_wallets": funded_wallets,

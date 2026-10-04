@@ -1,6 +1,6 @@
-"""Módulo de ingestión de datos on-chain."""
+"""Ingesta de datos on-chain con resultados tipados (E03)."""
 
-from .cliente_etherscan import ClienteEtherscan
-from .modelos import DatosWallet, Transaccion, TransferenciaToken
+from .modelos import DatosWallet, Token, Transaccion, TransferenciaToken
+from .resultados import Calidad, CalidadDatos, Motivo
 
-__all__ = ["ClienteEtherscan", "DatosWallet", "Transaccion", "TransferenciaToken"]
+__all__ = ["DatosWallet", "Token", "Transaccion", "TransferenciaToken", "Calidad", "CalidadDatos", "Motivo"]

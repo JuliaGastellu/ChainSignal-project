@@ -12,9 +12,33 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// Exijo este header en todas las rutas salvo /health.
+app.use((req, res, next) => {
+    if (req.path === '/health') return next();
+    const token = req.get('X-WDK-Token');
+    if (!token || token !== WDK_SERVICE_TOKEN) {
+        return res.status(401).json({ error: 'Missing or invalid X-WDK-Token header.' });
+    }
+    return next();
+});
+
 const PORT = process.env.WDK_PORT || 3001;
 const NETWORK = process.env.WDK_NETWORK || 'sepolia';
 const RPC_URL = process.env.WDK_RPC_URL || 'https://rpc.sepolia.org';
+
+// Antes este servicio aceptaba solicitudes de cualquiera que lo alcanzara y
+// varias rutas de escritura firmaban y emitían transacciones sin verificar al
+// llamador. No arranco sin secreto compartido y lo exijo en cada ruta
+// (ver requireServiceToken).
+const WDK_SERVICE_TOKEN = process.env.WDK_SERVICE_TOKEN;
+if (!WDK_SERVICE_TOKEN) {
+    console.error('[FATAL] WDK_SERVICE_TOKEN no configurado. El servicio WDK no arranca sin él.');
+    process.exit(1);
+}
+
+// Antes la seed del agente llegaba como campo JSON en cada escritura. Ahora la
+// leo una sola vez del entorno de este servicio y nunca la acepto en un body.
+const AGENT_SEED_PHRASE = process.env.AGENT_SEED_PHRASE;
 
 // Clases del SDK (se cargarán dinámicamente)
 let WalletAccountEvm, VeloraProtocolEvm, WalletAccountEvmErc4337;
@@ -57,6 +81,20 @@ async function getAccountForSeed(seed, useAA = false) {
     return new WalletAccountEvm(seed, "0'/0/0", { provider: RPC_URL });
 }
 
+// Derivo la cuenta firmante una vez, del AGENT_SEED_PHRASE de este servicio y
+// nunca de un body. La cacheo por useAA porque cambia el tipo de cuenta.
+const _agentAccountCache = {};
+async function getAgentAccount(useAA = false) {
+    const key = useAA ? 'aa' : 'eoa';
+    if (_agentAccountCache[key]) return _agentAccountCache[key];
+    if (!AGENT_SEED_PHRASE) {
+        throw new Error('AGENT_SEED_PHRASE no configurada en el entorno del servicio WDK.');
+    }
+    const account = await getAccountForSeed(AGENT_SEED_PHRASE, useAA);
+    _agentAccountCache[key] = account;
+    return account;
+}
+
 /**
  * Endpoint: Salud y estado del servicio
  */
@@ -76,10 +114,9 @@ app.get('/health', (req, res) => {
  */
 app.post('/wallet/create', async (req, res) => {
     try {
-        const { seedPhrase } = req.body;
-        if (!seedPhrase) return res.status(400).json({ error: "seedPhrase requerida" });
-
-        const account = await getAccountForSeed(seedPhrase);
+        // El llamador ya no envía seedPhrase: siempre devuelvo (o derivo en la
+        // primera llamada) la cuenta propia de este servicio.
+        const account = await getAgentAccount(Boolean(req.body && req.body.useAA));
         const address = await account.getAddress();
 
         console.log(`[OPERACION] Wallet obtenida: ${address}`);
@@ -118,12 +155,12 @@ app.get('/wallet/balance', async (req, res) => {
  */
 app.post('/wallet/send', async (req, res) => {
     try {
-        const { seedPhrase, to, valueWei, useAA } = req.body;
-        if (!seedPhrase || !to || !valueWei) {
-            return res.status(400).json({ error: "Faltan parámetros (seedPhrase, to, valueWei)" });
+        const { to, valueWei, useAA } = req.body;
+        if (!to || !valueWei) {
+            return res.status(400).json({ error: "Faltan parámetros (to, valueWei)" });
         }
 
-        const account = await getAccountForSeed(seedPhrase, useAA);
+        const account = await getAgentAccount(useAA);
         console.log(`[OPERACION] Enviando ${valueWei} Wei a ${to} (AA=${useAA || false})`);
 
         const tx = await account.transfer(to, BigInt(valueWei));
@@ -146,7 +183,7 @@ app.post('/swap/quote', async (req, res) => {
             return res.status(400).json({ error: "Faltan parámetros (tokenIn, tokenOut, amount)" });
         }
 
-        const account = await getAccountForSeed(process.env.AGENT_SEED_PHRASE);
+        const account = await getAgentAccount(false);
         const swapProtocol = new VeloraProtocolEvm(account, {
             swapMaxFee: BigInt(process.env.WDK_SWAP_MAX_FEE || "200000000000000")
         });
@@ -173,14 +210,13 @@ app.post('/swap/quote', async (req, res) => {
  */
 app.post('/swap/execute', async (req, res) => {
     try {
-        const { seedPhrase, tokenIn, tokenOut, amount, useAA } = req.body;
-        const seed = seedPhrase || process.env.AGENT_SEED_PHRASE;
+        const { tokenIn, tokenOut, amount, useAA } = req.body;
 
-        if (!seed || !tokenIn || !tokenOut || !amount) {
+        if (!tokenIn || !tokenOut || !amount) {
             return res.status(400).json({ error: "Faltan parámetros" });
         }
 
-        const account = await getAccountForSeed(seed, useAA);
+        const account = await getAgentAccount(useAA);
         const swapProtocol = new VeloraProtocolEvm(account, {
             swapMaxFee: BigInt(process.env.WDK_SWAP_MAX_FEE || "200000000000000")
         });
@@ -208,13 +244,16 @@ app.post('/swap/execute', async (req, res) => {
  */
 app.post('/contract/deploy', async (req, res) => {
     try {
-        const { seedPhrase, abi, bytecode, args } = req.body;
-        if (!seedPhrase || !abi || !bytecode) {
+        const { abi, bytecode, args } = req.body;
+        if (!abi || !bytecode) {
             return res.status(400).json({ error: "Faltan parámetros para el despliegue" });
+        }
+        if (!AGENT_SEED_PHRASE) {
+            return res.status(500).json({ error: "AGENT_SEED_PHRASE no configurada en el entorno del servicio WDK." });
         }
 
         const provider = new ethers.JsonRpcProvider(RPC_URL);
-        const wallet = ethers.HDNodeWallet.fromPhrase(seedPhrase.trim(), provider);
+        const wallet = ethers.HDNodeWallet.fromPhrase(AGENT_SEED_PHRASE.trim(), provider);
         const balance = await provider.getBalance(wallet.address);
         console.log(`[DEBUG] Dirección Deployer: ${wallet.address} (Saldo: ${ethers.formatEther(balance)} ETH)`);
         const factory = new ethers.ContractFactory(abi, bytecode, wallet);
@@ -237,14 +276,14 @@ app.post('/contract/deploy', async (req, res) => {
  */
 app.post('/contract/call', async (req, res) => {
     try {
-        const { seedPhrase, address, abi, method, args, value, useAA } = req.body;
-        if (!seedPhrase || !address || !abi || !method) {
+        const { address, abi, method, args, value, useAA } = req.body;
+        if (!address || !abi || !method) {
             return res.status(400).json({ error: "Faltan parámetros para llamar al contrato" });
         }
 
         // Se instancia el provider aquí para poder verificar el código del contrato
         const provider = new ethers.JsonRpcProvider(RPC_URL);
-        const account = await getAccountForSeed(seedPhrase, useAA);
+        const account = await getAgentAccount(useAA);
         const contract = new ethers.Contract(address, abi, account);
 
         console.log(`[OPERACION] Ejecutando ${method} en ${address}...`);
@@ -351,7 +390,7 @@ app.post('/skills/swap/quote', async (req, res) => {
             return res.status(503).json({ error: "Módulo VeloraProtocolEvm no disponible. SDK no inicializado." });
         }
 
-        const account = await getAccountForSeed(process.env.AGENT_SEED_PHRASE);
+        const account = await getAgentAccount(false);
         const swapProtocol = new VeloraProtocolEvm(account, {
             swapMaxFee: BigInt(process.env.WDK_SWAP_MAX_FEE || "200000000000000")
         });
@@ -384,13 +423,12 @@ app.post('/skills/swap/quote', async (req, res) => {
 app.post('/skills/swap/execute', async (req, res) => {
     try {
         const { tokenIn, tokenOut, amount, useAA } = req.body;
-        const seed = process.env.AGENT_SEED_PHRASE;
 
         if (!tokenIn || !tokenOut || !amount) {
             return res.status(400).json({ error: "Faltan parámetros (tokenIn, tokenOut, amount)" });
         }
 
-        if (!seed) {
+        if (!AGENT_SEED_PHRASE) {
             return res.status(400).json({ error: "AGENT_SEED_PHRASE no configurada en el entorno" });
         }
 
@@ -398,7 +436,7 @@ app.post('/skills/swap/execute', async (req, res) => {
             return res.status(503).json({ error: "Módulo VeloraProtocolEvm no disponible. SDK no inicializado." });
         }
 
-        const account = await getAccountForSeed(seed, useAA || false);
+        const account = await getAgentAccount(useAA || false);
         const swapProtocol = new VeloraProtocolEvm(account, {
             swapMaxFee: BigInt(process.env.WDK_SWAP_MAX_FEE || "200000000000000")
         });

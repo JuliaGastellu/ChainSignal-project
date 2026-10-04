@@ -8,7 +8,7 @@ from generacion_features.extractor import FeaturesWallet
 
 @dataclass
 class PerfilWallet:
-    """Classified wallet profile with type and support signals."""
+    """Perfil clasificado de la wallet, con tipo y señales de respaldo."""
 
     type: str
     confidence: str
@@ -30,7 +30,7 @@ class ClasificadorWallet:
     UMBRAL_WHALE_BALANCE = 50.0
 
     def clasificar(self, features: FeaturesWallet) -> PerfilWallet:
-        """Applies classification rules and returns the wallet profile."""
+        """Aplico las reglas de clasificación y devuelvo el perfil de la wallet."""
         puntajes = {
             "defi_power_user": self._evaluar_defi_power_user(features),
             "protocol_explorer": self._evaluar_protocol_explorer(features),
@@ -98,7 +98,8 @@ class ClasificadorWallet:
 
     def _evaluar_lp_candidate(self, f: FeaturesWallet) -> int:
         puntaje = 0
-        if f.balance_eth_actual >= 5.0:
+        # Sin balance leído no sumo ni resto: no lo trato como cero.
+        if f.balance_eth_actual is not None and f.balance_eth_actual >= 5.0:
             puntaje += 1
         if f.porcentaje_interacciones_contratos >= 50 and f.tokens_unicos_utilizados >= 5:
             puntaje += 2
@@ -112,17 +113,18 @@ class ClasificadorWallet:
             puntaje += 2
         if f.porcentaje_interacciones_contratos >= 70:
             puntaje += 1
-        if f.tokens_unicos_utilizados >= 10 and f.balance_eth_actual < 0.5:
+        if f.tokens_unicos_utilizados >= 10 and f.balance_eth_actual is not None and f.balance_eth_actual < 0.5:
             puntaje += 2
         return puntaje
 
     def _evaluar_long_term_holder(self, f: FeaturesWallet) -> int:
         puntaje = 0
-        if f.dias_activo >= 365:
+        # Observar actividad de hace un año prueba al menos un año de vida.
+        if f.dias_observados >= 365:
             puntaje += 2
         if f.frecuencia_transacciones_por_dia <= 0.05:
             puntaje += 1
-        if f.balance_eth_actual >= 1.0:
+        if f.balance_eth_actual is not None and f.balance_eth_actual >= 1.0:
             puntaje += 1
         if f.porcentaje_transacciones_recientes <= 10:
             puntaje += 1
@@ -159,8 +161,8 @@ class ClasificadorWallet:
             senales.append("High recent activity (last 30 days)")
         if f.transacciones_con_error > 5:
             senales.append("Presence of failed transactions")
-        if f.dias_activo > 365:
-            senales.append("Veteran wallet (active for more than 1 year)")
+        if f.dias_observados > 365:
+            senales.append("Activity observed over more than 1 year")
         
         return senales
 

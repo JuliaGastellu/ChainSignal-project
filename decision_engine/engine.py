@@ -1,4 +1,4 @@
-"""Deterministic decision engine for the AI agent."""
+"""Motor de decisión determinístico del agente."""
 from loguru import logger
 
 class DecisionEngine:
@@ -6,8 +6,8 @@ class DecisionEngine:
 
     def evaluate(self, scores: dict, metrics: dict = None):
         """
-        Evaluates whether a financial action (transfer or contract) should be executed.
-        Confidence is proportional to data volume and profile quality.
+        Evalúo si corresponde ejecutar una acción financiera (transferencia o contrato).
+        La confianza crece con el volumen de datos y la calidad del perfil.
         """
         if not scores:
             return {

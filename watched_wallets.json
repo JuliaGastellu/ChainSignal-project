@@ -7,6 +7,14 @@
       "last_analyzed": "2026-03-22T23:13:21.165042+00:00",
       "last_signal": "MONITOR",
       "times_flagged": 0
+    },
+    {
+      "address": "0x000000000000000000000000000000000000aa",
+      "label": "",
+      "added_at": "2026-08-07T19:26:31.828744+00:00",
+      "last_analyzed": null,
+      "last_signal": null,
+      "times_flagged": 0
     }
   ]
 }

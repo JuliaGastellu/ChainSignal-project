@@ -53,8 +53,13 @@ class TestHerramientaGenerarContrato:
 
 
 class TestHerramientaCompilarContrato:
+    @pytest.mark.integration
     def test_compilar_risk_guard(self):
-        """Verifica que la compilación del contrato RiskGuard produce ABI y bytecode."""
+        """Verifica que la compilación del contrato RiskGuard produce ABI y bytecode.
+
+        Es integración manual: py-solc-x descarga solc 0.8.20 de
+        binaries.soliditylang.org si no está en la caché local.
+        """
         from tools.herramienta_generar_contrato import generar_contrato
         from tools.herramienta_compilar_contrato import compilar_contrato_tool
 

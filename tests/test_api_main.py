@@ -1,10 +1,8 @@
-from fastapi.testclient import TestClient
-
-from api.main import app
+from tests.ayudantes_identidad import iniciar_sesion
 
 
-def test_ejecutar_agente_wallet_nula_retorna_datos_insuficientes():
-    client = TestClient(app)
+def test_ejecutar_agente_wallet_nula_retorna_datos_insuficientes(organizacion):
+    client = iniciar_sesion(organizacion[1])
     response = client.get("/ejecutar-agente/0x0000000000000000000000000000000000000000")
 
     assert response.status_code == 200

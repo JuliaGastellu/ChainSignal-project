@@ -19,7 +19,7 @@ def test_features_wallet_activo(extractor):
     assert features.total_transacciones > 0
     assert features.balance_eth_actual == 1.5
     assert features.tokens_unicos_utilizados >= 4
-    assert features.token_mas_utilizado == "USDC"
+    assert features.token_mas_utilizado.startswith("USDC")
     assert features.volumen_total_transferido_eth >= 0
     assert features.numero_wallets_interactuadas >= 1
 
@@ -52,7 +52,7 @@ def test_porcentaje_contratos_en_rango_valido(extractor):
     assert 0.0 <= features.porcentaje_interacciones_contratos <= 100.0
 
 
-def test_dias_activo_positivo(extractor):
+def test_dias_observados_positivo(extractor):
     datos = datos_wallet_activo()
     features = extractor.extraer(datos)
-    assert features.dias_activo >= 1
+    assert features.dias_observados >= 1

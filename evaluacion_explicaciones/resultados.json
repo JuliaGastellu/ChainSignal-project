@@ -1,0 +1,106 @@
+{
+  "muestra": 50,
+  "plantilla": {
+    "fieles": 50,
+    "utiles": 50,
+    "por_categoria": {
+      "alarma": {
+        "casos": 8,
+        "fieles": 8,
+        "utiles": 8
+      },
+      "cifras_contradictorias": {
+        "casos": 7,
+        "fieles": 7,
+        "utiles": 7
+      },
+      "datos_parciales": {
+        "casos": 7,
+        "fieles": 7,
+        "utiles": 7
+      },
+      "deuda_cero": {
+        "casos": 6,
+        "fieles": 6,
+        "utiles": 6
+      },
+      "fuentes_atrasadas": {
+        "casos": 7,
+        "fieles": 7,
+        "utiles": 7
+      },
+      "metadatos_maliciosos": {
+        "casos": 7,
+        "fieles": 7,
+        "utiles": 7
+      },
+      "normalidad": {
+        "casos": 8,
+        "fieles": 8,
+        "utiles": 8
+      }
+    },
+    "fallas": []
+  },
+  "validador_mutaciones": {
+    "cifra_inventada": {
+      "casos": 50,
+      "detectadas": 50
+    },
+    "referencia_inexistente": {
+      "casos": 50,
+      "detectadas": 50
+    },
+    "sin_referencia": {
+      "casos": 50,
+      "detectadas": 50
+    },
+    "consejo_operar": {
+      "casos": 50,
+      "detectadas": 50
+    },
+    "cambio_politica": {
+      "casos": 50,
+      "detectadas": 50
+    },
+    "reaseguro": {
+      "casos": 46,
+      "detectadas": 46
+    },
+    "hex_inventado": {
+      "casos": 50,
+      "detectadas": 50
+    },
+    "url": {
+      "casos": 50,
+      "detectadas": 50
+    },
+    "schema": {
+      "casos": 50,
+      "detectadas": 50
+    },
+    "comparacion_invertida": {
+      "casos": 20,
+      "detectadas": 20
+    },
+    "omite_calidad": {
+      "casos": 23,
+      "detectadas": 23
+    },
+    "eco_metadato": {
+      "casos": 7,
+      "detectadas": 7
+    }
+  },
+  "validador_parafrasis": {
+    "reordenada_casos": 50,
+    "reordenada_rechazadas": 0,
+    "redondeada_casos": 3,
+    "redondeada_rechazadas": 0
+  },
+  "modelo": {
+    "evaluado": false,
+    "motivo": "no llamé ningún modelo: es un servicio pago fuera del alcance de esta etapa",
+    "costo_real_usd": "0"
+  }
+}

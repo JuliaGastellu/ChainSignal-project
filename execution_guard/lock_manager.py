@@ -16,8 +16,8 @@ class WalletLockManager:
 
     def acquire(self, wallet: str, timeout: int = 10) -> bool:
         """
-        Attempts to acquire a lock for a wallet.
-        Returns True if successful, False otherwise.
+        Intento tomar el lock de una wallet.
+        Devuelvo True si lo consigo y False si no.
         """
         lock_path = self._get_lock_path(wallet)
         
@@ -40,7 +40,7 @@ class WalletLockManager:
             return False
 
     def release(self, wallet: str):
-        """Releases the lock for a wallet."""
+        """Libero el lock de una wallet."""
         lock_path = self._get_lock_path(wallet)
         try:
             if lock_path.exists():
@@ -52,7 +52,7 @@ class WalletLockManager:
         """Checks if a wallet is currently locked."""
         lock_path = self._get_lock_path(wallet)
         
-        # Check for stale lock (e.g., > 60 seconds for is_locked checks)
+        # Detecto locks vencidos (por ejemplo, más de 60 segundos en is_locked)
         if lock_path.exists():
             if time.time() - lock_path.stat().st_mtime > 60:
                 logger.warning(f"Removing stale lock for wallet {wallet} (is_locked check)")

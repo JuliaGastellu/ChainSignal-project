@@ -54,11 +54,13 @@ class BehavioralScorer:
                 "detail": "High frequency of outgoing transfers compared to receipts. Common in automated trading or fund drainage."
             })
             
-        if f.dias_activo < 30:
+        # Solo afirmo que una wallet es joven si observé su historial completo;
+        # con una ventana truncada, la primera actividad observada no es su edad.
+        if f.historial_completo and f.dias_observados < 30:
             breakdown.append({
                 "factor": "Young Wallet",
                 "severity": "medium",
-                "detail": f"Wallet is only {f.dias_activo} days old. Young wallets have less established behavioral history."
+                "detail": f"First observed activity is {f.dias_observados} days old and the full history was ingested."
             })
             
         if f.porcentaje_interacciones_contratos < 5:
@@ -107,7 +109,7 @@ class BehavioralScorer:
         elif f.transacciones_con_error > 5: puntos += 20
         
         if f.ratio_envios_vs_recepciones > 20: puntos += 30
-        if f.dias_activo < 30: puntos += 30 # Young wallets are riskier
+        if f.historial_completo and f.dias_observados < 30: puntos += 30  # joven, con historial completo
         
         valor = min(100, puntos)
         
@@ -119,7 +121,7 @@ class BehavioralScorer:
         return MetricaScoring(value=valor, interpretation=inter)
 
     def _score_defi(self, f: FeaturesWallet) -> MetricaScoring:
-        """Score for interaction with DeFi protocols and smart contracts."""
+        """Score de interacción con protocolos DeFi y contratos."""
         valor = min(100, int(f.porcentaje_interacciones_contratos))
         
         if valor >= 80: inter = "Fully immersed in DeFi protocols/Smart Contracts."
@@ -130,7 +132,7 @@ class BehavioralScorer:
         return MetricaScoring(value=valor, interpretation=inter)
 
     def _score_diversidad(self, f: FeaturesWallet) -> MetricaScoring:
-        """Score for diversity of tokens used on the network."""
+        """Score de diversidad de tokens usados en la red."""
         puntos = int(f.diversidad_tokens * 80)
         if f.tokens_unicos_utilizados > 20: puntos += 20
         elif f.tokens_unicos_utilizados > 5: puntos += 10
@@ -145,8 +147,8 @@ class BehavioralScorer:
         return MetricaScoring(value=valor, interpretation=inter)
 
     def _score_exploracion(self, f: FeaturesWallet) -> MetricaScoring:
-        """Score for protocol exploration and discovery."""
-        # Safety check for the attribute
+        """Score de exploración de protocolos."""
+        # Verifico que exista el atributo
         div = getattr(f, "diversidad_protocolos", 0.0)
         valor = min(100, int(div * 100))
         
@@ -159,7 +161,7 @@ class BehavioralScorer:
 
     def _calcular_indice_web3(self, scores: BehavioralScores) -> MetricaScoring:
         """Web3 Activity Index (normalized 0-100) based on multiple behavior metrics."""
-        # Weigh activity, defi, diversity and exploration for the global index
+        # Pondero actividad, DeFi, diversidad y exploración para el índice global
         weighted_score = (
             (scores.activity_score.value * 0.4) +
             (scores.defi_engagement.value * 0.3) +

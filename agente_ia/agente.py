@@ -1,10 +1,10 @@
-"""Deterministic analysis agent for ChainSignal.
+"""Agente de análisis determinístico de ChainSignal.
 
-Generates structured InsightContrato and optionally orchestrates with OpenClaw.
+Genera un InsightContrato estructurado a partir de métricas y perfil. Retiré la
+orquestación opcional con OpenClaw porque solo registraba un mensaje y no
+ejecutaba nada.
 """
 
-import os
-from loguru import logger
 from typing import Any
 
 from domain.modelos_contrato import InsightContrato
@@ -12,19 +12,6 @@ from domain.modelos_contrato import InsightContrato
 
 class AgenteAnalisis:
     """Deterministic agent that transforms features into an InsightContrato."""
-
-    def __init__(self):
-        self.modo_openclaw = os.getenv("OPENCLAW_ENABLED", "true").lower() in ("1", "true", "yes")
-        self.openclaw_disponible = False
-        try:
-            from openclaw import OpenClaw
-            self.openclaw_disponible = True
-            self.OpenClaw = OpenClaw
-            logger.info("OpenClaw available for tool orchestration.")
-        except Exception:
-            self.openclaw_disponible = False
-            self.OpenClaw = None
-            logger.info("OpenClaw not available; using local deterministic agent.")
 
     def analizar(self, metrics: Any, perfil: Any, wallet_addr: str = "unknown", scores: dict | None = None) -> InsightContrato:
         """Generates a structured InsightContrato without external HTTP calls."""
@@ -46,9 +33,6 @@ class AgenteAnalisis:
         )
 
         insight.recommended_action = accion
-
-        if self.modo_openclaw and self.openclaw_disponible:
-            self._orquestar_con_openclaw(insight, metrics, perfil)
 
         return insight
 
@@ -105,11 +89,11 @@ class AgenteAnalisis:
         return None
 
     def _decidir_tipo_contrato(self, risk: int, actividad: int, perfil: Any) -> str | None:
-        """Decides which contract type should be generated in the insight."""
+        """Decido qué tipo de contrato propone el insight."""
         return self._resolver_tipo_contrato(risk, actividad, perfil)
 
     def _determinar_accion(self, risk: int, actividad: int, perfil: Any) -> str:
-        """Main action suggestion for reporting in the insight."""
+        """Acción principal sugerida para el reporte del insight."""
         tipo = self._resolver_tipo_contrato(risk, actividad, perfil)
         if tipo == "risk_guard":
             return "protect"
@@ -118,12 +102,3 @@ class AgenteAnalisis:
         if tipo == "signal_lock":
             return "protect"
         return "monitor"
-
-    def _orquestar_con_openclaw(self, insight: InsightContrato, metrics: Any, perfil: Any) -> None:
-        """Optional orchestration log. Does not block deterministic flow."""
-        try:
-            client = self.OpenClaw()
-            logger.info("OpenClaw no-op: tool available for orchestration, no external model executed.")
-            # Here you could register tool wrappers if you want to extend the flow.
-        except Exception as e:
-            logger.warning("Could not start OpenClaw: {}", e)

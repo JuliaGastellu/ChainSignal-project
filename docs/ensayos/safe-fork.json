@@ -1,0 +1,52 @@
+{
+  "fork_block": 26120500,
+  "scenarios": {
+    "happy_path": {
+      "state": "CONFIRMADA",
+      "detail": "executed: 0x217d23c8ad169876eb730315a1cc5312e08c6fb5ec96f7700892150cd1c22d60",
+      "history": [
+        "PROPUESTA",
+        "APROBADA",
+        "INCIERTA",
+        "ENVIADA",
+        "CONFIRMADA"
+      ],
+      "simulated_changes": [
+        {
+          "token": "aWETH",
+          "delta": "+999999999999999998"
+        },
+        {
+          "token": "ETH",
+          "delta": "-1000000000000000000"
+        }
+      ],
+      "fee_estimate_wei": 28677745002780,
+      "mode": "ATOMICO_MULTISEND",
+      "ok": true
+    },
+    "receipt_without_effect": {
+      "receipt_status": 1,
+      "state": "FALLIDA",
+      "detail": "successful receipt without the expected effect; needs review",
+      "ok": true
+    },
+    "stale_and_altered": {
+      "stale_errors": [
+        "stale_simulation"
+      ],
+      "altered_errors": [
+        "approval_does_not_match_payload",
+        "stale_simulation"
+      ],
+      "ok": true
+    },
+    "nonce_used_by_other": {
+      "state": "FALLIDA",
+      "detail": "nonce used by another transaction",
+      "ok": true
+    }
+  },
+  "safe": "0xc3001E60E78e7829380026cE6D161bd30Cc4F170",
+  "all_ok": true
+}

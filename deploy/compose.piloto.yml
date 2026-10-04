@@ -1,0 +1,113 @@
+# Topología del piloto (E08): React estático + FastAPI + worker + PostgreSQL.
+#
+#   docker compose -f deploy/compose.piloto.yml up -d --build --scale api=2
+#
+# - `migrate` corre `alembic upgrade head` una vez y termina. La API y el
+#   worker arrancan después, con DB_AUTO_MIGRATE=false: solo verifican que el
+#   esquema esté en head.
+# - Cada proceso recibe solo sus variables. Ninguno recibe seed, token WDK ni
+#   destino de rescate. La clave del modelo de explicaciones solo la ve la API.
+# - Los secretos vienen del entorno de quien despliega (`${VAR:?}`), nunca de
+#   un archivo dentro de la imagen.
+# - TLS lo termina la plataforma delante de `web`. Con APP_ENV=production la
+#   API exige CORS https, cookie Secure y DATABASE_URL de PostgreSQL.
+#
+# No lo desplegué a producción: lo ensayé en local con deploy/compose.ensayo.yml.
+
+x-base: &base
+  image: chainsignal-api:${CHAINSIGNAL_VERSION:-local}
+  restart: unless-stopped
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+x-db: &db
+  DATABASE_URL: postgresql+psycopg2://chainsignal:${PILOTO_DB_PASSWORD:?definí PILOTO_DB_PASSWORD}@db:5432/chainsignal
+  DB_AUTO_MIGRATE: "false"
+  CHAINSIGNAL_DISABLE_DOTENV: "1"
+  CHAINSIGNAL_MODE: READ_ONLY
+  APP_ENV: ${APP_ENV:-production}
+  CHAIN_ID: "1"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chainsignal
+      POSTGRES_PASSWORD: ${PILOTO_DB_PASSWORD:?definí PILOTO_DB_PASSWORD}
+      POSTGRES_DB: chainsignal
+    volumes:
+      - piloto_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chainsignal -d chainsignal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: chainsignal-api:${CHAINSIGNAL_VERSION:-local}
+    build: ..
+    # alembic.ini usa rutas relativas: corro desde /app. El CLI de Alembic migra
+    # siempre; DB_AUTO_MIGRATE solo gobierna el arranque de la API y el worker.
+    working_dir: /app
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *db
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *base
+    environment:
+      <<: *db
+      ETHEREUM_RPC_URL: ${ETHEREUM_RPC_URL:-}
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?definí PUBLIC_ORIGIN}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
+      DEMO_ENABLED: ${DEMO_ENABLED:-true}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      AAVE_REPLAY_FIXTURE: ${AAVE_REPLAY_FIXTURE:-}
+      EXPLANATION_MODEL_ENABLED: ${EXPLANATION_MODEL_ENABLED:-false}
+      EXPLANATION_API_BASE: ${EXPLANATION_API_BASE:-}
+      EXPLANATION_API_KEY: ${EXPLANATION_API_KEY:-}
+      EXPLANATION_MODEL: ${EXPLANATION_MODEL:-}
+      EXPLANATION_PRICE_INPUT_USD_PER_MTOK: ${EXPLANATION_PRICE_INPUT_USD_PER_MTOK:-}
+      EXPLANATION_PRICE_OUTPUT_USD_PER_MTOK: ${EXPLANATION_PRICE_OUTPUT_USD_PER_MTOK:-}
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/ready', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    <<: *base
+    command: ["python", "-m", "worker_lectura"]
+    environment:
+      <<: *db
+      ETHEREUM_RPC_URL: ${ETHEREUM_RPC_URL:-}
+      AAVE_REPLAY_FIXTURE: ${AAVE_REPLAY_FIXTURE:-}
+      WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-5}
+    healthcheck:
+      test: ["CMD", "python", "-m", "operacion.vida_worker"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  web:
+    image: chainsignal-web:${CHAINSIGNAL_VERSION:-local}
+    build: ../web_app
+    restart: unless-stopped
+    ports:
+      - "${WEB_PUBLISHED_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  piloto_pgdata:

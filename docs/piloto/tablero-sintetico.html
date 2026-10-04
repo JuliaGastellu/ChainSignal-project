@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablero del piloto (SINTÉTICO)</title>
+<style>
+:root { --fondo:#ffffff; --texto:#111827; --borde:#d1d5db; --aviso:#92400e; --aviso-fondo:#fef3c7; }
+@media (prefers-color-scheme: dark) { :root { --fondo:#0f172a; --texto:#e5e7eb; --borde:#334155; --aviso:#fde68a; --aviso-fondo:#422006; } }
+body { background:var(--fondo); color:var(--texto); font-family:system-ui,sans-serif; margin:0 auto; max-width:900px; padding:16px; }
+table { border-collapse:collapse; width:100%; margin:8px 0 24px; } td,th { border-bottom:1px solid var(--borde); padding:6px; text-align:left; }
+.sintetico { background:var(--aviso-fondo); color:var(--aviso); border:2px solid var(--aviso); padding:12px; font-weight:700; margin-bottom:16px; }
+.tabla { overflow-x:auto; }
+</style></head><body>
+<div class="sintetico">DATOS SINTÉTICOS: pilotos inventados para mostrar el tablero. No son clientes, pagos ni renovaciones reales.</div>
+<h1>Tablero del piloto (SINTÉTICO)</h1>
+<p>Organizaciones (sin demos): 5. Activadas: 3 (account + first snapshot + policy + tested channel).</p>
+<p>Primer valor (mediana desde el alta hasta el primer snapshot): 30.0 min, n = 4.</p>
+<p>Recurrencia en semana 4: 2 de 2 organizaciones con 4 semanas o más. Activas en los últimos 7 días: 0.</p>
+<p><strong>Puerta comercial:</strong> 2 de 3 pilotos pagos y 1 de 2 renovaciones: no cumplida (SINTÉTICO: no cuenta para la decisión). Fuente: payment_records (confirmed payments only).</p>
+<p>Utilidad de alertas: pending: needs the client&#x27;s judgement on reviewed alerts (recorded by hand in the pilot log).</p>
+<h2>Embudo</h2><div class="tabla"><table><tr><th>Paso</th><th>Organizaciones</th><th>%</th></tr><tr><td>org_created</td><td>5</td><td>100 %</td></tr><tr><td>account_added</td><td>5</td><td>100 %</td></tr><tr><td>first_snapshot</td><td>4</td><td>80 %</td></tr><tr><td>policy_created</td><td>3</td><td>60 %</td></tr><tr><td>channel_tested</td><td>3</td><td>60 %</td></tr><tr><td>incident_reviewed</td><td>2</td><td>40 %</td></tr><tr><td>incident_acknowledged</td><td>1</td><td>20 %</td></tr></table></div>
+<h2>Por organización</h2><div class="tabla"><table><tr><th>Organización</th><th>Pasos</th><th>Estado</th><th>Pagos confirmados</th></tr><tr><td>[SINTÉTICO] Piloto A</td><td>org_created, account_added, first_snapshot, policy_created, channel_tested, incident_reviewed, incident_acknowledged</td><td>active</td><td>2</td></tr><tr><td>[SINTÉTICO] Piloto B</td><td>org_created, account_added, first_snapshot, policy_created, channel_tested, incident_reviewed</td><td>active</td><td>1</td></tr><tr><td>[SINTÉTICO] Piloto C</td><td>org_created, account_added, first_snapshot, policy_created, channel_tested</td><td>expired</td><td>0</td></tr><tr><td>[SINTÉTICO] Piloto D</td><td>org_created, account_added, first_snapshot</td><td>trialing</td><td>0</td></tr><tr><td>[SINTÉTICO] Piloto E</td><td>org_created, account_added</td><td>trialing</td><td>0</td></tr></table></div>
+</body></html>

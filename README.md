@@ -1,196 +1,85 @@
-﻿# ChainSignal Autonomous On-Chain Agent
+# ChainSignal
 
-ChainSignal is an autonomous deterministic agent that analyzes on-chain wallet behavior, generates structured mitigation insights, and executes protective operations through the Tether Wallet Development Kit (WDK).
+Desarrollo ChainSignal para analizar actividad on-chain y construir monitoreo de posiciones DeFi con evidencia, alertas y seguimiento. Quiero ayudar a pequeños equipos a revisar sus posiciones sin custodiar sus fondos.
 
-## Product Definition
+## Mi estado actual
 
-ChainSignal is an autonomous capital intelligence agent:
+Tengo un prototipo FastAPI, React/Vite, ingestión Etherscan, clasificación por reglas y circuitos experimentales testnet. Hay mejoras de seguridad y persistencia en el checkout, pero todavía no lo considero listo para recibir u operar capital de clientes.
 
-- Wallet/Block input is an intelligence source.
-- Agent Wallet is the only execution actor.
-- The agent detects signals, selects strategy, executes safely, and learns from outcomes.
+Desde E01 la API y el worker corren en modo `READ_ONLY` por defecto: ninguna ruta puede firmar, transferir, hacer swap ni desplegar, y no necesitan seed, token WDK ni destino de rescate. Los experimentos de escritura en Sepolia quedan en experiments/, fuera del runtime. Describo el grafo de llamadas y las rutas deshabilitadas en [mi runtime de lectura](docs/RUNTIME_LECTURA.md). Desde E02 cada persona inicia sesión con una cookie HttpOnly y la API autoriza cada recurso privado por organización y rol (owner, operator, viewer); ya no existe la clave global. Lo detallo en [mi identidad](docs/IDENTIDAD.md). Desde E03 cada lectura on-chain informa su calidad (FRESH, STALE, PARTIAL o UNAVAILABLE), su bloque de referencia y su completitud, y no recomiendo acciones sin datos frescos ([mis datos](docs/DATOS.md)). Desde E04 leo posiciones de Aave V3 en Ethereum a un bloque explícito, las guardo como snapshots y las reconcilio con la fuente ([mis posiciones Aave](docs/POSICIONES_AAVE.md)). Desde E05 un worker independiente monitorea esas posiciones con jobs durables, reglas versionadas e incidentes con evidencia inmutable, y notifica por outbox sin enviar mensajes reales ([mi monitoreo](docs/MONITOREO.md)). Desde E06 la interfaz es un producto con cuatro secciones (Resumen, Posiciones, Incidentes y Configuración), alta de organización, demo sintética aislada y seguimiento de incidentes; lo verifico con E2E sobre un entorno aislado ([mi experiencia](docs/EXPERIENCIA.md)). Desde E07 cada incidente tiene una explicación por plantilla determinista, con referencias al snapshot, la regla y la evidencia; un modelo opcional (apagado por defecto) solo redacta esos hechos y se valida antes de mostrarse. Renombré el "aprendizaje" a historial y quité el sesgo que forzaba estrategias por cantidad de transacciones aceptadas ([mi evaluación](docs/EVALUACION_EXPLICACIONES.md)). Desde E08 el piloto tiene una topología revisable (nginx con React estático, API replicada, worker y PostgreSQL, con la migración como paso aparte), readiness, métricas operativas, CI y runbooks; ensayé en un staging local proveedor caído, reinicios, dos réplicas y restauración real de la base. No lo desplegué ([mi operación](docs/OPERACION.md)). Desde E09 hay un piloto comercial de lectura: prueba de 14 días, hasta 10 cuentas, límites aplicados en el backend, cancelación visible, cobro asistido (sin procesador real) y eventos de activación sin datos personales; el precio de USD 150 es una hipótesis y la puerta de 3 pilotos pagos y 2 renovaciones sigue en 0 ([mi piloto](docs/PILOTO.md)). E10 (propuestas Safe con firma humana) no está lista: como esas puertas no se cumplen, dejé un spike fuera del runtime, verificado con mocks, contra contratos oficiales y en un fork aislado ([mis propuestas Safe](docs/PROPUESTAS_SAFE.md)).
 
-## Architecture Overview
+## Mi evolución
 
-The system is organized as follows:
+Comienzo con lectura de Aave V3 en Ethereum, alertas y seguimiento por organización. Después evalúo propuestas simuladas con aprobación humana. Es mi objetivo, no funcionalidad ya implementada.
 
-1. Data ingestion and feature extraction from Etherscan.
-2. Behavioral profiling and risk scoring.
-3. Deterministic decision engine that outputs explicit actions.
-4. Agent orchestration for contract generation/execution.
-5. Execution gateway through WDK and ERC-4337.
+## Mi documentación
 
-## Technology Stack
+- [Mi baseline reproducible](docs/BASELINE.md): instalación, checks, resultados y bloqueos.
+- [Mi runtime de lectura](docs/RUNTIME_LECTURA.md): modo READ_ONLY, grafo de llamadas y rutas deshabilitadas.
+- [Mi identidad](docs/IDENTIDAD.md): organizaciones, roles, sesiones, migraciones y migración de configuración.
+- [Mis datos](docs/DATOS.md): red única, resultados tipados, ingesta con checkpoints y features honestas.
+- [Mis posiciones Aave](docs/POSICIONES_AAVE.md): adaptador Aave V3, snapshots, reconciliación y replay.
+- [Mi monitoreo](docs/MONITOREO.md): worker, jobs con lease, reglas, incidentes, outbox y SSE.
+- [Mi auditoría](CHAIN_SIGNAL_AUDIT.md).
+- [Mi estrategia comercial](docs/ESTRATEGIA_PRODUCTO.md).
+- [Mi plan de implementación](CHAIN_SIGNAL_IMPLEMENTATION_PLAN.md).
+- [Mi arquitectura objetivo](CHAIN_SIGNAL_TARGET_ARCHITECTURE.md).
+- [Mi guía del dashboard](docs/AUTONOMOUS_DASHBOARD.md).
+- [Mi experiencia comercial](docs/EXPERIENCIA.md): recorrido de activación, demo, estados, E2E y capturas.
+- [Mi explicación y evaluación](docs/EVALUACION_EXPLICACIONES.md): historial, explicación validada, 50 casos y plan de ML.
+- [Mi operación](docs/OPERACION.md): topología del piloto, salud, métricas, CI, ensayo en staging y [runbooks](docs/runbooks/).
+- [Mi piloto y monetización](docs/PILOTO.md): plan, límites, cobro asistido, analítica, tablero, [guía de entrevistas](docs/piloto/GUIA_ENTREVISTAS.md) y [registro](docs/piloto/REGISTRO_PILOTOS.md).
+- [Mis propuestas Safe](docs/PROPUESTAS_SAFE.md): spike E10 fuera del runtime, fuentes verificadas, estados y ensayo en fork.
+- [Mi interfaz web](web_app/README.md).
 
-- Python 3.x (FastAPI, Web3.py, HTTPX)
-- Node.js (WDK gateway service)
-- Tether WDK for wallet orchestration and ERC-4337
-- SSE frontend for real-time progress updates
+## Mi código
 
-## Setup
+Uso api/ para endpoints; ingestion_onchain/ y generacion_features/ para datos; perfil_wallet/, decision_engine/ y services/ para evaluación; infra/ para configuración/DB; web_app/src/ para React.
 
-Install dependencies:
+Mantengo los experimentos de escritura en experiments/, execution_guard/, wallet_controller/, agent_executor/, contract_generator/ y wdk_service/; todos exigen `CHAINSIGNAL_MODE=TESTNET_EXPERIMENT`. El monitoreo periódico corre en worker_lectura.py. La interfaz heredada en web_app/app.py quedó fuera del despliegue comercial (perfil `legado` del Compose de desarrollo). La topología del piloto está en [mi operación](docs/OPERACION.md).
 
-```bash
-pip install -r requirements.txt
-cd wdk_service && npm install
+## Cómo preparo desarrollo
+
+Uso Python 3.11 y Node 20 o superior.
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt -c constraints.txt
+Copy-Item .env.example .env
+Set-Location web_app
+npm ci
 ```
 
-Set required environment variables:
+`requirements.txt` lista solo dependencias directas con versión exacta y `constraints.txt` fija las transitivas que probé. `.env.example` no tiene secretos: en `READ_ONLY` no necesito ningún secreto para arrancar. WDK_SERVICE_TOKEN y SAFE_WALLET_ADDRESS solo los pide el experimento testnet. El esquema se aplica con migraciones de Alembic y creo la primera organización con `python -m identidad.cli crear-organizacion`. DATABASE_URL vacía cae en un SQLite temporal solo apto para desarrollo; Compose usa PostgreSQL.
 
-- APP_ENV (production/local)
-- ETHERSCAN_API_KEY
-- SEPOLIA_RPC_URL
-- AGENT_SEED_PHRASE
-- WDK_BUNDLER_URL
-- WDK_PAYMASTER_URL
+No guardo secretos en Git ni en VITE_*. Antes de conectar RPC/WDK/fondos resuelvo la lectura de E01.
 
-## Run
+## Qué comprobé
 
-Production:
+Al 4 de octubre de 2026, en Python 3.11 sobre Windows:
 
-```bash
-docker-compose up --build
+- 421 pruebas Python aprobadas, offline y sin leer mi `.env`, incluidas las de concurrencia contra PostgreSQL 16 (`CHAINSIGNAL_TEST_POSTGRES_URL`). Sin PostgreSQL, esas quedan omitidas.
+- Migraciones `0001`–`0009` de ida y vuelta en PostgreSQL y `alembic check` sin diferencias.
+- Frontend: `typecheck` y `lint` sin errores (7 advertencias en `ui/`), 45 pruebas de Vitest, build correcto y 11 escenarios E2E con Playwright sobre un entorno aislado.
+- Evaluación de explicaciones: 50 casos, plantilla fiel y útil en los 50.
+- Ensayo del piloto en staging local (`python -m operacion.ensayo_staging`): 6 de 6 pasos, con restauración real de la base.
+- Sin secretos en el historial ni en el árbol (gitleaks) y sin vulnerabilidades conocidas en dependencias Python ni altas en las de producción de la interfaz.
+
+```powershell
+python -m pytest
+Set-Location web_app
+npm run build
+npm test
+npm run lint
+npm run typecheck
+npm run e2e
 ```
 
-Local run:
+Las integraciones manuales (Etherscan, WDK, descarga de solc) viven en tests/integration/ o llevan la marca `integration` y solo corren con `CHAINSIGNAL_RUN_INTEGRATION=1 pytest -m integration`. No las corro con claves de firma ni fondos.
 
-```bash
-cd wdk_service && node server.js
-python -m uvicorn api.main:app --host 0.0.0.0 --port 8001
-```
+## Cómo interpreto resultados
 
-## API Documentation
+Mis scores son heurísticas, no probabilidades calibradas. Historial no es modelo entrenado; hash enviado no es confirmación; contrato de plantilla no protege por sí mismo una posición externa.
 
-- https://chainsignal-project.onrender.com/docs
-
-## Product Model: Target Wallet vs Agent Wallet
-
-- **Target Wallet**: wallet under analysis (read-only).
-- **Agent Wallet**: execution wallet controlled by the autonomous agent.
-- **Funds source**: agent actions use the agent budget, not the target wallet funds.
-
-The UI exposes this context explicitly through Wallet Context, Agent Summary, and Action Scope blocks.
-
-## API and UI
-
-The FastAPI backend provides:
-
-- `GET /run-agent/{wallet}` / `GET /ejecutar-agente/{wallet}` SSE analysis+decision+execution stream
-- `GET /events/sse/{wallet}` / `GET /events/sse?wallet=...` SSE aliases
-- `GET /report/{wallet}` full free analysis snapshot
-- `GET /analyze/wallet/{wallet}` wallet-level strategic analysis
-- `GET /analyze/block/{block_number}` block-level strategic analysis
-- `POST /agent/execute` trigger autonomous execution evaluation
-- `POST /agent/budget` assign budget from verified MetaMask tx hash
-- `GET /agent/budget/{wallet}` current budget for target wallet
-- `GET /agent/actions` recent autonomous actions
-- `GET /agent/state` global agent state and latest action
-- `GET /agent/learning` learning outcomes and signal history summary
-- `GET /agent/radar` tracked wallets radar for autonomous prioritization
-- `POST /track-wallet` add/update autonomous loop tracking
-- `GET /health` service and loop health
-
-The UI is served via FastAPI from `web_app/app.py` and uses SSE to display real-time progress.
-
-## SSE Event Payload Model
-
-All SSE events include contextual fields to avoid ambiguity:
-
-- `source`: `api` | `loop`
-- `agent_wallet`
-- `action_scope`: `{ target_wallet: "read_only", agent_wallet: "execution_enabled" }`
-- `decision_context`: `{ target_wallet, executor_wallet, funds_source }`
-
-Autonomous observability events:
-
-- `signal_detected`
-- `strategy_selected`
-- `simulation_passed`
-- `execution_submitted`
-- `execution_value`
-- `execution_verified`
-
-Final event is always guaranteed as `decision_final` or `execution_final_status`.
-
-## Operational Modes
-
-- Production mode (`APP_ENV=production`) executes real blockchain operations through ESL/WDK.
-- Simulation mode runs deterministic flows without real on-chain transactions.
-- If budget is empty, the agent returns `SIMULATION_ONLY` (no funds at risk).
-- Demo mode (`AGENT_DEMO_MODE=true`) lowers action thresholds and forces low-risk explore execution when budget is available.
-
-## Production Mode Requirements
-
-- [ ] APP_ENV=production
-- [ ] WDK active and reachable
-- [ ] Bundler configured
-- [ ] Paymaster configured
-
-## Decision System
-
-The deterministic decision engine returns explicit outputs:
-
-- `DATOS_INSUFICIENTES` (insufficient data)
-- `MONITOR`
-- `EXECUTE_BASIC`
-- `EXECUTE_ADVANCED`
-
-## Safety Guarantees
-
-- Invalid wallet inputs are rejected.
-- Execution only occurs when decision is actionable and budget is available.
-- Simulation mode is explicitly indicated.
-- ESL remains mandatory: idempotency, cooldown, nonce and exposure validation before execution.
-
-## Dashboard Flow
-
-Analyze & Monitor → Decision → ESL Validation → Autonomous Execution (if applicable) → Activity Feed
-
-Autonomous lifecycle:
-
-Observe → Analyze → Detect Signal → Select Strategy → Simulate → Execute → Verify → Learn
-
-## Demo Instructions
-
-1. Set `AGENT_DEMO_MODE=true`.
-2. Use **Fund Agent Wallet** panel and approve MetaMask transaction.
-3. Wait for status progression: `Transaction submitted` → `Waiting for funds` → `Funds received`.
-4. In demo mode, first funded wallet triggers immediate bootstrap execution.
-5. Verify timeline events: `signal_detected` → `strategy_selected` → `execution_submitted` → `execution_value` → `execution_verified`.
-6. Confirm Hero and Activity Feed show updated balance, moved capital, and simulated labels when applicable.
-
-## Funding Flow
-
-- Funding is signed only in MetaMask from the frontend.
-- Backend verifies tx receipt and recipient via `POST /agent/budget`.
-- Agent wallet is the sole execution wallet; analyzed wallet is intelligence input only.
-- On confirmed balance increase, UI triggers autonomous execution for the selected target wallet.
-- In demo mode, backend also triggers immediate bootstrap execution when no previous successful execution exists.
-
-## Runtime Configuration
-
-- `AGENT_DEMO_MODE`: enables high-frequency demo behavior and bootstrap execution.
-- `DEMO_FORCE_TRANSFER_WEI`: micro transfer amount used for forced first execution.
-- `DEMO_SIMULATED_MOVED_ETH`: moved value used when fallback execution is simulated.
-- `ETHERSCAN_TX_BASE_URL` / `ETHERSCAN_ADDRESS_BASE_URL`: explorer URL roots.
-- `VITE_API_BASE`: frontend API base override.
-- `VITE_DEFAULT_FUND_AMOUNT`: default amount in funding panel.
-
-## Panel Meanings
-
-- Agent Hero: balance, last action, PnL, runtime status.
-- Strategy Engine: chosen strategy, confidence, trigger signals.
-- Agent Intelligence Feed: detected signal stream with severity/confidence.
-- Wallet Radar: prioritized tracked wallets for loop execution.
-- Agent Activity Feed: executed/skipped actions with strategy and moved value.
-
-- Timeline: append-only and phase-colored.
-- ResultsPanel + AnalysisDashboard: full analysis, free, no premium gate.
-- SidePanel: autonomous status, safety semantics, treasury state.
-
-## References
-
-- ARCHITECTURE.md
-- AGENT_DESIGN.md
-- docs/AUTONOMOUS_DASHBOARD.md
+Preparé la baja revisable de los archivos operativos versionados, pero todavía no la apliqué. Debo elegir licencia raíz y definir privacidad/soporte antes de distribuir una versión cobrable.

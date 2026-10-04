@@ -70,7 +70,7 @@ class ExecutionPlan:
             self.expires_at = self.created_at + 600
 
     def generate_fingerprint(self) -> str:
-        """Generates a deterministic fingerprint for the plan."""
+        """Genero un fingerprint determinístico del plan."""
         # Sort actions to ensure same set of actions produces same fingerprint
         sorted_actions = sorted(
             [f"{a.type}:{json.dumps(a.params, sort_keys=True)}" for a in self.actions]
@@ -96,7 +96,7 @@ class ExecutionPlan:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ExecutionPlan':
-        """Reconstructs the plan from a dictionary."""
+        """Reconstruyo el plan desde un diccionario."""
         actions = [
             PlannedAction(
                 action_id=a["action_id"],

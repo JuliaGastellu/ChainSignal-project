@@ -7,7 +7,7 @@ from typing import Optional
 
 @dataclass
 class InsightContrato:
-    """Analysis context that triggers the generation of a contract."""
+    """Contexto de análisis que dispara la generación de un contrato."""
 
     type: Optional[str]
     analyzed_wallet: str

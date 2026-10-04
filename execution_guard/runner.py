@@ -5,6 +5,7 @@ from .models import ExecutionPlan, ExecutionLifecycle, ActionStatus, ExecutionMo
 from .persistence import PersistenceManager
 from services.servicio_wdk import ServicioWDK
 from domain.modelos_contrato import ContratoCompilado
+from infra.modo import exigir_escritura_experimental
 
 class ExecutionRunner:
     """Orchestrates the sequential execution of a validated plan."""
@@ -17,14 +18,25 @@ class ExecutionRunner:
         """
         Executes all steps in the plan.
         on_step: callback(step_name, status, data)
+
+        Solo corre en el experimento testnet: fuera de ese modo lanza
+        EscrituraDeshabilitada antes de tomar locks o tocar la base.
         """
+        exigir_escritura_experimental("ejecutar_plan")
         if not self.persistence.acquire_lock(plan.fingerprint):
             if on_step: on_step("execution_lock", "error", {"message": "Could not acquire lock"})
             return False
 
         try:
+            # El lock en archivo solo serializa llamadas de este host. Este
+            # reclamo en la base es el respaldo real contra dos ejecuciones del
+            # mismo fingerprint; lo uso además del lock, no en su lugar.
+            claimed, claim_reason = self.persistence.try_claim_plan(plan)
+            if not claimed:
+                if on_step: on_step("execution_lock", "error", {"message": f"Could not claim execution plan: {claim_reason}"})
+                return False
+
             plan.lifecycle = ExecutionLifecycle.EXECUTING
-            self.persistence.save_plan(plan)
             self.persistence.log_event(plan.fingerprint, "execution_started")
 
             for action in plan.actions:
@@ -126,6 +138,6 @@ class ExecutionRunner:
                 "final_balance": final_balance,
                 "verification_time": time.time()
             }
-            # In a real system, we'd wait for tx receipts and check events here.
+            # Un sistema real esperaría aquí los receipts y verificaría eventos (hallazgo A04).
         except Exception as e:
             logger.warning(f"Post-state verification failed: {e}")

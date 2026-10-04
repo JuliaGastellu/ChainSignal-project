@@ -1,0 +1,59 @@
+{
+  "verified_at": "2026-10-04T14:26:47-0300",
+  "block": 26120478,
+  "versions": {
+    "Safe 1.4.1": "1.4.1",
+    "GnosisSafe 1.3.0": "1.3.0"
+  },
+  "code": {
+    "MultiSendCallOnly 1.4.1": true,
+    "Aave V3 Pool": true,
+    "WETH": true,
+    "USDC": true
+  },
+  "hashes": [
+    {
+      "singleton": "0x41675C099F32341bf84BFc5382aF534df5C7461a",
+      "case": "supply WETH por MultiSend",
+      "nonce": 7,
+      "contract_hash": "0xf2df7b472a503ffcd4eab1bf5900c288d18d89391864f26e3cb0cc758bc0c0bd",
+      "match": true
+    },
+    {
+      "singleton": "0x41675C099F32341bf84BFc5382aF534df5C7461a",
+      "case": "repay USDC por MultiSend",
+      "nonce": 123456,
+      "contract_hash": "0x98ee286aef020d9db7c8bb950753ee0c6db9b81c2006991173a6c63404988ca9",
+      "match": true
+    },
+    {
+      "singleton": "0x41675C099F32341bf84BFc5382aF534df5C7461a",
+      "case": "una sola llamada",
+      "nonce": 0,
+      "contract_hash": "0xe0ee7fbf018180e92ccd76ed2188a417765e98739f73ee666f7f153ae56b0de0",
+      "match": true
+    },
+    {
+      "singleton": "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552",
+      "case": "supply WETH por MultiSend",
+      "nonce": 7,
+      "contract_hash": "0x6f3ce7359d11c95d33fb2d21d59610390aeec6fb1430aad01b8e8df1cee11ccd",
+      "match": true
+    },
+    {
+      "singleton": "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552",
+      "case": "repay USDC por MultiSend",
+      "nonce": 123456,
+      "contract_hash": "0x1dcd2316e2aa5251d788201f30cfc0b900d1f2a33a5ea9ae08d7253d0bb8f1f8",
+      "match": true
+    },
+    {
+      "singleton": "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552",
+      "case": "una sola llamada",
+      "nonce": 0,
+      "contract_hash": "0x79cc0c894ee0dc2a882f134c1798c0f4499e30844909d11a2375e1c34da3da8b",
+      "match": true
+    }
+  ],
+  "all_ok": true
+}

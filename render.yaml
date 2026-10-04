@@ -1,9 +1,71 @@
-services:
-  - type: web
-    name: chainsignal-api
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn api.main:app --host 0.0.0.0 --port 10000"
+# Blueprint del piloto para Render (E08). Lo dejo revisable; no lo apliqué.
+# Topología: interfaz estática servida por nginx + API privada + worker + PostgreSQL.
+# La interfaz y la API comparten origen: nginx hace de proxy hacia la API, que
+# es un servicio privado. Con orígenes distintos en onrender.com (sufijo
+# público) la cookie de sesión SameSite=Lax no viajaría en los fetch.
+# - La migración corre en preDeployCommand, una vez por despliegue, antes de
+#   reemplazar instancias; la API y el worker arrancan con DB_AUTO_MIGRATE=false.
+# - Los secretos (RPC, METRICS_TOKEN, clave del modelo) se cargan en el panel
+#   con sync: false; ninguno vive en este archivo. No hay seed ni token WDK.
+# - TLS lo termina la plataforma. El origen público va en CORS_ALLOWED_ORIGINS.
+
+databases:
+  - name: chainsignal-db
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+
+envVarGroups:
+  - name: chainsignal-lectura
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11
+      - key: APP_ENV
+        value: production
+      - key: CHAINSIGNAL_MODE
+        value: READ_ONLY
+      - key: CHAINSIGNAL_DISABLE_DOTENV
+        value: "1"
+      - key: DB_AUTO_MIGRATE
+        value: "false"
+      - key: CHAIN_ID
+        value: "1"
+      - key: ETHEREUM_RPC_URL
+        sync: false
+
+services:
+  - type: pserv
+    name: chainsignal-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    preDeployCommand: cd /app && alembic upgrade head
+    numInstances: 2
+    envVars:
+      - fromGroup: chainsignal-lectura
+      - key: DATABASE_URL
+        fromDatabase:
+          name: chainsignal-db
+          property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: METRICS_TOKEN
+        sync: false
+
+  - type: worker
+    name: chainsignal-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python -m worker_lectura
+    envVars:
+      - fromGroup: chainsignal-lectura
+      - key: DATABASE_URL
+        fromDatabase:
+          name: chainsignal-db
+          property: connectionString
+
+  - type: web
+    name: chainsignal-web
+    runtime: docker
+    dockerContext: ./web_app
+    dockerfilePath: ./web_app/Dockerfile
+    healthCheckPath: /ready
+    envVars:
+      - key: API_UPSTREAM
+        value: chainsignal-api:8001

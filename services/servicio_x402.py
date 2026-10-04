@@ -151,12 +151,12 @@ class ValidadorX402:
             logger.error(f"Error guardando hash usado (con lock): {e}")
 
     def esta_habilitado(self) -> bool:
-        """Returns True if x402 is enabled in the environment."""
+        """Devuelvo True si x402 está habilitado en el entorno."""
         valor = os.getenv("X402_ENABLED", "true").lower()
         return valor in ("true", "1", "yes")
 
     def extraer_hash_pago(self, headers: dict) -> Optional[str]:
-        """Extracts the payment hash from the X-Payment header."""
+        """Extraigo el hash de pago del header X-Payment."""
         return headers.get("x-payment") or headers.get("X-Payment")
 
     def validar(self, hash_pago: str) -> Tuple[bool, str]:

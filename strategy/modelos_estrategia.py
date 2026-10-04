@@ -6,7 +6,7 @@ from typing import List
 
 @dataclass
 class DecisionEstrategia:
-    """Represents the structured high-level decision of the agent."""
+    """Representa la decisión estructurada de alto nivel del agente."""
 
     requires_contract: bool
     requires_funds_movement: bool

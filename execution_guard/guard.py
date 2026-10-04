@@ -4,6 +4,12 @@ from loguru import logger
 from .models import ExecutionPlan, ExecutionLifecycle, ActionStatus
 from .persistence import PersistenceManager
 from infra.config import settings
+from infra.modo import escritura_habilitada
+
+POLITICA_ESTRICTA = "STRICT"
+# Solo para el experimento en Sepolia: escribo sin simulación previa, y lo
+# declaro así en el plan. Nunca es válida fuera de TESTNET_EXPERIMENT.
+POLITICA_TESTNET_SIN_SIMULACION = "TESTNET_UNSIMULATED"
 
 class ExecutionGuard:
     """Validates execution plans against safety and financial rules."""
@@ -31,7 +37,7 @@ class ExecutionGuard:
                         return False, f"Plan with fingerprint {plan.fingerprint[:10]} already executing."
 
             # 2. Cooldown Check
-            # (Simplified: check if any plan for this wallet was completed in the last COOLDOWN_BLOCKS)
+            # (Simplificado: reviso si algún plan de esta wallet terminó en los últimos COOLDOWN_BLOCKS)
             # In a real system, we'd check blockchain events or a more robust history.
             all_plans = self.persistence.get_all_plans()
             cooldown_period = getattr(settings, "COOLDOWN_SECONDS", 300) # 5 mins cooldown
@@ -61,12 +67,22 @@ class ExecutionGuard:
                 if plan.risk_score - current_state.get("current_risk_score", 100) > 10:
                     return False, f"Risk score dropped from {plan.risk_score} to {current_state.get('current_risk_score')}. Aborting."
 
-            # 6. Strict Simulation Policy (in Production)
-            if settings.APP_ENV == "production":
-                # This would ideally call a WDK dry-run or Tenderly simulation
-                # For now, we ensure the simulation_policy is respected.
-                if plan.context.simulation_policy == "STRICT" and not current_state.get("simulation_success", False):
-                    return False, "Strict simulation policy active, but no successful simulation was provided."
+            # 6. Política de simulación. Ya no depende de APP_ENV (A03): antes
+            # cualquier entorno distinto de production contaba como "simulación
+            # exitosa". STRICT exige evidencia de un simulador, que hoy ningún
+            # camino produce, así que ningún plan STRICT se aprueba.
+            politica = plan.context.simulation_policy
+            if politica == POLITICA_ESTRICTA:
+                evidencia = current_state.get("simulation_evidence")
+                if not (isinstance(evidencia, dict) and evidencia.get("provider") and evidencia.get("success") is True):
+                    return False, "Simulation policy STRICT requires verifiable simulation evidence; none was provided."
+            elif politica == POLITICA_TESTNET_SIN_SIMULACION:
+                if not escritura_habilitada():
+                    return False, "TESTNET_UNSIMULATED policy is only valid in CHAINSIGNAL_MODE=TESTNET_EXPERIMENT outside production."
+                if current_state.get("chain_id") != settings.SEPOLIA_CHAIN_ID:
+                    return False, f"TESTNET_UNSIMULATED policy requires chain_id {settings.SEPOLIA_CHAIN_ID}; got {current_state.get('chain_id')}."
+            else:
+                return False, f"Unknown simulation policy: {politica}."
 
             return True, "Validation successful."
 
@@ -74,7 +90,7 @@ class ExecutionGuard:
             logger.error(f"Guard validation error: {e}")
             return False, f"Guard internal error: {str(e)}"
 
-    def create_plan(self, wallet: str, actions_data: list, risk_score: int, block_number: int, nonce: int, balance: float) -> ExecutionPlan:
+    def create_plan(self, wallet: str, actions_data: list, risk_score: int, block_number: int, nonce: int, balance: float, simulation_policy: str = POLITICA_ESTRICTA) -> ExecutionPlan:
         """Helper to create a new plan with current state snapshot."""
         from .models import PlannedAction, ExecutionContext, ExecutionMode
         
@@ -90,7 +106,8 @@ class ExecutionGuard:
                 "block_number": block_number
             },
             max_exposure_per_execution=getattr(settings, "MAX_EXPOSURE_ETH", 0.5),
-            execution_mode=ExecutionMode.ATOMIC
+            execution_mode=ExecutionMode.ATOMIC,
+            simulation_policy=simulation_policy,
         )
         
         return ExecutionPlan(

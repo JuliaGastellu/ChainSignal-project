@@ -1,0 +1,5 @@
+# Dependencias para desarrollo y pruebas. No forman parte de la imagen de la API.
+#   pip install -r requirements-dev.txt -c constraints.txt
+-r requirements.txt
+
+pytest==9.0.2
