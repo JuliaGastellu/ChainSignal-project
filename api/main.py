@@ -42,6 +42,17 @@ async def lifespan(app: FastAPI):
     logger.info("Starting ChainSignal API in {} mode (no background loops).", settings.CHAINSIGNAL_MODE)
     from infra.db import engine, init_db
 
+    # Registro solo la ruta local para diagnosticar permisos, nunca credenciales.
+    if engine.dialect.name == "sqlite":
+        from pathlib import Path
+        import os
+
+        ruta_base = Path(engine.url.database).resolve()
+        logger.warning(
+            "Uso SQLite temporal: ruta={}, directorio_existe={}, directorio_escribible={}",
+            ruta_base, ruta_base.parent.exists(), os.access(ruta_base.parent, os.W_OK),
+        )
+
     # Con DB_AUTO_MIGRATE migro (desarrollo); sin él solo verifico que el
     # esquema esté en head y, si no, no arranco (E08).
     init_db(engine)
