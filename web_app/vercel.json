@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/registro", "destination": "/index.html" },
+    { "source": "/invitacion", "destination": "/index.html" },
+    { "source": "/app/:path*", "destination": "/index.html" }
+  ]
+}
